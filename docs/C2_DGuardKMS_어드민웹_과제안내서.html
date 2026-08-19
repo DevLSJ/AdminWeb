@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>솔루션 어드민 웹 개발 과제 안내서 · 수행자용</title>
+<style>
+  :root{
+    color-scheme: light;
+    --surface-1:#fcfcfb; --page:#f9f9f7;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --border:rgba(11,11,11,0.10);
+    --series-a:#2a78d6; --series-b:#eb6834;
+    --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
+    --chip:rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])){
+      color-scheme: dark;
+      --surface-1:#1a1a19; --page:#0d0d0d;
+      --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --border:rgba(255,255,255,0.10);
+      --series-a:#3987e5; --series-b:#d95926;
+      --chip:rgba(255,255,255,0.06);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-1:#1a1a19; --page:#0d0d0d;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --border:rgba(255,255,255,0.10);
+    --series-a:#3987e5; --series-b:#d95926;
+    --chip:rgba(255,255,255,0.06);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--page);color:var(--text-primary);
+    font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+    font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px 80px}
+
+  header.top{position:sticky;top:0;z-index:50;background:var(--surface-1);border-bottom:1px solid var(--border)}
+  .top-inner{max-width:1120px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .brand{font-weight:650;font-size:15px;letter-spacing:-0.01em}
+  .brand small{display:block;font-weight:400;font-size:12px;color:var(--muted);letter-spacing:0}
+  nav.sections{display:flex;gap:1px;margin-left:auto;flex-wrap:wrap}
+  nav.sections a{color:var(--text-secondary);text-decoration:none;font-size:12.5px;padding:6px 9px;border-radius:6px}
+  nav.sections a:hover{background:var(--chip);color:var(--text-primary)}
+  .theme-btn{background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:6px 10px;font-family:inherit}
+  .theme-btn:hover{color:var(--text-primary)}
+
+  section{margin-top:44px;scroll-margin-top:80px}
+  h2{font-size:19px;font-weight:650;margin:0 0 4px;letter-spacing:-0.01em}
+  h2 .num{color:var(--muted);font-weight:400;margin-right:8px}
+  h3.sh{font-size:14px;font-weight:650;margin:0 0 8px;letter-spacing:-0.01em}
+  .sub{color:var(--text-secondary);font-size:13px;margin:0 0 18px}
+  .card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:20px;overflow-x:auto}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.two-col{grid-template-columns:1fr}}
+  .two-col>*{min-width:0}
+
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--grid);border-radius:10px;overflow:hidden;margin-top:26px;border:1px solid var(--border)}
+  @media(max-width:760px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--surface-1);padding:16px 18px}
+  .tile .t-label{font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .tile .t-val{font-size:20px;font-weight:600;letter-spacing:-0.02em}
+  .tile .t-val small{font-size:12px;font-weight:400;color:var(--text-secondary);margin-left:3px}
+  .tile .t-note{font-size:11.5px;color:var(--text-secondary);margin-top:3px;font-variant-numeric:tabular-nums}
+
+  .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+  .sw-a{background:var(--series-a)} .sw-b{background:var(--series-b)}
+
+  .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:var(--grid);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+  @media(max-width:980px){.timeline{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:640px){.timeline{grid-template-columns:1fr}}
+  .tl-cell{background:var(--surface-1);padding:15px}
+  .tl-cell.design{background:var(--chip)}
+  .tl-cell .wk{font-size:11.5px;color:var(--muted)}
+  .tl-cell .ph{font-size:13.5px;font-weight:600;margin:2px 0 6px;letter-spacing:-0.01em}
+  .tl-cell .dt{font-size:11.5px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+  .tl-cell .tl-focus{font-size:12px;color:var(--text-secondary);margin-top:8px;padding-top:8px;border-top:1px solid var(--grid)}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:var(--chip);color:var(--text-secondary);margin-top:8px}
+
+  .box-title{font-size:12px;color:var(--muted);margin-bottom:7px}
+  ul.tight{margin:0;padding-left:18px}
+  ul.tight li{font-size:13px;margin-bottom:4px;color:var(--text-secondary)}
+  ul.tight li b{color:var(--text-primary);font-weight:600}
+
+  table.data{width:100%;border-collapse:collapse;font-size:13px}
+  table.data th,table.data td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
+  table.data th{font-size:11.5px;color:var(--muted);font-weight:500;white-space:nowrap}
+  table.data code{font-size:12px;background:var(--chip);padding:1px 5px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  table.data tr.opt td{color:var(--muted)}
+
+  .fsm{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-top:4px}
+  .fsm .st{border:1px solid var(--border);background:var(--chip);border-radius:7px;padding:7px 12px;font-size:12.5px;font-weight:600}
+  .fsm .ar{color:var(--muted);padding:0 9px;font-size:13px}
+  .fsm-note{font-size:12px;color:var(--muted);margin-top:9px}
+
+  .warnbox{border:1px solid var(--border);border-left:3px solid var(--critical);border-radius:8px;padding:13px 15px;background:var(--surface-1);margin-top:14px}
+  .warnbox.warn{border-left-color:var(--warning)}
+  .warnbox.ok{border-left-color:var(--good)}
+  .warnbox.info{border-left-color:var(--series-a)}
+  .warnbox .wt{font-size:12.5px;font-weight:600;margin-bottom:6px}
+
+  pre.code{background:var(--chip);border:1px solid var(--border);border-radius:7px;padding:12px 14px;font-size:12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow-x:auto;margin:8px 0 0;color:var(--text-secondary);line-height:1.75}
+  pre.code b{color:var(--text-primary);font-weight:600}
+  pre.diagram{font-size:12.5px;line-height:1.85}
+
+  .who{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--grid);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+  @media(max-width:700px){.who{grid-template-columns:1fr}}
+  .who .wcell{background:var(--surface-1);padding:16px}
+  .who .wname{font-size:15px;font-weight:650;display:flex;align-items:center;gap:8px;letter-spacing:-0.01em}
+  .who .wmeta{font-size:12px;color:var(--muted);margin-top:2px}
+  .who dl{margin:12px 0 0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px}
+  .who dt{color:var(--muted)}
+  .who dd{margin:0;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+  .who dd code{font-size:12px;background:var(--chip);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;font-size:12.5px}
+  .flow .fs{border:1px solid var(--border);border-radius:6px;padding:6px 10px;background:var(--chip)}
+  .flow .fa{color:var(--muted);padding:0 8px}
+
+  footer.pg{margin-top:56px;padding-top:20px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+  footer.pg a{color:var(--text-secondary)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">아이넵 솔루션 어드민 웹 개발 과제 안내서
+      <small>일학습병행 · 과제 수행자용 · 류재민프로 · 이성재프로</small>
+    </div>
+    <nav class="sections">
+      <a href="#overview">개요</a>
+      <a href="#schedule">일정</a>
+      <a href="#scope">기능·설계</a>
+      <a href="#masterkey">마스터키</a>
+      <a href="#protect">데이터 보호</a>
+      <a href="#present">발표</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" type="button">다크 모드</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ================= OVERVIEW ================= -->
+  <section id="overview" style="margin-top:0">
+    <div class="tiles">
+      <div class="tile">
+        <div class="t-label">전체 기간</div>
+        <div class="t-val">설계 3일<small>+ 구현 4주</small></div>
+        <div class="t-note">08/12(수) ~ 09/14(월)</div>
+      </div>
+      <div class="tile">
+        <div class="t-label">설계 단계</div>
+        <div class="t-val">3<small>일</small></div>
+        <div class="t-note">08/12(수) ~ 08/14(금)</div>
+      </div>
+      <div class="tile">
+        <div class="t-label">구현 단계</div>
+        <div class="t-val">4<small>주</small></div>
+        <div class="t-note">08/17(월) ~ 09/11(금)</div>
+      </div>
+      <div class="tile">
+        <div class="t-label">발표</div>
+        <div class="t-val">매주 월요일</div>
+        <div class="t-note">최종 발표 09/14(월)</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="box-title">과제 수행자 및 개발 환경</div>
+      <div class="who">
+        <div class="wcell">
+          <div class="wname"><span class="swatch sw-a"></span>류재민 프로</div>
+          <div class="wmeta">과제 수행자 1</div>
+          <dl>
+            <dt>개발 서버</dt><dd>192.168.200.52</dd>
+            <dt>애플리케이션 계정</dt><dd>dguard / <code>qwe123!@#</code></dd>
+            <dt>시스템 계정</dt><dd>root / <code>qwe123!@#</code></dd>
+          </dl>
+        </div>
+        <div class="wcell">
+          <div class="wname"><span class="swatch sw-b"></span>이성재 프로</div>
+          <div class="wmeta">과제 수행자 2</div>
+          <dl>
+            <dt>개발 서버</dt><dd>192.168.200.53</dd>
+            <dt>애플리케이션 계정</dt><dd>dguard / <code>qwe123!@#</code></dd>
+            <dt>시스템 계정</dt><dd>root / <code>qwe123!@#</code></dd>
+          </dl>
+        </div>
+      </div>
+      <div class="warnbox warn">
+        <div class="wt">개발 서버 사용 규칙</div>
+        <ul class="tight">
+          <li><b>각자 전용 서버</b> · 개별 수행 과제이므로 서버도 분리 운영한다</li>
+          <li><b>계정 용도 분리</b> · <code>root</code>는 설치·설정 전용, 애플리케이션 빌드·기동은 <code>dguard</code> 계정으로만 수행</li>
+          <li><b>비밀번호 변경</b> · 첫 접속 시 각자 비밀번호를 변경한다</li>
+          <li><b>구성</b> · 본인에게 효율적인 방식으로 자유롭게 구성한다 (예: 로컬 IDE 개발, VS Code Remote SSH)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="two-col">
+        <div>
+          <div class="box-title">과제 주제</div>
+          <p style="margin:0 0 10px;font-size:13.5px;color:var(--text-secondary)">
+            아이넵의 <b style="color:var(--text-primary)">통합키관리(D'GuardKMS)</b>를 학습용으로 축소한
+            <b style="color:var(--text-primary)">암호키 관리 어드민 웹</b>을 본체로 구축하고,
+            여기에 어드민의 기본기인 <b style="color:var(--text-primary)">사용자 관리</b>와
+            <b style="color:var(--text-primary)">게시판(공지사항 · 파일 업로드/다운로드)</b>을 얹는다.
+          </p>
+          <div class="box-title" style="margin-top:14px">두 가지 키 — 역할이 다르다</div>
+          <ul class="tight">
+            <li><b>마스터키</b> · 어드민이 <b>자기 DB에 저장하는 데이터</b>를 보호하는 키.
+                사용자 개인정보와 게시판 첨부파일을 이 키로 암호화하고, KMS 관리 키를 저장할 때도 이 키로 래핑한다.
+                마스터 패스프레이즈에서 <b>유도(PBKDF2)</b>해 만든다</li>
+            <li><b>KMS 관리 키</b> · <b>외부 시스템이 연동해 쓰는</b> 데이터 암호화용 키.
+                어드민의 역할은 이 키들의 <b>생명주기 관리</b>(등록·상태 전이·이력·사용 로그)와,
+                생성된 키가 제대로 동작하는지 확인하는 <b>암복호화 테스트 기능</b> 제공이다.
+                어드민 자체 데이터에는 사용하지 않는다</li>
+          </ul>
+        </div>
+        <div>
+          <div class="box-title">기술 스택 (권장 예시)</div>
+          <ul class="tight">
+            <li><b>백엔드</b> · Java 17, Spring Boot 3.x, Spring Data JPA, Spring Security(JWT), PostgreSQL 16, Gradle, springdoc-openapi</li>
+            <li><b>암호</b> · PBKDF2-HMAC-SHA256(마스터키 유도 · 비밀번호 해시), AES-256-GCM(데이터 암호화 · 키 래핑), HMAC-SHA256(무결성 · 검색 해시), SecureRandom</li>
+            <li><b>프론트엔드</b> · React 18, Vite, JavaScript, Ant Design, React Router, Axios, Recharts</li>
+            <li><b>도구</b> · VS Code, pgAdmin 4, Postman, Git</li>
+          </ul>
+          <div class="warnbox info">
+            <div class="wt">스택은 예시이며 변경 가능하다</div>
+            <div style="font-size:12.5px;color:var(--text-secondary)">
+              위 목록은 <b>권장 예시</b>다. 요구 기능과 암호화·무결성 요건을 충족한다면
+              언어·프레임워크·DBMS·라이브러리를 <b>본인 판단으로 자유롭게 변경</b>할 수 있다.
+              변경한 경우 08/17(월) 설계 발표에서 <b>선택한 이유</b>를 함께 설명한다.
+            </div>
+          </div>
+          <div class="box-title" style="margin-top:16px">최종 목표 상태</div>
+          <ul class="tight">
+            <li>기동 시 <b>마스터 패스프레이즈로 마스터키를 유도</b>하고 KCV로 검증한다</li>
+            <li>KMS 관리 키를 <b>등록·조회하고 생명주기(상태)를 관리</b>하며, <b>암복호화 테스트</b>로 동작을 확인할 수 있다</li>
+            <li>사용자 <b>비밀번호는 단방향 해시 + Salt</b>로, <b>연락처·이메일은 마스터키로 암호화</b></li>
+            <li>게시판 <b>첨부파일이 마스터키로 암호화</b>되어 저장되고 복호화 다운로드된다</li>
+            <li>키·사용자·감사로그 테이블은 <b>무결성 컬럼</b>으로 DB 직접 조작을 탐지한다</li>
+            <li>모든 관리자 행위가 <b>감사로그</b>에 자동 기록되고 검색·내려받기가 된다</li>
+          </ul>
+          <div class="pill">두 수행자는 동일 요구사항을 각자 독립 수행 (상호 협업·코드 공유 없음)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="box-title">전체 키 구조 — 어느 키가 무엇을 보호하는가</div>
+<pre class="code diagram">마스터 패스프레이즈  ──PBKDF2-HMAC-SHA256(salt, 210,000회)──▶  <b>마스터키 (AES-256)</b>
+   (환경변수)                                                      │
+                                                                   ├──(직접 암호화)──▶ <b>사용자 개인정보</b>  app_user.phone_enc · email_enc
+                                                                   │
+                                                                   ├──(직접 암호화)──▶ <b>게시판 첨부파일</b>  암호문 파일 + notice_file.iv
+                                                                   │
+                                                                   └──(래핑/언래핑)──▶ <b>KMS 관리 키</b>  key_material.wrapped_key
+                                                                                              │
+                                                                                              ├─▶ 외부 시스템 연동 (과제 범위 외)
+                                                                                              └─▶ <b>어드민 암복호화 테스트 기능</b> (과제 범위)</pre>
+      <p style="font-size:12.5px;color:var(--muted);margin:12px 0 0">
+        KMS 관리 키는 <b style="color:var(--text-secondary)">외부에 제공하기 위한 자산</b>이므로 어드민 데이터를 암호화하지 않는다.
+        어드민이 그 키에 대해 하는 일은 <b style="color:var(--text-secondary)">생명주기 관리</b>와 <b style="color:var(--text-secondary)">동작 검증(암복호화 테스트)</b>이다.
+        반대로 어드민이 자기 DB에 저장하는 데이터는 전부 <b style="color:var(--text-secondary)">마스터키 하나</b>로 보호한다.
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="box-title">KMS 관리 키의 생명주기 상태 전이 — 구현 2주차의 핵심 규칙</div>
+      <div class="fsm">
+        <span class="st">CREATED 생성</span><span class="ar">→</span>
+        <span class="st">ACTIVE 활성</span><span class="ar">→</span>
+        <span class="st">EXPIRED 만료</span><span class="ar">→</span>
+        <span class="st">INACTIVE 비활성</span><span class="ar">→</span>
+        <span class="st">DESTROYED 폐기</span>
+      </div>
+      <div class="fsm-note">
+        허용 전이 · CREATED→ACTIVE / ACTIVE→EXPIRED · INACTIVE / EXPIRED→INACTIVE · ACTIVE(재활성, 사유 필수) / INACTIVE→DESTROYED &nbsp;·&nbsp;
+        <b style="color:var(--text-primary)">금지 전이</b> · DESTROYED에서 나가는 모든 전이, CREATED→DESTROYED 직행, 임의 역행 &nbsp;·&nbsp;
+        암복호화 테스트는 <b style="color:var(--text-primary)">ACTIVE 상태에서만</b> 허용 (외부 연동 차단과 같은 의미)
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCHEDULE ================= -->
+  <section id="schedule">
+    <h2><span class="num">01</span>일정</h2>
+    <p class="sub">설계 3일(08/12 수 ~ 08/14 금) 후 구현 4주(08/17 월 ~ 09/11 금). 발표는 매주 월요일, 최종 발표 09/14(월).</p>
+    <div class="timeline">
+      <div class="tl-cell design">
+        <div class="wk">설계</div>
+        <div class="ph">요구사항 · ERD · 키 체계 설계</div>
+        <div class="dt">08/12 수 ~ 08/14 금 · 3일</div>
+        <div class="tl-focus">무엇을 만들지 문서로 확정한다. 코드는 아직 쓰지 않는다.</div>
+      </div>
+      <div class="tl-cell">
+        <div class="wk">구현 1주</div>
+        <div class="ph">프로젝트 골격 · 마스터키 · 인증</div>
+        <div class="dt">08/17 월 ~ 08/21 금</div>
+        <div class="tl-focus">마스터키를 만들고, 앞으로 4주 내내 쓸 골격과 인증을 세운다.</div>
+      </div>
+      <div class="tl-cell">
+        <div class="wk">구현 2주</div>
+        <div class="ph">KMS 관리 키 · 암복호화 테스트 · 무결성</div>
+        <div class="dt">08/24 월 ~ 08/28 금</div>
+        <div class="tl-focus">외부 연동용 키의 생명주기를 관리하고, 동작을 검증하는 테스트 기능을 만든다.</div>
+      </div>
+      <div class="tl-cell">
+        <div class="wk">구현 3주</div>
+        <div class="ph">사용자 관리 · 감사로그</div>
+        <div class="dt">08/31 월 ~ 09/04 금</div>
+        <div class="tl-focus">한 테이블에서 세 가지 보호 방식을 동시에 쓴다.</div>
+      </div>
+      <div class="tl-cell">
+        <div class="wk">구현 4주</div>
+        <div class="ph">게시판(공지·첨부 암호화) · 대시보드 · 마감</div>
+        <div class="dt">09/07 월 ~ 09/11 금</div>
+        <div class="tl-focus">첨부파일 암호화를 얹고, 품질을 확보해 마감한다.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCOPE ================= -->
+  <section id="scope">
+    <h2><span class="num">02</span>기능 범위 · 설계 기준</h2>
+    <p class="sub">아래 범위로 고정한다. 벗어나는 기능 추가는 멘토 승인 후에만 진행하고, "심화"는 여유가 있을 때만 진행한다.</p>
+
+    <div class="card">
+      <div class="box-title">화면 목록 (15개 + 심화 1개)</div>
+      <table class="data">
+        <thead><tr><th>구분</th><th>화면</th><th>주요 기능</th><th>착수</th></tr></thead>
+        <tbody>
+          <tr><td>공통</td><td>기본 레이아웃</td><td>사이드바 메뉴, 헤더(관리자명·로그아웃), 컨텐츠 영역</td><td>구현 1주</td></tr>
+          <tr><td>인증</td><td>로그인</td><td>관리자 인증, 실패 메시지, JWT 토큰 저장</td><td>구현 1주</td></tr>
+          <tr><td>키</td><td>키 목록</td><td>키명·알고리즘·상태·용도 검색, 정렬, 페이징, 무결성 상태 표시</td><td>구현 2주</td></tr>
+          <tr><td>키</td><td>키 등록</td><td>알고리즘·키길이·용도·유효기간 선택, 키 자동 생성 후 마스터키로 래핑</td><td>구현 2주</td></tr>
+          <tr><td>키</td><td>키 상세</td><td>메타정보, 상태 이력 타임라인, 사용 통계</td><td>구현 2주</td></tr>
+          <tr><td>키</td><td>키 상태 변경</td><td>현재 상태에서 가능한 전이만 노출, 사유 필수 입력</td><td>구현 2주</td></tr>
+          <tr><td>키</td><td><b>암복호화 테스트</b></td><td><b>KMS 관리 키의 동작 검증 도구</b> — 키 선택 → 평문 암호화 / 암호문 복호화 결과 확인, ACTIVE 아닌 키는 차단</td><td>구현 2주</td></tr>
+          <tr><td>사용자</td><td>사용자 목록</td><td>이름·상태 검색, 연락처 정확검색, 페이징, <b>마스킹 표시</b></td><td>구현 3주</td></tr>
+          <tr><td>사용자</td><td>사용자 등록/수정</td><td>모달 폼, 유효성 검사, 상태 변경, <b>비밀번호 재설정</b></td><td>구현 3주</td></tr>
+          <tr><td>사용자</td><td>사용자 상세</td><td>기본정보, <b>원문 보기</b>(ADMIN 한정 · 감사로그 기록), 무결성 상태</td><td>구현 3주</td></tr>
+          <tr><td>감사</td><td>감사 로그</td><td>기간·행위자·행위유형 검색, 페이징, CSV 내려받기, <b>해시 체인 검증 결과</b></td><td>구현 3주</td></tr>
+          <tr><td>게시판</td><td>공지사항 목록</td><td>제목 검색, 노출여부 필터, 조회수, 페이징</td><td>구현 4주</td></tr>
+          <tr><td>게시판</td><td>공지사항 상세</td><td>본문 조회, 조회수 증가, <b>첨부파일 복호화 다운로드</b></td><td>구현 4주</td></tr>
+          <tr><td>게시판</td><td>공지사항 등록/수정</td><td>본문 작성, <b>첨부파일 다중 암호화 업로드</b>, 노출여부</td><td>구현 4주</td></tr>
+          <tr><td>통계</td><td>대시보드</td><td>요약 카드 4개, 만료 임박 키, 최근 30일 키 사용 추이, <b>무결성 위반 건수</b></td><td>구현 4주</td></tr>
+          <tr class="opt"><td>설정</td><td>코드·정책 관리</td><td>알고리즘·용도·상태 공통코드, 기본 유효기간·만료 알림일</td><td>심화</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="box-title">DB 테이블 (10개 · 변경 가능)</div>
+      <table class="data">
+        <thead><tr><th>테이블</th><th>설명</th><th>핵심 컬럼</th></tr></thead>
+        <tbody>
+          <tr><td><code>crypto_config</code></td><td><b>마스터키 유도 설정</b></td><td>config_key, config_value — <b>salt</b>, <b>kcv</b>, algo, iterations (비밀 아님 · DB와 함께 백업)</td></tr>
+          <tr><td><code>admin_user</code></td><td>관리자</td><td>login_id, <b>password_hash</b>, <b>password_salt</b>, password_algo, password_iter, name, role, status</td></tr>
+          <tr><td><code>crypto_key</code></td><td>KMS 관리 키 메타<br><span style="color:var(--muted);font-size:12px">(외부 연동용 자산)</span></td><td>key_uid, key_name, algorithm, key_size, purpose, status, version, expire_at, <b>integrity_hash</b></td></tr>
+          <tr><td><code>key_material</code></td><td>래핑된 키 값<br><span style="color:var(--muted);font-size:12px">(마스터키로 래핑)</span></td><td>key_id, wrapped_key(<code>bytea</code>), iv(<code>bytea</code>), wrap_algo</td></tr>
+          <tr><td><code>key_status_history</code></td><td>상태 전이 이력</td><td>key_id, from_status, to_status, reason, changed_by, changed_at</td></tr>
+          <tr><td><code>key_usage_log</code></td><td>키 사용 로그<br><span style="color:var(--muted);font-size:12px">(테스트 기능 호출 기록)</span></td><td>key_id, operation, result, fail_reason, used_at</td></tr>
+          <tr><td><code>app_user</code></td><td>서비스 사용자</td><td>name, <b>password_hash</b>, <b>password_salt</b>, phone_enc(<code>bytea</code>), phone_hash, email_enc(<code>bytea</code>), email_hash, iv, <b>enc_ver</b>, status, <b>integrity_hash</b></td></tr>
+          <tr><td><code>notice</code></td><td>공지사항</td><td>title, content, expose_yn, view_count, created_by</td></tr>
+          <tr><td><code>notice_file</code></td><td>첨부파일<br><span style="color:var(--muted);font-size:12px">(마스터키로 암호화)</span></td><td>notice_id, orig_name, saved_name, size, iv, <b>enc_ver</b></td></tr>
+          <tr><td><code>audit_log</code></td><td>관리자 행위 감사</td><td>actor, action, target_type, target_id, detail(<code>jsonb</code>), created_at, <b>prev_hash</b>, <b>row_hash</b></td></tr>
+        </tbody>
+      </table>
+      <div class="warnbox info">
+        <div class="wt">테이블 구성은 예시이며 변경 가능하다</div>
+        <div style="font-size:12.5px;color:var(--text-secondary)">
+          위 구성은 <b>권장 예시</b>다. 요구 기능과 암호화·무결성 요건을 충족한다면
+          테이블 분할·병합, 컬럼명·타입을 <b>본인 판단으로 자유롭게 변경</b>할 수 있다.
+          변경한 경우 08/17(월) 설계 발표에서 ERD와 함께 이유를 설명한다.
+          타입 표기는 PostgreSQL 기준이며, 다른 DBMS를 선택하면 동등한 타입(바이너리·JSON·타임존 포함 시각)으로 대체한다.
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:10px 0 0">
+        단, 다음 두 가지는 유지한다 — <code>enc_ver</code>는 어느 세대의 마스터키로 암호화했는지 표시하는 값(기본 1)으로
+        나중에 패스프레이즈를 바꿔야 할 때 구·신 데이터를 구분한다.
+        <code>audit_log</code>는 <b>append-only</b>(UPDATE·DELETE 금지)다.
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="box-title">REST API 명세 (32개 · 변경 가능)</div>
+      <div class="warnbox info" style="margin:0 0 14px">
+        <div class="wt">경로·구성은 예시이며 변경 가능하다</div>
+        <div style="font-size:12.5px;color:var(--text-secondary)">
+          위 명세는 <b>권장 예시</b>다. 요구 기능을 충족한다면 경로·메서드·엔드포인트 분할 방식을
+          <b>본인 판단으로 자유롭게 변경</b>할 수 있다. 변경한 내용은 <b>API 명세서에 반영</b>하고
+          08/17(월) 설계 발표에서 함께 설명한다.
+        </div>
+      </div>
+      <table class="data">
+        <thead><tr><th>구분</th><th>메서드</th><th>경로</th><th>설명</th><th>착수</th></tr></thead>
+        <tbody>
+          <tr><td>인증</td><td><code>POST</code></td><td><code>/api/auth/login</code></td><td>관리자 로그인 · JWT 발급 (해시 검증)</td><td>1주</td></tr>
+          <tr><td>인증</td><td><code>GET</code></td><td><code>/api/auth/me</code></td><td>내 정보 조회</td><td>1주</td></tr>
+          <tr><td>인증</td><td><code>POST</code></td><td><code>/api/auth/logout</code></td><td>로그아웃</td><td>1주</td></tr>
+          <tr><td>키</td><td><code>GET</code></td><td><code>/api/keys</code></td><td>키 목록 (keyword, algorithm, status, purpose, page, sort)</td><td>2주</td></tr>
+          <tr><td>키</td><td><code>POST</code></td><td><code>/api/keys</code></td><td>키 생성 · <b>마스터키로 래핑</b> 저장 · 무결성 해시 생성</td><td>2주</td></tr>
+          <tr><td>키</td><td><code>GET</code></td><td><code>/api/keys/{id}</code></td><td>키 상세 (키 값 미반환, 무결성 검증 결과 포함)</td><td>2주</td></tr>
+          <tr><td>키</td><td><code>PUT</code></td><td><code>/api/keys/{id}</code></td><td>키 메타정보 수정 · 무결성 해시 재계산</td><td>2주</td></tr>
+          <tr><td>키</td><td><code>PATCH</code></td><td><code>/api/keys/{id}/status</code></td><td>상태 전이 (사유 필수, 규칙 위반 시 400/409)</td><td>2주</td></tr>
+          <tr><td>키</td><td><code>GET</code></td><td><code>/api/keys/{id}/history</code></td><td>상태 전이 이력 조회</td><td>2주</td></tr>
+          <tr><td>키</td><td><code>GET</code></td><td><code>/api/keys/{id}/usage</code></td><td>키 사용 통계 (테스트 호출 기록 기준)</td><td>2주</td></tr>
+          <tr><td>테스트</td><td><code>POST</code></td><td><code>/api/keys/{id}/test/encrypt</code></td><td><b>KMS 관리 키 동작 검증</b> — 언래핑 후 평문 암호화, ACTIVE 키만 허용</td><td>2주</td></tr>
+          <tr><td>테스트</td><td><code>POST</code></td><td><code>/api/keys/{id}/test/decrypt</code></td><td><b>KMS 관리 키 동작 검증</b> — 암호문·IV 복호화, ACTIVE 키만 허용</td><td>2주</td></tr>
+          <tr><td>사용자</td><td><code>GET</code></td><td><code>/api/users</code></td><td>사용자 목록 (마스킹 응답 · 해시 기반 연락처 정확검색)</td><td>3주</td></tr>
+          <tr><td>사용자</td><td><code>GET</code></td><td><code>/api/users/{id}</code></td><td>사용자 상세 (마스킹 응답 · 무결성 검증 결과)</td><td>3주</td></tr>
+          <tr><td>사용자</td><td><code>GET</code></td><td><code>/api/users/{id}/plain</code></td><td>원문 조회 (ADMIN 한정 · 감사로그 필수)</td><td>3주</td></tr>
+          <tr><td>사용자</td><td><code>POST</code></td><td><code>/api/users</code></td><td>사용자 등록 (비밀번호 해시+Salt, 연락처 <b>마스터키 암호화</b>)</td><td>3주</td></tr>
+          <tr><td>사용자</td><td><code>PUT</code></td><td><code>/api/users/{id}</code></td><td>사용자 수정 (재암호화 · 검색 해시 · 무결성 재계산)</td><td>3주</td></tr>
+          <tr><td>사용자</td><td><code>PATCH</code></td><td><code>/api/users/{id}/password</code></td><td>비밀번호 재설정 (새 Salt 생성 · 원문 조회 불가)</td><td>3주</td></tr>
+          <tr><td>사용자</td><td><code>PATCH</code></td><td><code>/api/users/{id}/status</code></td><td>상태 변경 (활성·정지)</td><td>3주</td></tr>
+          <tr><td>감사</td><td><code>GET</code></td><td><code>/api/audit-logs</code></td><td>감사로그 검색 (from, to, actor, action, page)</td><td>3주</td></tr>
+          <tr><td>감사</td><td><code>GET</code></td><td><code>/api/audit-logs/verify</code></td><td>해시 체인 검증 — 변조·삭제된 구간 반환</td><td>3주</td></tr>
+          <tr><td>감사</td><td><code>GET</code></td><td><code>/api/audit-logs/export</code></td><td>감사로그 CSV 내려받기</td><td>3주</td></tr>
+          <tr><td>게시판</td><td><code>GET</code></td><td><code>/api/notices</code></td><td>공지 목록 (검색·노출여부·페이징)</td><td>4주</td></tr>
+          <tr><td>게시판</td><td><code>GET</code></td><td><code>/api/notices/{id}</code></td><td>공지 상세 (조회수 +1)</td><td>4주</td></tr>
+          <tr><td>게시판</td><td><code>POST</code></td><td><code>/api/notices</code></td><td>공지 등록 (multipart · 첨부 <b>마스터키 암호화</b> 저장)</td><td>4주</td></tr>
+          <tr><td>게시판</td><td><code>PUT</code></td><td><code>/api/notices/{id}</code></td><td>공지 수정</td><td>4주</td></tr>
+          <tr><td>게시판</td><td><code>DELETE</code></td><td><code>/api/notices/{id}</code></td><td>공지 삭제 (첨부 함께 정리)</td><td>4주</td></tr>
+          <tr><td>게시판</td><td><code>GET</code></td><td><code>/api/files/{id}/download</code></td><td>첨부 복호화 다운로드 (스트리밍)</td><td>4주</td></tr>
+          <tr><td>게시판</td><td><code>DELETE</code></td><td><code>/api/files/{id}</code></td><td>첨부 삭제</td><td>4주</td></tr>
+          <tr><td>통계</td><td><code>GET</code></td><td><code>/api/dashboard/summary</code></td><td>요약 (키·사용자·공지 수, 만료임박, 무결성 위반 수)</td><td>4주</td></tr>
+          <tr><td>통계</td><td><code>GET</code></td><td><code>/api/dashboard/expiring</code></td><td>만료 임박 키 목록 (기본 30일)</td><td>4주</td></tr>
+          <tr><td>통계</td><td><code>GET</code></td><td><code>/api/dashboard/usage-trend</code></td><td>최근 30일 일자별 키 사용 추이</td><td>4주</td></tr>
+          <tr class="opt"><td>심화</td><td><code>POST</code></td><td><code>/api/keys/{id}/rotate</code></td><td>KMS 관리 키 교체 · 신규 버전 생성 후 이전 버전 비활성</td><td>심화</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="box-title">공통 규격</div>
+      <div class="two-col">
+        <div>
+          <ul class="tight">
+            <li><b>응답 포맷</b> · <code>{ success, data, message, errorCode }</code> 로 통일</li>
+            <li><b>페이징</b> · <code>{ content, page, size, totalElements, totalPages }</code></li>
+            <li><b>HTTP 상태</b> · 200 / 400 검증·전이규칙 위반 / 401 미인증 / 403 권한없음 / 404 없음 / 409 상태충돌·무결성 위반 / 500</li>
+          </ul>
+        </div>
+        <div>
+          <ul class="tight">
+            <li><b>날짜</b> · 저장은 타임존 포함 시각(UTC), 응답은 <code>yyyy-MM-dd HH:mm:ss</code> KST</li>
+            <li><b>암호화 컬럼 검색</b> · 평문 <code>LIKE</code> 불가. 해시 컬럼으로 <b>정확검색만</b> 지원하고 부분검색 미지원을 명세에 적는다</li>
+            <li><b>외부 식별자</b> · 순번 노출 대신 <code>key_uid</code>(UUID) 사용</li>
+            <li><b>개인정보</b> · 실제 고객 데이터·운영 키 사용 금지, 샘플 데이터만 사용</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MASTER KEY ================= -->
+  <section id="masterkey">
+    <h2><span class="num">03</span>마스터키 — 유도 · 보관 · 검증</h2>
+    <p class="sub">어드민이 자기 DB에 저장하는 모든 데이터를 보호하는 단 하나의 키. 설계 단계에서 확정하고 구현 1주차에 만든다.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h3 class="sh">규격 및 유도 방식</h3>
+        <table class="data">
+          <thead><tr><th>항목</th><th>값 / 방식</th></tr></thead>
+          <tbody>
+            <tr><td>역할</td><td>① 사용자 개인정보 암호화 ② 게시판 첨부파일 암호화 ③ KMS 관리 키 래핑</td></tr>
+            <tr><td>키 규격</td><td>AES-256 (32바이트) · GCM 모드 사용</td></tr>
+            <tr><td>생성 방식</td><td><b>비밀번호 유도</b> — 마스터 패스프레이즈에서 PBKDF2로 파생 (랜덤 키를 파일로 보관하지 않는다)</td></tr>
+            <tr><td>유도 함수</td><td>PBKDF2-HMAC-SHA256, 반복 <b>210,000회</b>, 출력 32바이트</td></tr>
+            <tr><td>Salt</td><td>16바이트 <code>SecureRandom</code> · <b>서버마다 다른 값</b> · <code>crypto_config</code>에 저장 (비밀 아님)</td></tr>
+            <tr><td>패스프레이즈 주입</td><td>환경변수 <code>KMS_MASTER_PASSPHRASE</code> — systemd <code>EnvironmentFile</code>(권한 <code>600</code>, <code>dguard</code> 소유)</td></tr>
+            <tr><td>패스프레이즈 강도</td><td><b>20자 이상</b> 권장. 이 값의 강도가 곧 마스터키의 강도다</td></tr>
+            <tr><td>메모리 취급</td><td>기동 시 1회 유도 → <code>byte[]</code>로만 보관 → 사용 후 <code>Arrays.fill(key, (byte)0)</code>. <b><code>String</code> 사용 금지</b>(GC까지 힙에 남아 힙덤프로 노출)</td></tr>
+            <tr><td>기동 시 검증</td><td><b>KCV</b>(Key Check Value) 대조 → 불일치 시 <b>기동 실패</b>(fail-fast)</td></tr>
+            <tr><td>분실 시</td><td><b>복구 불가.</b> 개발 환경에서 잊으면 DB 초기화 후 재시작</td></tr>
+          </tbody>
+        </table>
+<pre class="code">// 기동 시 1회
+salt = crypto_config['salt']
+<b>masterKey = PBKDF2-HMAC-SHA256(env.KMS_MASTER_PASSPHRASE, salt, 210000, 32)</b>
+
+// KCV 검증
+expected = crypto_config['kcv']
+actual   = AES-256-GCM(masterKey, fixedIv, <b>"KMS-KCV-V1"</b>)
+if (!MessageDigest.isEqual(actual, expected)) <b>throw → 애플리케이션 기동 중단</b></pre>
+      </div>
+
+      <div class="card">
+        <h3 class="sh">왜 KCV가 필수인가 — 이 방식의 최대 위험</h3>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--text-secondary)">
+          비밀번호 유도 방식에서 패스프레이즈를 <b style="color:var(--text-primary)">한 글자 잘못 입력</b>하면
+          전혀 다른 마스터키가 만들어진다. 그런데 애플리케이션은 아무 오류 없이 기동한다.
+        </p>
+        <ul class="tight">
+          <li>기존 데이터는 전부 복호화 실패한다 — 여기까지는 그나마 눈에 보인다</li>
+          <li><b>새로 저장되는 데이터는 틀린 키로 암호화된다</b> — 이게 진짜 사고다.
+              나중에 올바른 패스프레이즈로 되돌려도 그 사이 저장된 데이터는 <b>영구히 못 읽는다</b></li>
+          <li>KCV가 있으면 기동 자체가 실패하므로 <b>잘못된 데이터가 한 건도 쌓이지 않는다</b></li>
+        </ul>
+        <div class="warnbox ok">
+          <div class="wt">구현 규칙</div>
+          <div style="font-size:12.5px;color:var(--text-secondary)">
+            KCV 검증은 <b>애플리케이션 기동 시</b> 수행하고, 실패하면 예외를 던져 기동을 중단한다.
+            "경고 로그만 남기고 계속 진행"은 허용하지 않는다.
+            KCV는 최초 마스터키 설정 시 생성해 <code>crypto_config</code>에 저장한다.
+          </div>
+        </div>
+
+        <h3 class="sh" style="margin-top:18px">비밀번호 유도 방식의 구조적 제약</h3>
+        <ul class="tight">
+          <li><b>패스프레이즈 변경 = 마스터키 변경 = 전체 재암호화</b> ·
+              개인정보와 모든 첨부파일을 복호화 후 재암호화해야 한다. <code>enc_ver</code> 컬럼이 이때 구·신 데이터를 구분한다.
+              <b>과제 범위에서는 구현하지 않고 제약으로만 문서화</b>한다</li>
+          <li><b>랜덤 32바이트 키보다 약하다</b> · 패스프레이즈가 약하면 오프라인 대입 공격에 노출된다.
+              반복 210,000회는 그 공격 비용을 올리는 장치다 — 반복 횟수를 낮추면 안 되는 이유를 설명할 수 있어야 한다</li>
+          <li><b>Salt는 비밀이 아니다</b> · DB에 두어도 된다. Salt의 목적은 비밀 유지가 아니라
+              같은 패스프레이즈에서 서버마다 <b>다른 키</b>가 나오게 하고 사전 계산(레인보우 테이블)을 막는 것이다</li>
+          <li><b>백업 주의</b> · DB를 백업하면 salt·KCV는 함께 백업되지만 <b>패스프레이즈는 백업되지 않는다</b>.
+              DB만 복원하고 패스프레이즈를 모르면 모든 암호화 데이터를 영구히 잃는다</li>
+        </ul>
+
+        <div class="warnbox">
+          <div class="wt">실제 제품과의 차이 — 발표에서 설명할 항목</div>
+          <div style="font-size:12.5px;color:var(--text-secondary)">
+            아이넵 D'GuardKMS는 이 역할을 <b>물리 HSM</b>(FIPS 140-2 Level 3)이 수행하며,
+            키가 HSM 밖으로 나오지 않고 <b>스마트카드 + Passphrase 2단계 인증</b>으로 접근을 통제한다.
+            이번 과제는 이를 <b>환경변수 패스프레이즈 유도</b>로 축소한 것이다.
+            "우리 구현이 HSM 대비 무엇을 포기했는가"를 최종 발표에서 설명한다.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PROTECT ================= -->
+  <section id="protect">
+    <h2><span class="num">04</span>데이터 보호 방식</h2>
+    <p class="sub">세 가지 방식을 무엇에 쓰는지 구분하는 것이 이 과제의 핵심 학습 목표다.</p>
+    <div class="card">
+      <table class="data">
+        <thead><tr><th>데이터</th><th>방식</th><th>왜</th><th>저장 컬럼</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>비밀번호</b></td>
+            <td>단방향 해시 + Salt<br><span style="color:var(--muted);font-size:12px">PBKDF2-HMAC-SHA256</span></td>
+            <td>원문을 알 필요가 전혀 없다. 유출돼도 <b>복원이 불가능해야</b> 한다</td>
+            <td><code>password_hash</code>, <code>password_salt</code></td>
+          </tr>
+          <tr>
+            <td><b>연락처 · 이메일<br>첨부파일</b></td>
+            <td>양방향 암호화<br><span style="color:var(--muted);font-size:12px">AES-256-GCM (마스터키)</span></td>
+            <td>업무상 <b>원문이 다시 필요하다</b> (고객 응대·파일 다운로드)</td>
+            <td><code>phone_enc</code>, <code>email_enc</code>, <code>iv</code>, <code>enc_ver</code></td>
+          </tr>
+          <tr>
+            <td><b>행 무결성</b></td>
+            <td>HMAC-SHA256<br><span style="color:var(--muted);font-size:12px">비밀키 기반 인증 태그</span></td>
+            <td>내용을 숨기려는 게 아니라 <b>변조를 탐지</b>하려는 것</td>
+            <td><code>integrity_hash</code> / <code>prev_hash</code>·<code>row_hash</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size:12.5px;color:var(--muted);margin:12px 0 0">
+        무결성 대상 테이블은 <code>crypto_key</code> · <code>app_user</code> · <code>audit_log</code>이며,
+        무결성 키는 마스터 패스프레이즈와 <b>별개</b>의 환경변수(<code>INTEGRITY_HMAC_KEY</code>)로 주입한다.
+        <code>audit_log</code>는 직전 행의 해시를 물고 가는 <b>해시 체인</b>으로 구성해 중간 행 삭제·순서 변경까지 탐지한다.
+        해시 계산 전 <b>정규화 규칙</b>(구분자·null 처리·날짜 포맷)은 설계 단계에서 문서로 확정한다 — 규칙이 흔들리면 정상 데이터도 전부 검증 실패한다.
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= PRESENT ================= -->
+  <section id="present">
+    <h2><span class="num">05</span>발표 일정 및 통과 기준</h2>
+    <p class="sub">발표 5회(설계 발표 + 주간 발표 3회 + 최종 발표). 개별 수행이므로 각자 따로 발표한다.</p>
+    <div class="card">
+      <table class="data">
+        <thead><tr><th>회차</th><th>일자</th><th>발표 주제</th><th>통과 기준</th></tr></thead>
+        <tbody>
+          <tr><td>설계 발표</td><td>08/17(월)</td><td>상태도 · ERD · 키 체계 · 비밀번호/무결성 설계 · API 명세</td><td>설계 문서 6종 승인</td></tr>
+          <tr><td>1차</td><td>08/24(월)</td><td>프로젝트 골격 &amp; 인증 &amp; 마스터키</td><td>로그인 동작, <b>패스프레이즈를 틀리게 넣으면 KCV 검증으로 기동 실패</b> 시연, DB에 비밀번호 평문 없음</td></tr>
+          <tr><td>2차</td><td>08/31(월)</td><td>KMS 관리 키 &amp; 암복호화 테스트 &amp; 무결성</td><td>키 CRUD·상태 전이 차단·테스트 기능 동작, DB에 키 평문 없음, DB 직접 수정 시 무결성 위반 탐지 시연</td></tr>
+          <tr><td>3차</td><td>09/07(월)</td><td>사용자 관리 &amp; 감사로그</td><td>개인정보 마스터키 암호화·마스킹 조회, 원문 조회 감사기록, 감사로그 해시 체인 검증 동작</td></tr>
+          <tr><td>최종</td><td>09/14(월)</td><td>전체 데모 + 구조·보안 설계 설명</td><td>통합 테스트 22개 중 19개 이상 통과, 게시판·대시보드 동작, <b>두 가지 키의 역할 차이와 HSM 대비 한계 설명</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="pg">
+    아이넵소프트 · 일학습병행 과제 안내서 (수행자용) · 기준일 2026-08-11 ·
+    설계 2026-08-12(수)~08-14(금) · 구현 2026-08-17(월)~09-11(금) · 최종 발표 2026-09-14(월) ·
+    참고: <a href="https://www.inebsoft.com/%ED%86%B5%ED%95%A9%ED%82%A4%EA%B4%80%EB%A6%AC">아이넵 통합키관리(D'GuardKMS)</a>
+  </footer>
+</div>
+
+<script>
+const btn = document.getElementById('themeBtn');
+function syncBtn(){
+  btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '라이트 모드' : '다크 모드';
+}
+btn.addEventListener('click',()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  syncBtn();
+});
+if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches){
+  document.documentElement.setAttribute('data-theme','dark');
+}
+syncBtn();
+</script>
+</body>
+</html>

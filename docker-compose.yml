@@ -1,0 +1,76 @@
+services:
+
+  # ─────────────────────────────
+  # PostgreSQL
+  # ─────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: dguard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dguard_kms}
+      POSTGRES_USER: ${DB_USER:-dguard}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # 한국 시간대 설정
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    volumes:
+      # 호스트 경로에 직접 마운트 → 컨테이너 삭제해도 데이터 보존
+      - /home/dguard/dguard-kms/pgdata:/var/lib/postgresql/data
+      # 초기화 SQL 스크립트 (최초 1회만 실행)
+      - /home/dguard/dguard-kms/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 로컬 접속 전용 (외부 노출 금지 — 필요 시 127.0.0.1:5432만 허용)
+      - "127.0.0.1:5432:5432"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dguard} -d ${DB_NAME:-dguard_kms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────
+  # Spring Boot Backend
+  # ─────────────────────────────
+  backend:
+    image: ${DOCKER_USERNAME}/dguard-backend:${IMAGE_TAG:-latest}
+    container_name: dguard-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME:-dguard_kms}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-dguard}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${DDL_AUTO:-validate}
+      KMS_MASTER_PASSPHRASE: ${KMS_MASTER_PASSPHRASE}
+      INTEGRITY_HMAC_KEY: ${INTEGRITY_HMAC_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────
+  # React + Nginx Frontend
+  # ─────────────────────────────
+  frontend:
+    image: ${DOCKER_USERNAME}/dguard-frontend:${IMAGE_TAG:-latest}
+    container_name: dguard-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
