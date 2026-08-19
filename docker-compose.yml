@@ -16,9 +16,9 @@ services:
       PGTZ: Asia/Seoul
     volumes:
       # 호스트 경로에 직접 마운트 → 컨테이너 삭제해도 데이터 보존
-      - /home/dguard/dguard-kms/pgdata:/var/lib/postgresql/data
+      - /home/dguard/app/pgdata:/var/lib/postgresql/data
       # 초기화 SQL 스크립트 (최초 1회만 실행)
-      - /home/dguard/dguard-kms/initdb:/docker-entrypoint-initdb.d:ro
+      - /home/dguard/app/initdb:/docker-entrypoint-initdb.d:ro
     ports:
       # 로컬 접속 전용 (외부 노출 금지 — 필요 시 127.0.0.1:5432만 허용)
       - "127.0.0.1:5432:5432"

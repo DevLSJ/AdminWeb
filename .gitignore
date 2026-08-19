@@ -13,3 +13,11 @@
 
 # Docker
 docker-compose.override.yml
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Backend
+backend/build/
+backend/.gradle/
