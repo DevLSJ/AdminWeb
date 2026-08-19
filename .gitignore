@@ -21,3 +21,4 @@ frontend/dist/
 # Backend
 backend/build/
 backend/.gradle/
+docs/
