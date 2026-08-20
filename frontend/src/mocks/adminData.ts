@@ -12,7 +12,7 @@ import type {
 export const mockKeys: CryptoKey[] = [
   { keyUid: '9a12f0d4-5901-4c55-8517-111111111111', keyName: 'PAYMENT-AES-001', algorithm: 'AES', keySize: 256, purpose: 'ENCRYPT', status: 'ACTIVE', version: 2, expireAt: '2026-08-24', integrityValid: true, createdAt: '2026-05-10 09:12:31', updatedAt: '2026-08-01 14:20:00' },
   { keyUid: '20b11c91-05f2-4b2f-9191-222222222222', keyName: 'MEMBER-AES-003', algorithm: 'AES', keySize: 256, purpose: 'ENCRYPT', status: 'ACTIVE', version: 1, expireAt: '2026-08-28', integrityValid: true, createdAt: '2026-06-02 11:04:52', updatedAt: '2026-06-02 11:04:52' },
-  { keyUid: '774ce1aa-d3ca-4fd4-a203-333333333333', keyName: 'AUTH-HMAC-004', algorithm: 'HMAC', keySize: 256, purpose: 'AUTH', status: 'DISTRIBUTED', version: 3, expireAt: '2026-09-02', integrityValid: true, createdAt: '2026-02-14 08:40:12', updatedAt: '2026-08-10 17:30:21' },
+  { keyUid: '774ce1aa-d3ca-4fd4-a203-333333333333', keyName: 'AUTH-HMAC-004', algorithm: 'HMAC', keySize: 256, purpose: 'AUTH', status: 'DEPLOYED', version: 3, expireAt: '2026-09-02', integrityValid: true, createdAt: '2026-02-14 08:40:12', updatedAt: '2026-08-10 17:30:21' },
   { keyUid: 'a1204b7c-97f0-4b40-b148-444444444444', keyName: 'NOTICE-AES-002', algorithm: 'AES', keySize: 256, purpose: 'WRAP', status: 'INACTIVE', version: 1, expireAt: '2026-09-08', integrityValid: true, createdAt: '2026-03-28 13:30:00', updatedAt: '2026-08-11 09:22:41' },
   { keyUid: 'c875e21f-184e-409d-81b3-555555555555', keyName: 'BACKUP-RSA-001', algorithm: 'RSA', keySize: 2048, purpose: 'SIGN', status: 'CREATED', version: 1, expireAt: '2027-01-31', integrityValid: true, createdAt: '2026-08-18 16:45:10', updatedAt: '2026-08-18 16:45:10' },
   { keyUid: 'd46a5403-ac81-4907-96d1-666666666666', keyName: 'LEGACY-AES-007', algorithm: 'AES', keySize: 256, purpose: 'ENCRYPT', status: 'EXPIRED', version: 1, expireAt: '2026-07-31', integrityValid: false, createdAt: '2025-08-01 10:00:00', updatedAt: '2026-08-01 00:00:01' },
@@ -22,12 +22,23 @@ export const mockKeys: CryptoKey[] = [
 
 export const keyStatusTransitions: Record<KeyStatus, KeyStatus[]> = {
   CREATED: ['ACTIVE'],
-  ACTIVE: ['EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED'],
+  ACTIVE: ['EXPIRED', 'INACTIVE', 'DEPLOYING', 'COMPROMISED', 'ROTATED'],
   EXPIRED: ['INACTIVE', 'ACTIVE'],
   INACTIVE: ['DESTROYED'],
-  DISTRIBUTED: ['DESTROYED'],
+  DISTRIBUTED: ['DEPLOYING', 'DESTROYED'],
+  DEPLOYING: ['DEPLOYED', 'DEPLOY_FAILED'],
+  DEPLOYED: ['ROTATED', 'INACTIVE', 'COMPROMISED'],
+  DEPLOY_FAILED: ['DEPLOYING', 'INACTIVE'],
+  ROTATED: ['ACTIVE', 'DEPRECATED'],
+  DEPRECATED: ['DESTROYED'],
   COMPROMISED: ['DESTROYED'],
   DESTROYED: [],
+}
+
+const managedLifecycleStatuses: KeyStatus[] = ['DEPLOYING', 'DEPLOYED', 'DEPLOY_FAILED', 'ROTATED', 'DEPRECATED']
+
+export function getManualKeyStatusTransitions(status: KeyStatus) {
+  return keyStatusTransitions[status].filter((nextStatus) => !managedLifecycleStatuses.includes(nextStatus))
 }
 
 export const mockKeyHistory: KeyStatusHistory[] = [
@@ -51,7 +62,7 @@ export const mockUsers: AppUser[] = [
   { userUid: 'usr-bb92174a', name: '최유진', phoneMasked: '010-****-7732', phonePlain: '010-9811-7732', emailMasked: 'yu***@example.com', emailPlain: 'yujin@example.com', status: 'ACTIVE', integrityValid: true, encVer: 1, createdAt: '2026-06-17 12:51:09', updatedAt: '2026-06-17 12:51:09' },
 ]
 
-const auditActions: AuditAction[] = ['LOGIN', 'KEY_CREATE', 'KEY_STATUS_CHANGE', 'KEY_TEST', 'USER_CREATE', 'USER_VIEW_PLAIN', 'USER_PASSWORD_RESET', 'NOTICE_CREATE', 'FILE_DOWNLOAD', 'LOGOUT']
+const auditActions: AuditAction[] = ['LOGIN', 'KEY_CREATE', 'KEY_STATUS_CHANGE', 'KEY_DEPLOY', 'KEY_ROTATE', 'KEY_TEST', 'USER_CREATE', 'USER_VIEW_PLAIN', 'USER_PASSWORD_RESET', 'NOTICE_CREATE', 'FILE_DOWNLOAD', 'LOGOUT']
 
 export const mockAuditLogs: AuditLog[] = auditActions.map((action, index) => ({
   logUid: `log-${String(index + 1).padStart(4, '0')}`,
@@ -65,6 +76,7 @@ export const mockAuditLogs: AuditLog[] = auditActions.map((action, index) => ({
 }))
 
 export const mockNotices: Notice[] = [
+  { noticeUid: 'notice-005', title: '클라이언트 연동 테스트 결과', content: '암복호화 테스트와 키 목록 조회 기능이 정상 동작하는 것을 확인했습니다.', exposeYn: 'Y', viewCount: 36, createdBy: 'client', createdAt: '2026-08-20 08:40:00', updatedAt: '2026-08-20 08:40:00', files: [] },
   { noticeUid: 'notice-001', title: 'D’Guard KMS 정기 점검 안내', content: '서비스 안정성 향상을 위한 정기 점검이 예정되어 있습니다. 점검 시간 동안 일부 키 관리 기능이 제한될 수 있습니다.', exposeYn: 'Y', viewCount: 842, createdBy: 'admin', createdAt: '2026-08-18 09:30:00', updatedAt: '2026-08-18 09:30:00', files: [{ fileUid: 'file-001', originalName: '점검_작업계획서.pdf', size: 248320, encVer: 1 }] },
   { noticeUid: 'notice-002', title: '키 교체 정책 변경 사전 안내', content: '관리 키 교체 주기 정책이 변경됩니다. 상세 내용은 첨부된 정책 문서를 확인해 주세요.', exposeYn: 'Y', viewCount: 529, createdBy: 'admin', createdAt: '2026-08-13 14:10:00', updatedAt: '2026-08-16 11:20:00', files: [{ fileUid: 'file-002', originalName: '키_교체_정책_v2.docx', size: 91392, encVer: 1 }] },
   { noticeUid: 'notice-003', title: '개인정보 조회 권한 점검', content: 'ADMIN 권한 및 개인정보 원문 조회 감사로그를 정기적으로 확인해 주세요.', exposeYn: 'N', viewCount: 74, createdBy: 'admin', createdAt: '2026-08-08 10:00:00', updatedAt: '2026-08-08 10:00:00', files: [] },

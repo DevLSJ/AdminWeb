@@ -53,9 +53,11 @@ const theme = createTheme({
     },
     body1: {
       fontSize: '1rem',
+      lineHeight: 1.65,
     },
     body2: {
-      fontSize: '0.9rem',
+      fontSize: '0.925rem',
+      lineHeight: 1.6,
     },
     button: {
       fontWeight: 700,
@@ -78,7 +80,48 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 9,
+          fontSize: '0.9rem',
+          lineHeight: 1.5,
         },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.875rem',
+          lineHeight: 1.55,
+          paddingTop: 14,
+          paddingBottom: 14,
+        },
+        head: {
+          fontSize: '0.875rem',
+          fontWeight: 750,
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: { fontSize: '0.9rem', lineHeight: 1.55 },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: { fontSize: '0.9rem' },
+      },
+    },
+    MuiFormHelperText: {
+      styleOverrides: {
+        root: { fontSize: '0.8rem', lineHeight: 1.5 },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        label: { fontSize: '0.78rem', fontWeight: 650 },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: { fontSize: '1.15rem', fontWeight: 750 },
       },
     },
     MuiTextField: {

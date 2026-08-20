@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import {
   AddRounded,
   CheckCircleRounded,
+  CloudUploadRounded,
   FilterAltOffRounded,
-  MoreVertRounded,
+  ReplayRounded,
   SearchRounded,
   ShieldOutlined,
   WarningAmberRounded,
@@ -13,15 +14,16 @@ import {
   Box,
   Button,
   Card,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
-  IconButton,
   InputAdornment,
   InputLabel,
+  ListItemText,
   MenuItem,
   Select,
   Stack,
@@ -32,13 +34,16 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { FilterCard, PageHeader, PaginationBar, StatusChip } from '../../components/admin/AdminPage'
-import { keyStatusTransitions, mockKeys } from '../../mocks/adminData'
-import type { CryptoKey, KeyListParams, KeyStatus } from '../../types/api'
+import { useAuth } from '../../hooks/useAuth'
+import { useKmsMock } from '../../hooks/useKmsMock'
+import { getManualKeyStatusTransitions } from '../../mocks/adminData'
+import type { CryptoKey, DeploymentTargetType, KeyListParams, KeyStatus } from '../../types/api'
+import { isAdminRole } from '../../types/auth'
+import { getStatusLabel } from '../../utils/status'
 
 const defaultParams: KeyListParams = {
   keyword: '',
@@ -51,17 +56,26 @@ const defaultParams: KeyListParams = {
 }
 
 const algorithmOptions = ['ALL', 'AES', 'HMAC', 'RSA'] as const
-const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED', 'DESTROYED'] as const
+const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'DEPLOYING', 'DEPLOYED', 'DEPLOY_FAILED', 'ROTATED', 'DEPRECATED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 
 function KeyList() {
+  const { user } = useAuth()
+  const { keys, deployments, changeKeyStatus, startDeployment, rollbackDeployment } = useKmsMock()
+  const isAdmin = isAdminRole(user?.role)
   const [params, setParams] = useState<KeyListParams>(defaultParams)
-  const [keys, setKeys] = useState(mockKeys)
   const [transitionKey, setTransitionKey] = useState<CryptoKey | null>(null)
   const [toStatus, setToStatus] = useState<KeyStatus | ''>('')
   const [reason, setReason] = useState('')
   const [message, setMessage] = useState('')
+  const [deployOpen, setDeployOpen] = useState(false)
+  const [deployKeyUids, setDeployKeyUids] = useState<string[]>([])
+  const [targetType, setTargetType] = useState<DeploymentTargetType>('SERVER_IP')
+  const [target, setTarget] = useState('')
+  const [simulateFailure, setSimulateFailure] = useState(false)
+  const [deploymentUid, setDeploymentUid] = useState('')
   const navigate = useNavigate()
+  const deployment = deployments.find((item) => item.deploymentUid === deploymentUid)
 
   const filteredKeys = useMemo(() => {
     const keyword = params.keyword.trim().toLowerCase()
@@ -95,17 +109,31 @@ function KeyList() {
 
   const handleTransition = () => {
     if (!transitionKey || !toStatus || !reason.trim()) return
-    setKeys((current) => current.map((key) => key.keyUid === transitionKey.keyUid ? { ...key, status: toStatus, updatedAt: '2026-08-19 16:30:00' } : key))
-    setMessage(`${transitionKey.keyName}: ${transitionKey.status} → ${toStatus} 상태 전이가 반영되었습니다.`)
+    changeKeyStatus(transitionKey.keyUid, toStatus, reason)
+    setMessage(`${transitionKey.keyName}: ${getStatusLabel(transitionKey.status)} → ${getStatusLabel(toStatus)} 상태 전이가 반영되었습니다.`)
     setTransitionKey(null)
+  }
+
+  const openDeployment = () => {
+    setDeployKeyUids([])
+    setTargetType('SERVER_IP')
+    setTarget('')
+    setSimulateFailure(false)
+    setDeploymentUid('')
+    setDeployOpen(true)
+  }
+
+  const executeDeployment = () => {
+    if (deployKeyUids.length === 0 || !target.trim()) return
+    setDeploymentUid(startDeployment(deployKeyUids, targetType, target.trim(), simulateFailure))
   }
 
   return (
     <Box>
       <PageHeader
         title="키 목록"
-        description="KMS 관리 키를 검색하고 상태·무결성·만료 정보를 관리합니다. 키 원문과 래핑 값은 화면에 노출하지 않습니다."
-        action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/keys/register')}>키 등록</Button>}
+        description={isAdmin ? 'KMS 관리 키를 검색하고 상태·무결성·만료 정보를 관리합니다. 키 원문과 래핑 값은 화면에 노출하지 않습니다.' : '사용 가능한 KMS 관리 키의 메타정보와 상태를 조회합니다.'}
+        action={isAdmin ? <Stack direction="row" spacing={1}><Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/keys/register')}>키 등록</Button><Button variant="outlined" startIcon={<CloudUploadRounded />} onClick={openDeployment}>키 배포</Button></Stack> : undefined}
       />
 
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
@@ -114,16 +142,16 @@ function KeyList() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 2fr) repeat(4, minmax(130px, 1fr))' }, gap: 1.5 }}>
           <TextField
             size="small"
-            label="keyword"
+            label="검색어"
             placeholder="키 이름 또는 key_uid"
             value={params.keyword}
             onChange={(event) => updateParam('keyword', event.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }}
           />
-          <FormControl size="small"><InputLabel>algorithm</InputLabel><Select label="algorithm" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 알고리즘' : option}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel>status</InputLabel><Select label="status" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{statusOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : option}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel>purpose</InputLabel><Select label="purpose" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : option}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel>sort</InputLabel><Select label="sort" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
+          <FormControl size="small"><InputLabel>알고리즘</InputLabel><Select label="알고리즘" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 알고리즘' : option}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>상태</InputLabel><Select label="상태" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{statusOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : getStatusLabel(option)}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>용도</InputLabel><Select label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : option}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>정렬</InputLabel><Select label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
         </Box>
         <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
           <Chip icon={<ShieldOutlined />} label="외부 식별자는 UUID(key_uid)만 사용" size="small" variant="outlined" />
@@ -138,18 +166,14 @@ function KeyList() {
             <TableBody>
               {pageContent.map((key) => (
                 <TableRow key={key.keyUid} hover sx={{ cursor: 'pointer' }} onDoubleClick={() => navigate(`/keys/${key.keyUid}`)}>
-                  <TableCell><Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>{key.keyName}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
+                  <TableCell><Typography sx={{ fontWeight: 700, fontSize: 14 }}>{key.keyName}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 12.5 }}>{key.keyUid}</Typography></TableCell>
                   <TableCell><Chip label={`${key.algorithm}-${key.keySize}`} size="small" variant="outlined" /></TableCell>
                   <TableCell>{key.purpose}</TableCell>
                   <TableCell><StatusChip status={key.status} /></TableCell>
                   <TableCell>v{key.version}</TableCell>
                   <TableCell>{key.expireAt}</TableCell>
                   <TableCell>{key.integrityValid ? <Chip icon={<CheckCircleRounded />} label="정상" color="success" size="small" variant="outlined" /> : <Chip icon={<WarningAmberRounded />} label="위반" color="error" size="small" />}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>
-                    <Button size="small" disabled={keyStatusTransitions[key.status].length === 0} onClick={() => openTransition(key)}>상태 변경</Button>
-                    <Tooltip title="향후 행별 작업 메뉴"><IconButton size="small"><MoreVertRounded /></IconButton></Tooltip>
-                  </TableCell>
+                  <TableCell align="right"><Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}><Button size="small" variant="text" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>{isAdmin && <Button size="small" variant="outlined" disabled={getManualKeyStatusTransitions(key.status).length === 0} onClick={() => openTransition(key)}>상태 변경</Button>}</Stack></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -163,10 +187,24 @@ function KeyList() {
         <DialogContent>
           <Alert severity="info" sx={{ mb: 2 }}>현재 상태에서 허용된 전이만 선택할 수 있으며 모든 변경은 감사로그와 상태 이력에 기록됩니다.</Alert>
           <TextField fullWidth label="대상 키" value={transitionKey?.keyName ?? ''} disabled sx={{ mb: 2 }} />
-          <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>변경 상태</InputLabel><Select label="변경 상태" value={toStatus} onChange={(event) => setToStatus(event.target.value as KeyStatus)}>{transitionKey && keyStatusTransitions[transitionKey.status].map((status) => <MenuItem key={status} value={status}>{status}</MenuItem>)}</Select></FormControl>
+          <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>변경 상태</InputLabel><Select label="변경 상태" value={toStatus} onChange={(event) => setToStatus(event.target.value as KeyStatus)}>{transitionKey && getManualKeyStatusTransitions(transitionKey.status).map((status) => <MenuItem key={status} value={status}>{getStatusLabel(status)}</MenuItem>)}</Select></FormControl>
           <TextField fullWidth required multiline minRows={3} label="변경 사유 (reason)" value={reason} onChange={(event) => setReason(event.target.value)} helperText="재활성 및 모든 상태 전이는 사유 입력이 필수입니다." />
         </DialogContent>
         <DialogActions><Button onClick={() => setTransitionKey(null)}>취소</Button><Button variant="contained" disabled={!toStatus || !reason.trim()} onClick={handleTransition}>변경 적용</Button></DialogActions>
+      </Dialog>
+
+      <Dialog open={deployOpen} onClose={() => deployment?.status !== 'DEPLOYING' && setDeployOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>키 배포</DialogTitle>
+        <DialogContent>
+          {deployment && <Alert severity={deployment.status === 'DEPLOY_FAILED' ? 'error' : deployment.status === 'DEPLOYING' ? 'info' : 'success'} sx={{ mb: 2 }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><StatusChip status={deployment.status} /><Typography>{deployment.status === 'DEPLOYING' ? '대상 에이전트가 키를 적용하고 있습니다.' : deployment.status === 'DEPLOY_FAILED' ? '배포에 실패했습니다. 이전 버전으로 롤백할 수 있습니다.' : deployment.status === 'ROLLED_BACK' ? '이전 버전 롤백이 완료되었습니다.' : '선택한 키의 배포가 완료되었습니다.'}</Typography></Stack></Alert>}
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth disabled={Boolean(deployment)}><InputLabel>배포할 키</InputLabel><Select multiple label="배포할 키" value={deployKeyUids} renderValue={(selected) => selected.map((uid) => keys.find((key) => key.keyUid === uid)?.keyName).filter(Boolean).join(', ')} onChange={(event) => setDeployKeyUids(typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value)}>{keys.filter((key) => !['DESTROYED', 'COMPROMISED'].includes(key.status)).map((key) => <MenuItem key={key.keyUid} value={key.keyUid}><Checkbox checked={deployKeyUids.includes(key.keyUid)} /><ListItemText primary={key.keyName} secondary={`v${key.version} · ${getStatusLabel(key.status)}`} /></MenuItem>)}</Select></FormControl>
+            <FormControl fullWidth disabled={Boolean(deployment)}><InputLabel>배포 대상 유형</InputLabel><Select label="배포 대상 유형" value={targetType} onChange={(event) => setTargetType(event.target.value as DeploymentTargetType)}><MenuItem value="SERVER_IP">서버 IP</MenuItem><MenuItem value="K8S_SECRET">K8s Secret</MenuItem><MenuItem value="APP_ID">App ID</MenuItem></Select></FormControl>
+            <TextField fullWidth required disabled={Boolean(deployment)} label={targetType === 'SERVER_IP' ? '서버 IP' : targetType === 'K8S_SECRET' ? 'K8s Secret 이름' : 'App ID'} placeholder={targetType === 'SERVER_IP' ? '10.20.30.40' : targetType === 'K8S_SECRET' ? 'kms/payment-key' : 'payment-service'} value={target} onChange={(event) => setTarget(event.target.value)} />
+            <FormControl fullWidth disabled={Boolean(deployment)}><InputLabel>Mock 배포 결과</InputLabel><Select label="Mock 배포 결과" value={simulateFailure ? 'FAILURE' : 'SUCCESS'} onChange={(event) => setSimulateFailure(event.target.value === 'FAILURE')}><MenuItem value="SUCCESS">배포 성공</MenuItem><MenuItem value="FAILURE">배포 실패 · 롤백 테스트</MenuItem></Select></FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setDeployOpen(false)} disabled={deployment?.status === 'DEPLOYING'}>{deployment ? '닫기' : '취소'}</Button>{deployment?.status === 'DEPLOY_FAILED' && <Button color="warning" variant="contained" startIcon={<ReplayRounded />} onClick={() => rollbackDeployment(deployment.deploymentUid)}>이전 버전 롤백</Button>}{!deployment && <Button variant="contained" startIcon={<CloudUploadRounded />} disabled={deployKeyUids.length === 0 || !target.trim()} onClick={executeDeployment}>배포 실행</Button>}</DialogActions>
       </Dialog>
     </Box>
   )

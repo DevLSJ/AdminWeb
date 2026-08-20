@@ -22,6 +22,11 @@ export type KeyStatus =
   | 'EXPIRED'
   | 'INACTIVE'
   | 'DISTRIBUTED'
+  | 'DEPLOYING'
+  | 'DEPLOYED'
+  | 'DEPLOY_FAILED'
+  | 'ROTATED'
+  | 'DEPRECATED'
   | 'COMPROMISED'
   | 'DESTROYED'
 
@@ -56,6 +61,29 @@ export interface KeyStatusHistory {
   reason: string
   changedBy: string
   changedAt: string
+}
+
+export type DeploymentTargetType = 'SERVER_IP' | 'K8S_SECRET' | 'APP_ID'
+export type DeploymentStatus = 'DEPLOYING' | 'DEPLOYED' | 'DEPLOY_FAILED' | 'ROLLED_BACK'
+export type AutoRotationDays = 30 | 60 | 90 | null
+
+export interface KeyVersion {
+  version: number
+  status: KeyStatus
+  createdAt: string
+  createdBy: string
+  decryptOnly: boolean
+}
+
+export interface KeyDeployment {
+  deploymentUid: string
+  keyUids: string[]
+  targetType: DeploymentTargetType
+  target: string
+  status: DeploymentStatus
+  previousVersions: Record<string, number>
+  createdAt: string
+  updatedAt: string
 }
 
 export interface KeyUsageSummary {
@@ -96,6 +124,10 @@ export type AuditAction =
   | 'KEY_CREATE'
   | 'KEY_STATUS_CHANGE'
   | 'KEY_TEST'
+  | 'KEY_DEPLOY'
+  | 'KEY_DEPLOY_ROLLBACK'
+  | 'KEY_ROTATE'
+  | 'KEY_AUTO_ROTATION_UPDATE'
   | 'USER_CREATE'
   | 'USER_UPDATE'
   | 'USER_VIEW_PLAIN'

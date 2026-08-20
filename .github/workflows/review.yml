@@ -1,0 +1,64 @@
+name: Codex PR Review
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  codex-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Initialize review artifact
+        run: |
+          printf '# Codex PR Review\n\n' > review.md
+          printf 'PR #%s\n\n' "${{ github.event.pull_request.number }}" >> review.md
+
+      - name: Review changed code with Codex
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            printf 'Codex review was skipped because `OPENAI_API_KEY` is unavailable. This is expected for pull requests from forks.\n' >> review.md
+            exit 0
+          fi
+
+          git fetch --no-tags origin "${{ github.event.pull_request.base.sha }}"
+
+          if ! npx --yes @openai/codex@latest exec review \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --output-last-message review.md \
+            "Review only the changes in this pull request. Produce a concise Korean Markdown review for review.md. Report only actionable correctness, regression, security, and testability findings, each with file and line evidence. If there are no blocking findings, state that clearly. Do not edit repository files."; then
+            printf '\n\n> Codex review execution failed. Inspect this workflow run for details.\n' >> review.md
+            exit 1
+          fi
+
+          if [ ! -s review.md ]; then
+            printf 'Codex completed without a review message.\n' > review.md
+          fi
+
+      - name: Upload review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-pr-review-${{ github.event.pull_request.number }}
+          path: review.md
+          if-no-files-found: error

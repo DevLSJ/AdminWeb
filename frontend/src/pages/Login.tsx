@@ -10,32 +10,22 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { alpha } from '@mui/material/styles'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
-const mockCredentials = {
-  username: 'admin',
-  password: 'admin',
-  token: 'mock-jwt-token',
-}
-
-interface LoginProps {
-  onLogin: () => void
-}
-
-function Login({ onLogin }: LoginProps) {
+function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(false)
+  const { login } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (username === mockCredentials.username && password === mockCredentials.password) {
-      localStorage.setItem('token', mockCredentials.token)
+    const result = login({ loginId: username, password })
+    if (result.success) {
       setError(false)
-      onLogin()
       navigate('/', { replace: true })
       return
     }
@@ -111,7 +101,7 @@ function Login({ onLogin }: LoginProps) {
             </Box>
             <Typography variant="h4">D&apos;Guard KMS</Typography>
             <Typography sx={{ mt: 1, color: 'text.secondary', fontSize: 15 }}>
-              통합 키 관리 시스템 관리자 로그인
+              통합 키 관리 시스템 로그인
             </Typography>
           </Box>
 
@@ -184,20 +174,6 @@ function Login({ onLogin }: LoginProps) {
               로그인
             </Button>
 
-            <Box
-              sx={{
-                mt: 3,
-                borderRadius: 2,
-                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.055),
-                px: 2,
-                py: 1.25,
-                textAlign: 'center',
-              }}
-            >
-              <Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>
-                목업 계정&nbsp;&nbsp; <strong>admin</strong> / <strong>admin</strong>
-              </Typography>
-            </Box>
           </Box>
         </CardContent>
       </Card>

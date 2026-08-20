@@ -26,26 +26,33 @@ import {
   Typography,
 } from '@mui/material'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
-import { mockAuditLogs } from '../../mocks/adminData'
+import { useKmsMock } from '../../hooks/useKmsMock'
 import type { AuditAction, AuditListParams, AuditLog as AuditLogType } from '../../types/api'
 
-const auditActions: Array<AuditAction | 'ALL'> = ['ALL', 'LOGIN', 'LOGOUT', 'KEY_CREATE', 'KEY_STATUS_CHANGE', 'KEY_TEST', 'USER_CREATE', 'USER_UPDATE', 'USER_VIEW_PLAIN', 'USER_PASSWORD_RESET', 'NOTICE_CREATE', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD']
-const defaultParams: AuditListParams = { from: '2026-08-01', to: '2026-08-19', actor: '', action: 'ALL', page: 0, size: 5 }
+const auditActions: Array<AuditAction | 'ALL'> = ['ALL', 'LOGIN', 'LOGOUT', 'KEY_CREATE', 'KEY_STATUS_CHANGE', 'KEY_DEPLOY', 'KEY_DEPLOY_ROLLBACK', 'KEY_ROTATE', 'KEY_AUTO_ROTATION_UPDATE', 'KEY_TEST', 'USER_CREATE', 'USER_UPDATE', 'USER_VIEW_PLAIN', 'USER_PASSWORD_RESET', 'NOTICE_CREATE', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD']
+const auditActionLabels: Record<AuditAction | 'ALL', string> = {
+  ALL: '전체 행위', LOGIN: '로그인', LOGOUT: '로그아웃', KEY_CREATE: '키 생성', KEY_STATUS_CHANGE: '키 상태 변경',
+  KEY_DEPLOY: '키 배포', KEY_DEPLOY_ROLLBACK: '키 배포 롤백', KEY_ROTATE: '키 갱신', KEY_AUTO_ROTATION_UPDATE: '자동 갱신 설정',
+  KEY_TEST: '키 테스트', USER_CREATE: '사용자 생성', USER_UPDATE: '사용자 수정', USER_VIEW_PLAIN: '개인정보 원문 조회',
+  USER_PASSWORD_RESET: '비밀번호 재설정', NOTICE_CREATE: '공지 생성', NOTICE_UPDATE: '공지 수정', NOTICE_DELETE: '공지 삭제', FILE_DOWNLOAD: '파일 내려받기',
+}
+const defaultParams: AuditListParams = { from: '2026-08-01', to: new Date().toISOString().slice(0, 10), actor: '', action: 'ALL', page: 0, size: 5 }
 
 function AuditLog() {
+  const { auditLogs } = useKmsMock()
   const [params, setParams] = useState(defaultParams)
   const [verifyResult, setVerifyResult] = useState<'idle' | 'valid' | 'invalid'>('idle')
   const [detail, setDetail] = useState<AuditLogType | null>(null)
 
-  const filteredLogs = useMemo(() => mockAuditLogs.filter((log) => {
+  const filteredLogs = useMemo(() => auditLogs.filter((log) => {
     const date = log.createdAt.slice(0, 10)
     return (!params.from || date >= params.from)
       && (!params.to || date <= params.to)
       && (!params.actor.trim() || log.actor.toLowerCase().includes(params.actor.trim().toLowerCase()))
       && (params.action === 'ALL' || log.action === params.action)
-  }), [params])
+  }), [auditLogs, params])
   const pageContent = filteredLogs.slice(params.page * params.size, (params.page + 1) * params.size)
-  const invalidLogs = mockAuditLogs.filter((log) => !log.chainValid)
+  const invalidLogs = auditLogs.filter((log) => !log.chainValid)
 
   const updateParam = <K extends keyof AuditListParams>(key: K, value: AuditListParams[K]) => setParams((current) => ({ ...current, [key]: value, page: key === 'page' ? Number(value) : 0 }))
 
@@ -74,15 +81,15 @@ function AuditLog() {
           <TextField size="small" type="date" label="from" value={params.from} onChange={(event) => updateParam('from', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" type="date" label="to" value={params.to} onChange={(event) => updateParam('to', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" label="actor" placeholder="행위자" value={params.actor} onChange={(event) => updateParam('actor', event.target.value)} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
-          <FormControl size="small"><InputLabel>action</InputLabel><Select label="action" value={params.action} onChange={(event) => updateParam('action', event.target.value as AuditListParams['action'])}>{auditActions.map((action) => <MenuItem key={action} value={action}>{action === 'ALL' ? '전체 행위' : action}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>행위</InputLabel><Select label="행위" value={params.action} onChange={(event) => updateParam('action', event.target.value as AuditListParams['action'])}>{auditActions.map((action) => <MenuItem key={action} value={action}>{auditActionLabels[action]}</MenuItem>)}</Select></FormControl>
           <Button color="inherit" onClick={() => setParams(defaultParams)}>초기화</Button>
         </Box>
       </FilterCard>
       <Card>
-        <TableContainer><Table sx={{ minWidth: 1080 }}><TableHead><TableRow sx={{ bgcolor: '#f8f9fc' }}><TableCell>시각 (KST)</TableCell><TableCell>행위자</TableCell><TableCell>행위</TableCell><TableCell>대상</TableCell><TableCell>설명</TableCell><TableCell>체인 검증</TableCell><TableCell align="right">상세</TableCell></TableRow></TableHead><TableBody>{pageContent.map((log) => <TableRow key={log.logUid} hover><TableCell>{log.createdAt}</TableCell><TableCell><Chip label={log.actor} size="small" variant="outlined" /></TableCell><TableCell><Typography sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 12.5 }}>{log.action}</Typography></TableCell><TableCell><Typography sx={{ fontSize: 12 }}>{log.targetType}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{log.targetId}</Typography></TableCell><TableCell sx={{ maxWidth: 280 }}><Typography noWrap sx={{ fontSize: 12.5 }}>{log.detail}</Typography></TableCell><TableCell>{log.chainValid ? <Chip label="정상" color="success" size="small" variant="outlined" /> : <Chip label="위반" color="error" size="small" />}</TableCell><TableCell align="right"><Button size="small" onClick={() => setDetail(log)}>보기</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer>
+        <TableContainer><Table sx={{ minWidth: 1080 }}><TableHead><TableRow sx={{ bgcolor: '#f8f9fc' }}><TableCell>시각 (KST)</TableCell><TableCell>행위자</TableCell><TableCell>행위</TableCell><TableCell>대상</TableCell><TableCell>설명</TableCell><TableCell>체인 검증</TableCell><TableCell align="right">상세</TableCell></TableRow></TableHead><TableBody>{pageContent.map((log) => <TableRow key={log.logUid} hover><TableCell>{log.createdAt}</TableCell><TableCell><Chip label={log.actor} size="small" variant="outlined" /></TableCell><TableCell><Typography sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 14 }}>{auditActionLabels[log.action]}</Typography></TableCell><TableCell><Typography sx={{ fontSize: 14 }}>{log.targetType}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 12.5 }}>{log.targetId}</Typography></TableCell><TableCell sx={{ maxWidth: 280 }}><Typography noWrap sx={{ fontSize: 14 }}>{log.detail}</Typography></TableCell><TableCell>{log.chainValid ? <Chip label="정상" color="success" size="small" variant="outlined" /> : <Chip label="위반" color="error" size="small" />}</TableCell><TableCell align="right"><Button size="small" onClick={() => setDetail(log)}>보기</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer>
         <PaginationBar page={params.page} size={params.size} totalElements={filteredLogs.length} onPageChange={(page) => updateParam('page', page)} onSizeChange={(size) => updateParam('size', size)} />
       </Card>
-      <Dialog open={Boolean(detail)} onClose={() => setDetail(null)} fullWidth maxWidth="sm"><DialogTitle>감사로그 상세</DialogTitle><DialogContent>{detail && <><InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={detail.action} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="대상 ID" value={detail.targetId} /><InfoRow label="상세 JSON" value={<Box component="pre" sx={{ m: 0, p: 1.5, borderRadius: 2, bgcolor: '#f7f8fc', whiteSpace: 'pre-wrap', fontSize: 12 }}>{JSON.stringify({ message: detail.detail, chainValid: detail.chainValid }, null, 2)}</Box>} /><InfoRow label="기록 시각" value={`${detail.createdAt} KST`} /></>}</DialogContent><DialogActions><Button onClick={() => setDetail(null)}>닫기</Button></DialogActions></Dialog>
+      <Dialog open={Boolean(detail)} onClose={() => setDetail(null)} fullWidth maxWidth="sm"><DialogTitle>감사로그 상세</DialogTitle><DialogContent>{detail && <><InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={auditActionLabels[detail.action]} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="대상 ID" value={detail.targetId} /><InfoRow label="상세 JSON" value={<Box component="pre" sx={{ m: 0, p: 1.5, borderRadius: 2, bgcolor: '#f7f8fc', whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.6 }}>{JSON.stringify({ message: detail.detail, chainValid: detail.chainValid }, null, 2)}</Box>} /><InfoRow label="기록 시각" value={`${detail.createdAt} KST`} /></>}</DialogContent><DialogActions><Button onClick={() => setDetail(null)}>닫기</Button></DialogActions></Dialog>
     </Box>
   )
 }

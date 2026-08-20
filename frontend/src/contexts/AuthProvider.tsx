@@ -1,0 +1,86 @@
+import { useState, type ReactNode } from 'react'
+import { AuthContext } from './AuthContext'
+import { canChangeRole, type AuthContextValue, type AuthResult, type AuthUser, type LoginCredentials, type MockAccount, type UserRole } from '../types/auth'
+
+const TOKEN_STORAGE_KEY = 'token'
+const SESSION_STORAGE_KEY = 'auth-session'
+
+const initialAccounts: MockAccount[] = [
+  { userUid: 'usr-auth-admin', loginId: 'admin', password: 'admin', name: '최고 관리자', role: 'S.ADMIN' },
+  { userUid: 'usr-auth-manager', loginId: 'manager', password: 'manager', name: '일반 관리자', role: 'ADMIN' },
+  { userUid: 'usr-auth-client', loginId: 'client', password: 'client', name: '클라이언트 사용자', role: 'CLIENT' },
+]
+
+function readStoredSession(): AuthUser | null {
+  if (!localStorage.getItem(TOKEN_STORAGE_KEY)) return null
+  try {
+    const value = localStorage.getItem(SESSION_STORAGE_KEY)
+    if (!value) return null
+    const stored = JSON.parse(value) as AuthUser
+    const account = initialAccounts.find((item) => item.loginId === stored.loginId)
+    return account
+      ? { userUid: account.userUid, loginId: account.loginId, name: stored.name || account.name, role: account.role }
+      : null
+  } catch {
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(SESSION_STORAGE_KEY)
+    return null
+  }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [accounts, setAccounts] = useState(initialAccounts)
+  const [user, setUser] = useState<AuthUser | null>(readStoredSession)
+
+  const persistSession = (session: AuthUser) => {
+    setUser(session)
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+  }
+
+  const login = ({ loginId, password }: LoginCredentials): AuthResult => {
+    const account = accounts.find((item) => item.loginId === loginId && item.password === password)
+    if (!account) return { success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다' }
+    const session: AuthUser = { userUid: account.userUid, loginId: account.loginId, name: account.name, role: account.role }
+    localStorage.setItem(TOKEN_STORAGE_KEY, `mock-jwt-token-${account.role.toLowerCase()}`)
+    persistSession(session)
+    return { success: true, message: '로그인되었습니다.' }
+  }
+
+  const logout = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(SESSION_STORAGE_KEY)
+    setUser(null)
+  }
+
+  const updateProfile = (name: string) => {
+    if (!user) return
+    setAccounts((current) => current.map((account) => account.loginId === user.loginId ? { ...account, name } : account))
+    persistSession({ ...user, name })
+  }
+
+  const changePassword = (currentPassword: string, newPassword: string): AuthResult => {
+    if (!user) return { success: false, message: '로그인이 필요합니다.' }
+    const account = accounts.find((item) => item.loginId === user.loginId)
+    if (!account || account.password !== currentPassword) return { success: false, message: '현재 비밀번호가 올바르지 않습니다.' }
+    setAccounts((current) => current.map((item) => item.loginId === user.loginId ? { ...item, password: newPassword } : item))
+    return { success: true, message: '비밀번호가 변경되었습니다. 실제 API 연동 시 새 Salt와 PBKDF2 해시를 저장합니다.' }
+  }
+
+  const updateAccountRole = (loginId: string, role: UserRole): AuthResult => {
+    if (!user) return { success: false, message: '로그인이 필요합니다.' }
+    const target = accounts.find((account) => account.loginId === loginId)
+    if (!target) return { success: false, message: '변경할 계정을 찾을 수 없습니다.' }
+    if (!canChangeRole(user, target, role)) {
+      if (loginId === user.loginId) return { success: false, message: '현재 로그인한 계정의 권한은 변경할 수 없습니다.' }
+      if (user.role === 'CLIENT') return { success: false, message: '관리자 권한이 필요합니다.' }
+      return { success: false, message: '일반 관리자는 CLIENT 계정만 ADMIN 또는 CLIENT로 변경할 수 있습니다.' }
+    }
+    setAccounts((current) => current.map((account) => account.loginId === loginId ? { ...account, role } : account))
+    return { success: true, message: `${loginId} 계정 권한이 ${role}(으)로 변경되었습니다.` }
+  }
+
+  const publicAccounts = accounts.map((account) => ({ userUid: account.userUid, loginId: account.loginId, name: account.name, role: account.role }))
+  const value: AuthContextValue = { user, accounts: publicAccounts, isAuthenticated: Boolean(user && localStorage.getItem(TOKEN_STORAGE_KEY)), login, logout, updateProfile, changePassword, updateAccountRole }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}

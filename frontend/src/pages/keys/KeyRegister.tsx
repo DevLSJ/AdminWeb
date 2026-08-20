@@ -19,6 +19,7 @@ import {
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/admin/AdminPage'
+import { useKmsMock } from '../../hooks/useKmsMock'
 import type { KeyAlgorithm, KeyPurpose } from '../../types/api'
 
 const initialForm = {
@@ -31,6 +32,7 @@ const initialForm = {
 }
 
 function KeyRegister() {
+  const { createKey } = useKmsMock()
   const [form, setForm] = useState(initialForm)
   const [createdUid, setCreatedUid] = useState('')
   const navigate = useNavigate()
@@ -45,7 +47,7 @@ function KeyRegister() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setCreatedUid(crypto.randomUUID())
+    setCreatedUid(createKey(form).keyUid)
   }
 
   return (
@@ -68,10 +70,10 @@ function KeyRegister() {
                 <FormControl fullWidth><InputLabel>용도 (purpose)</InputLabel><Select label="용도 (purpose)" value={form.purpose} onChange={(event) => setForm((current) => ({ ...current, purpose: event.target.value as KeyPurpose }))}><MenuItem value="ENCRYPT">ENCRYPT · 데이터 암복호화</MenuItem><MenuItem value="SIGN">SIGN · 전자서명</MenuItem><MenuItem value="AUTH">AUTH · 메시지 인증</MenuItem><MenuItem value="WRAP">WRAP · 키 래핑</MenuItem></Select></FormControl>
                 <TextField fullWidth required label="유효기간 (expireAt)" type="date" value={form.expireAt} onChange={(event) => setForm((current) => ({ ...current, expireAt: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
               </Box>
-              <FormControlLabel control={<Switch checked={form.activateImmediately} onChange={(event) => setForm((current) => ({ ...current, activateImmediately: event.target.checked }))} />} label="생성 직후 ACTIVE 상태로 전환 (상태 이력 기록)" />
+              <FormControlLabel control={<Switch checked={form.activateImmediately} onChange={(event) => setForm((current) => ({ ...current, activateImmediately: event.target.checked }))} />} label="생성 직후 활성 상태로 전환 (상태 이력 기록)" />
               <Stack direction="row" spacing={1.5} sx={{ mt: 3 }}><Button type="submit" variant="contained" size="large" startIcon={<KeyRounded />} disabled={!form.keyName.trim() || !form.expireAt}>키 자동 생성</Button><Button color="inherit" onClick={() => setForm(initialForm)}>입력 초기화</Button></Stack>
             </Box>
-            {createdUid && <Alert severity="success" sx={{ mt: 3 }}><Typography sx={{ fontWeight: 700 }}>키가 목업 생성되었습니다.</Typography><Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 12 }}>key_uid: {createdUid}</Typography><Typography sx={{ mt: 0.5, fontSize: 12.5 }}>status: {form.activateImmediately ? 'ACTIVE' : 'CREATED'} · integrityValid: true</Typography></Alert>}
+            {createdUid && <Alert severity="success" sx={{ mt: 3 }}><Typography sx={{ fontWeight: 700 }}>키가 목업 생성되었습니다.</Typography><Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 12 }}>키 UID: {createdUid}</Typography><Typography sx={{ mt: 0.5, fontSize: 12.5 }}>상태: {form.activateImmediately ? '활성' : '생성'} · 무결성: 정상</Typography></Alert>}
           </CardContent>
         </Card>
 
