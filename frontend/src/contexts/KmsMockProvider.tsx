@@ -12,7 +12,7 @@ import type {
   KeyStatusHistory,
   KeyVersion,
 } from '../types/api'
-import { KmsMockContext, type CreateKeyInput } from './KmsMockContext'
+import { KmsMockContext, type CreateKeyInput, type KeyTestOperation } from './KmsMockContext'
 
 function nowKst() {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -209,5 +209,12 @@ export function KmsMockProvider({ children }: { children: ReactNode }) {
     appendAudit('KEY_AUTO_ROTATION_UPDATE', keyUid, `[${actor}] 자동 갱신 주기 ${days ? `${days}일` : '미사용'} 설정`)
   }
 
-  return <KmsMockContext.Provider value={{ keys, auditLogs, deployments, keyHistories, keyVersions, autoRotationByKey, createKey, updateKeyMetadata, changeKeyStatus, startDeployment, rollbackDeployment, rotateKey, setAutoRotation }}>{children}</KmsMockContext.Provider>
+  const recordKeyTest = (keyUid: string, operation: KeyTestOperation, success: boolean, failureReason?: string) => {
+    const operationLabel = operation === 'ENCRYPT' ? '암호화' : '복호화'
+    const resultLabel = success ? '성공' : '실패'
+    const reason = !success && failureReason ? `: ${failureReason}` : ''
+    appendAudit('KEY_TEST', keyUid, `[${actor}] ${operationLabel} ${resultLabel}${reason}`)
+  }
+
+  return <KmsMockContext.Provider value={{ keys, auditLogs, deployments, keyHistories, keyVersions, autoRotationByKey, createKey, updateKeyMetadata, changeKeyStatus, startDeployment, rollbackDeployment, rotateKey, setAutoRotation, recordKeyTest }}>{children}</KmsMockContext.Provider>
 }

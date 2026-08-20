@@ -19,6 +19,8 @@ export interface CreateKeyInput {
   activateImmediately: boolean
 }
 
+export type KeyTestOperation = 'ENCRYPT' | 'DECRYPT'
+
 export interface KmsMockContextValue {
   keys: CryptoKey[]
   auditLogs: AuditLog[]
@@ -33,6 +35,7 @@ export interface KmsMockContextValue {
   rollbackDeployment: (deploymentUid: string) => void
   rotateKey: (keyUid: string) => number | null
   setAutoRotation: (keyUid: string, days: AutoRotationDays) => void
+  recordKeyTest: (keyUid: string, operation: KeyTestOperation, success: boolean, failureReason?: string) => void
 }
 
 export const KmsMockContext = createContext<KmsMockContextValue | null>(null)
