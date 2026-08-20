@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   InputAdornment,
   TextField,
   Typography,
@@ -16,21 +17,29 @@ import { useAuth } from '../hooks/useAuth'
 function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(false)
-  const { login } = useAuth()
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const { login, isInitializing } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
-    const result = login({ loginId: username, password })
-    if (result.success) {
-      setError(false)
-      navigate('/', { replace: true })
-      return
+    setSubmitting(true)
+    try {
+      const result = await login({ loginId: username, password })
+      if (result.success) {
+        setError('')
+        navigate('/', { replace: true })
+        return
+      }
+      setError(result.message)
+    } finally {
+      setSubmitting(false)
     }
+  }
 
-    setError(true)
+  if (isInitializing) {
+    return <Box sx={{ display: 'grid', minHeight: '100vh', placeItems: 'center' }}><CircularProgress /></Box>
   }
 
   return (
@@ -108,7 +117,7 @@ function Login() {
           <Box component="form" onSubmit={handleSubmit} noValidate>
             {error && (
               <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2, fontSize: 14 }}>
-                아이디 또는 비밀번호가 올바르지 않습니다
+                {error}
               </Alert>
             )}
 
@@ -121,7 +130,7 @@ function Login() {
               value={username}
               onChange={(event) => {
                 setUsername(event.target.value)
-                setError(false)
+                setError('')
               }}
               slotProps={{
                 input: {
@@ -143,7 +152,7 @@ function Login() {
               value={password}
               onChange={(event) => {
                 setPassword(event.target.value)
-                setError(false)
+                setError('')
               }}
               slotProps={{
                 input: {
@@ -159,6 +168,7 @@ function Login() {
             <Button
               fullWidth
               type="submit"
+              disabled={submitting || !username.trim() || !password}
               variant="contained"
               size="large"
               sx={{
@@ -171,7 +181,7 @@ function Login() {
                 },
               }}
             >
-              로그인
+              {submitting ? '로그인 중…' : '로그인'}
             </Button>
 
           </Box>

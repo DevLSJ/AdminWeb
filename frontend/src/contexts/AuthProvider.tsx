@@ -1,14 +1,17 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import axios from 'axios'
+import { apiEndpoints } from '../api/endpoints'
+import { apiClient, SESSION_STORAGE_KEY, TOKEN_STORAGE_KEY } from '../api/client'
 import { AuthContext } from './AuthContext'
+import type { ApiResponse } from '../types/api'
 import { canChangeRole, type AuthContextValue, type AuthResult, type AuthUser, type LoginCredentials, type MockAccount, type UserRole } from '../types/auth'
-
-const TOKEN_STORAGE_KEY = 'token'
-const SESSION_STORAGE_KEY = 'auth-session'
 
 const initialAccounts: MockAccount[] = [
   { userUid: 'usr-auth-admin', loginId: 'admin', password: 'admin', name: '최고 관리자', role: 'S.ADMIN' },
   { userUid: 'usr-auth-manager', loginId: 'manager', password: 'manager', name: '일반 관리자', role: 'ADMIN' },
   { userUid: 'usr-auth-client', loginId: 'client', password: 'client', name: '클라이언트 사용자', role: 'CLIENT' },
+  { userUid: 'usr-auth-auditor', loginId: 'auditor', password: 'auditor', name: '감사 관리자', role: 'ADMIN' },
+  { userUid: 'usr-auth-operator', loginId: 'operator', password: 'operator', name: '운영 클라이언트', role: 'CLIENT' },
 ]
 
 function readStoredSession(): AuthUser | null {
@@ -31,22 +34,60 @@ function readStoredSession(): AuthUser | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [user, setUser] = useState<AuthUser | null>(readStoredSession)
+  const [isInitializing, setIsInitializing] = useState(Boolean(localStorage.getItem(TOKEN_STORAGE_KEY)))
 
   const persistSession = (session: AuthUser) => {
     setUser(session)
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
   }
 
-  const login = ({ loginId, password }: LoginCredentials): AuthResult => {
-    const account = accounts.find((item) => item.loginId === loginId && item.password === password)
-    if (!account) return { success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다' }
-    const session: AuthUser = { userUid: account.userUid, loginId: account.loginId, name: account.name, role: account.role }
-    localStorage.setItem(TOKEN_STORAGE_KEY, `mock-jwt-token-${account.role.toLowerCase()}`)
-    persistSession(session)
-    return { success: true, message: '로그인되었습니다.' }
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY)
+    if (!token) {
+      setIsInitializing(false)
+      return
+    }
+
+    let active = true
+    void apiClient.get<ApiResponse<AuthUser>>(apiEndpoints.auth.me)
+      .then(({ data }) => {
+        if (active && data.success) persistSession(data.data)
+      })
+      .catch(() => {
+        if (!active) return
+        localStorage.removeItem(TOKEN_STORAGE_KEY)
+        localStorage.removeItem(SESSION_STORAGE_KEY)
+        setUser(null)
+      })
+      .finally(() => {
+        if (active) setIsInitializing(false)
+      })
+
+    return () => { active = false }
+  }, [])
+
+  const login = async ({ loginId, password }: LoginCredentials): Promise<AuthResult> => {
+    try {
+      const { data } = await apiClient.post<ApiResponse<AuthUser & { token: string }>>(apiEndpoints.auth.login, { loginId, password })
+      const session: AuthUser = {
+        userUid: data.data.userUid,
+        loginId: data.data.loginId,
+        name: data.data.name,
+        role: data.data.role,
+      }
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.data.token)
+      persistSession(session)
+      return { success: true, message: data.message || '로그인되었습니다.' }
+    } catch (error) {
+      const message = axios.isAxiosError<ApiResponse<never>>(error)
+        ? error.response?.data?.message
+        : undefined
+      return { success: false, message: message || '아이디 또는 비밀번호가 올바르지 않습니다' }
+    }
   }
 
   const logout = () => {
+    void apiClient.post(apiEndpoints.auth.logout).catch(() => undefined)
     localStorage.removeItem(TOKEN_STORAGE_KEY)
     localStorage.removeItem(SESSION_STORAGE_KEY)
     setUser(null)
@@ -80,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const publicAccounts = accounts.map((account) => ({ userUid: account.userUid, loginId: account.loginId, name: account.name, role: account.role }))
-  const value: AuthContextValue = { user, accounts: publicAccounts, isAuthenticated: Boolean(user && localStorage.getItem(TOKEN_STORAGE_KEY)), login, logout, updateProfile, changePassword, updateAccountRole }
+  const value: AuthContextValue = { user, accounts: publicAccounts, isAuthenticated: Boolean(user && localStorage.getItem(TOKEN_STORAGE_KEY)), isInitializing, login, logout, updateProfile, changePassword, updateAccountRole }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

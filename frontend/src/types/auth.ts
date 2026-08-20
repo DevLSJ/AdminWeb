@@ -37,7 +37,8 @@ export interface AuthContextValue {
   user: AuthUser | null
   accounts: AuthUser[]
   isAuthenticated: boolean
-  login: (credentials: LoginCredentials) => AuthResult
+  isInitializing: boolean
+  login: (credentials: LoginCredentials) => Promise<AuthResult>
   logout: () => void
   updateProfile: (name: string) => void
   changePassword: (currentPassword: string, newPassword: string) => AuthResult
