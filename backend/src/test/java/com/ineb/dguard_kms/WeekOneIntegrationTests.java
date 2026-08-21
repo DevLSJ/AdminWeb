@@ -47,14 +47,15 @@ class WeekOneIntegrationTests {
         assertThat(admin.getPasswordHash()).isNotBlank().isNotEqualTo("admin");
         assertThat(admin.getPasswordSalt()).isNotBlank();
         assertThat(admin.getPasswordAlgorithm()).isEqualTo("PBKDF2WithHmacSHA256");
-        assertThat(admin.getPasswordIterations()).isPositive();
+        assertThat(admin.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
         assertThat(admin.getRole()).isEqualTo("ADMIN");
 
         assertThat(client.getPasswordHash()).isNotBlank().isNotEqualTo("client");
         assertThat(client.getPasswordSalt()).isNotBlank();
         assertThat(client.getPasswordAlgorithm()).isEqualTo("PBKDF2WithHmacSHA256");
-        assertThat(client.getPasswordIterations()).isPositive();
+        assertThat(client.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
         assertThat(client.getRole()).isEqualTo("CLIENT");
+        assertThat(client.getPasswordSalt()).isNotEqualTo(admin.getPasswordSalt());
     }
 
     @Test

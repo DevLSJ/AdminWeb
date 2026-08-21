@@ -5,8 +5,6 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -16,13 +14,10 @@ import jakarta.persistence.Table;
 @Table(name = "admin_user")
 public class AdminUser {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @Column(name = "user_uid", nullable = false, unique = true, updatable = false)
     private UUID userUid;
 
+    @Id
     @Column(name = "login_id", nullable = false, unique = true, length = 100)
     private String loginId;
 
@@ -87,10 +82,6 @@ public class AdminUser {
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public UUID getUserUid() {

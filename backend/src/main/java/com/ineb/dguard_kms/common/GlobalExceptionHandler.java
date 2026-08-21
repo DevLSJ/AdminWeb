@@ -10,6 +10,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.ineb.dguard_kms.domain.key.service.KeyOperationException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -26,5 +28,17 @@ public class GlobalExceptionHandler {
                 .distinct()
                 .collect(Collectors.joining(" "));
         return ResponseEntity.badRequest().body(ApiResponse.failure(message, "VALIDATION_FAILED"));
+    }
+
+    @ExceptionHandler(KeyOperationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleKeyOperation(KeyOperationException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(ApiResponse.failure(exception.getMessage(), exception.getErrorCode()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure(exception.getMessage(), "INVALID_REQUEST"));
     }
 }
