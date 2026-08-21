@@ -40,13 +40,21 @@ class WeekOneIntegrationTests {
     private CryptoUtil cryptoUtil;
 
     @Test
-    void initialAdminUsesSaltedPbkdf2Hash() {
+    void initialUsersUseSaltedPbkdf2Hashes() {
         var admin = userRepository.findByLoginId("admin").orElseThrow();
+        var client = userRepository.findByLoginId("client").orElseThrow();
 
         assertThat(admin.getPasswordHash()).isNotBlank().isNotEqualTo("admin");
         assertThat(admin.getPasswordSalt()).isNotBlank();
         assertThat(admin.getPasswordAlgorithm()).isEqualTo("PBKDF2WithHmacSHA256");
         assertThat(admin.getPasswordIterations()).isPositive();
+        assertThat(admin.getRole()).isEqualTo("ADMIN");
+
+        assertThat(client.getPasswordHash()).isNotBlank().isNotEqualTo("client");
+        assertThat(client.getPasswordSalt()).isNotBlank();
+        assertThat(client.getPasswordAlgorithm()).isEqualTo("PBKDF2WithHmacSHA256");
+        assertThat(client.getPasswordIterations()).isPositive();
+        assertThat(client.getRole()).isEqualTo("CLIENT");
     }
 
     @Test
@@ -70,6 +78,15 @@ class WeekOneIntegrationTests {
         HttpResponse<String> me = client.send(meRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertThat(me.statusCode()).isEqualTo(200);
         assertThat(objectMapper.readTree(me.body()).path("data").path("loginId").asText()).isEqualTo("admin");
+
+        HttpResponse<String> clientLogin = client.send(jsonRequest("/api/auth/login", """
+                {"loginId":"client","password":"client"}
+                """), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertThat(clientLogin.statusCode()).isEqualTo(200);
+        JsonNode clientLoginBody = objectMapper.readTree(clientLogin.body());
+        assertThat(clientLoginBody.path("data").path("loginId").asText()).isEqualTo("client");
+        assertThat(clientLoginBody.path("data").path("role").asText()).isEqualTo("CLIENT");
+        assertThat(clientLoginBody.path("data").path("token").asText()).isNotBlank();
 
         HttpResponse<String> rejected = client.send(jsonRequest("/api/auth/login", """
                 {"loginId":"admin","password":"wrong-password"}

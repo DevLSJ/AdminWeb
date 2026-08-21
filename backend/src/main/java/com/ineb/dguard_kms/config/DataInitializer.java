@@ -25,21 +25,36 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (userRepository.existsByLoginId("admin")) {
+        createUserIfMissing(
+                "admin",
+                new char[] { 'a', 'd', 'm', 'i', 'n' },
+                "관리자",
+                "ADMIN"
+        );
+        createUserIfMissing(
+                "client",
+                new char[] { 'c', 'l', 'i', 'e', 'n', 't' },
+                "클라이언트 사용자",
+                "CLIENT"
+        );
+    }
+
+    private void createUserIfMissing(String loginId, char[] initialPassword, String name, String role) {
+        if (userRepository.existsByLoginId(loginId)) {
+            Arrays.fill(initialPassword, '\0');
             return;
         }
 
-        char[] initialPassword = { 'a', 'd', 'm', 'i', 'n' };
         try {
             PasswordService.PasswordHash encoded = passwordService.hash(initialPassword);
             userRepository.save(new AdminUser(
-                    "admin",
+                    loginId,
                     encoded.hash(),
                     encoded.salt(),
                     encoded.algorithm(),
                     encoded.iterations(),
-                    "관리자",
-                    "ADMIN"
+                    name,
+                    role
             ));
         } finally {
             Arrays.fill(initialPassword, '\0');
