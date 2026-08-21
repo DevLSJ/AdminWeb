@@ -71,7 +71,7 @@ public class AuditLogService {
     ) {
         Instant fromTime = from == null ? null : from.atStartOfDay(KST).toInstant();
         Instant toTime = to == null ? null : to.plusDays(1).atStartOfDay(KST).toInstant();
-        String actorFilter = actor == null || actor.isBlank() ? null : actor.trim();
+        String actorFilter = actor == null || actor.isBlank() ? "" : actor.trim();
         String actionFilter = action == null || action.isBlank() || "ALL".equals(action) ? null : action;
         Page<AuditLogResponse> result = repository.search(
                 fromTime,

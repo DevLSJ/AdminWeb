@@ -22,7 +22,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
             select log from AuditLog log
             where (:fromTime is null or log.createdAt >= :fromTime)
               and (:toTime is null or log.createdAt < :toTime)
-              and (:actor is null or lower(log.actor) like lower(concat('%', :actor, '%')))
+              and lower(log.actor) like lower(concat('%', :actor, '%'))
               and (:action is null or log.action = :action)
             """)
     Page<AuditLog> search(
