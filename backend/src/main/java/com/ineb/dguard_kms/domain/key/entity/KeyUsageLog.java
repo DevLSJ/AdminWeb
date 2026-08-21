@@ -53,4 +53,10 @@ public class KeyUsageLog {
 
     @PrePersist
     void onCreate() { usedAt = Instant.now(); }
+
+    public String getOperation() { return operation; }
+    public boolean isSuccess() { return success; }
+    public String getFailureReason() { return failureReason; }
+    public String getUsedBy() { return usedBy; }
+    public Instant getUsedAt() { return usedAt; }
 }

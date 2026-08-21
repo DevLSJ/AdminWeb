@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ineb.dguard_kms.crypto.CryptoUtil;
 import com.ineb.dguard_kms.crypto.IntegrityService;
+import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
 import com.ineb.dguard_kms.domain.key.dto.KeyCreateRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyDecryptRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyDecryptResponse;
@@ -25,8 +26,12 @@ import com.ineb.dguard_kms.domain.key.dto.KeyEncryptRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyEncryptResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyHistoryResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyRotationPolicyRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyRotationResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyStatusChangeRequest;
+import com.ineb.dguard_kms.domain.key.dto.KeyUpdateRequest;
+import com.ineb.dguard_kms.domain.key.dto.KeyUsageSummaryResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyVersionResponse;
 import com.ineb.dguard_kms.domain.key.entity.CryptoKey;
 import com.ineb.dguard_kms.domain.key.entity.KeyMaterial;
 import com.ineb.dguard_kms.domain.key.entity.KeyStatus;
@@ -48,6 +53,7 @@ public class CryptoKeyService {
     private final KeyUsageLogRepository usageLogRepository;
     private final CryptoUtil cryptoUtil;
     private final IntegrityService integrityService;
+    private final AuditLogService auditLogService;
 
     public CryptoKeyService(
             CryptoKeyRepository keyRepository,
@@ -55,7 +61,8 @@ public class CryptoKeyService {
             KeyStatusHistoryRepository historyRepository,
             KeyUsageLogRepository usageLogRepository,
             CryptoUtil cryptoUtil,
-            IntegrityService integrityService
+            IntegrityService integrityService,
+            AuditLogService auditLogService
     ) {
         this.keyRepository = keyRepository;
         this.materialRepository = materialRepository;
@@ -63,6 +70,7 @@ public class CryptoKeyService {
         this.usageLogRepository = usageLogRepository;
         this.cryptoUtil = cryptoUtil;
         this.integrityService = integrityService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
@@ -78,13 +86,15 @@ public class CryptoKeyService {
             CryptoKey key = new CryptoKey(
                     request.keyName().trim(), "AES", 256, request.purpose().trim(), request.expireAt()
             );
-            KeyMaterial material = new KeyMaterial(key, 1, wrapped.ciphertext(), wrapped.iv());
+            KeyMaterial material = new KeyMaterial(key, 1, wrapped.ciphertext(), wrapped.iv(), actor);
             signIntegrity(key, material);
             keyRepository.save(key);
             materialRepository.save(material);
             historyRepository.save(new KeyStatusHistory(
                     key, null, KeyStatus.CREATED, "키 최초 생성", actor
             ));
+            auditLogService.append(actor, "KEY_CREATE", "CRYPTO_KEY", key.getKeyUid().toString(),
+                    key.getKeyName() + " v1 키 생성");
             return KeyResponse.from(key, true);
         } catch (DataIntegrityViolationException exception) {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
@@ -111,6 +121,65 @@ public class CryptoKeyService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public KeyUsageSummaryResponse usage(UUID keyUid) {
+        CryptoKey key = findKey(keyUid);
+        return new KeyUsageSummaryResponse(
+                usageLogRepository.countByCryptoKey(key),
+                usageLogRepository.countByCryptoKeyAndSuccessTrue(key),
+                usageLogRepository.countByCryptoKeyAndSuccessFalse(key),
+                usageLogRepository.countByCryptoKeyAndOperation(key, "ENCRYPT"),
+                usageLogRepository.countByCryptoKeyAndOperation(key, "DECRYPT")
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<KeyVersionResponse> versions(UUID keyUid) {
+        CryptoKey key = findKey(keyUid);
+        return materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key).stream()
+                .map(KeyVersionResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public KeyResponse update(UUID keyUid, KeyUpdateRequest request, String actor) {
+        CryptoKey key = findKeyForUpdate(keyUid);
+        KeyMaterial material = verifiedCurrentMaterial(key);
+        String keyName = request.keyName().trim();
+        if (!keyName.equals(key.getKeyName()) && keyRepository.existsByKeyName(keyName)) {
+            throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
+        }
+        key.updateMetadata(keyName, request.purpose().trim(), request.expireAt());
+        signIntegrity(key, material);
+        historyRepository.save(new KeyStatusHistory(
+                key, key.getStatus(), key.getStatus(), "키 메타정보 수정", actor
+        ));
+        auditLogService.append(actor, "KEY_UPDATE", "CRYPTO_KEY", key.getKeyUid().toString(),
+                key.getKeyName() + " 메타정보 수정");
+        return KeyResponse.from(key, true);
+    }
+
+    @Transactional
+    public KeyResponse updateRotationPolicy(UUID keyUid, KeyRotationPolicyRequest request, String actor) {
+        CryptoKey key = findKeyForUpdate(keyUid);
+        KeyMaterial material = verifiedCurrentMaterial(key);
+        Integer days = request.days();
+        if (days != null && !Set.of(30, 60, 90).contains(days)) {
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST, "자동 갱신 주기는 30, 60, 90일만 지원합니다.", "INVALID_ROTATION_POLICY"
+            );
+        }
+        key.updateAutoRotationDays(days);
+        signIntegrity(key, material);
+        historyRepository.save(new KeyStatusHistory(
+                key, key.getStatus(), key.getStatus(),
+                days == null ? "자동 갱신 미사용" : "자동 갱신 주기 " + days + "일 설정", actor
+        ));
+        auditLogService.append(actor, "KEY_AUTO_ROTATION_UPDATE", "CRYPTO_KEY", key.getKeyUid().toString(),
+                days == null ? "자동 갱신 미사용" : "자동 갱신 주기 " + days + "일");
+        return KeyResponse.from(key, true);
+    }
+
     @Transactional
     public KeyResponse changeStatus(UUID keyUid, KeyStatusChangeRequest request, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
@@ -130,6 +199,8 @@ public class CryptoKeyService {
         key.changeStatus(to);
         signIntegrity(key, material);
         historyRepository.save(new KeyStatusHistory(key, from, to, request.reason().trim(), actor));
+        auditLogService.append(actor, "KEY_STATUS_CHANGE", "CRYPTO_KEY", key.getKeyUid().toString(),
+                from + " → " + to + ": " + request.reason().trim());
         return KeyResponse.from(key, true);
     }
 
@@ -150,7 +221,7 @@ public class CryptoKeyService {
             KeyStatus previousStatus = key.getStatus();
             int newVersion = key.nextVersion();
             key.changeStatus(KeyStatus.ACTIVE);
-            KeyMaterial newMaterial = new KeyMaterial(key, newVersion, wrapped.ciphertext(), wrapped.iv());
+            KeyMaterial newMaterial = new KeyMaterial(key, newVersion, wrapped.ciphertext(), wrapped.iv(), actor);
             signIntegrity(key, newMaterial);
             materialRepository.save(newMaterial);
             historyRepository.save(new KeyStatusHistory(
@@ -160,6 +231,8 @@ public class CryptoKeyService {
                     "v" + previousVersion + " 마감 및 v" + newVersion + " 갱신",
                     actor
             ));
+            auditLogService.append(actor, "KEY_ROTATE", "CRYPTO_KEY", key.getKeyUid().toString(),
+                    "v" + previousVersion + " → v" + newVersion + " 키 갱신");
             return new KeyRotationResponse(key.getKeyUid(), previousVersion, newVersion, KeyResponse.from(key, true));
         } finally {
             Arrays.fill(rawKey, (byte) 0);
@@ -185,15 +258,14 @@ public class CryptoKeyService {
                 request.reason().trim() + " (대상: " + request.target().trim() + ")",
                 actor
         ));
+        auditLogService.append(actor, "KEY_DEPLOY", "CRYPTO_KEY", key.getKeyUid().toString(),
+                "v" + material.getKeyVersion() + " 키 배포: " + request.target().trim());
 
         return new KeyDistributionResponse(
                 key.getKeyUid(),
                 material.getKeyVersion(),
                 request.target().trim(),
-                material.getWrappedKey(),
-                material.getWrappingIv(),
-                material.getWrappingAlgorithm(),
-                "BASE64",
+                key.getStatus(),
                 material.getDistributedAt() == null ? Instant.now() : material.getDistributedAt()
         );
     }
@@ -207,6 +279,7 @@ public class CryptoKeyService {
                     request.plaintext().getBytes(StandardCharsets.UTF_8), rawKey
             );
             usageLogRepository.save(new KeyUsageLog(key, "ENCRYPT", true, null, actor));
+            auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "암호화 성공");
             return new KeyEncryptResponse(encrypted.ciphertext(), encrypted.iv(), "BASE64");
         } finally {
             Arrays.fill(rawKey, (byte) 0);
@@ -223,6 +296,7 @@ public class CryptoKeyService {
                     new CryptoUtil.Base64Payload(request.ciphertext(), request.iv()), rawKey
             );
             usageLogRepository.save(new KeyUsageLog(key, "DECRYPT", true, null, actor));
+            auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "복호화 성공");
             return new KeyDecryptResponse(new String(plaintext, StandardCharsets.UTF_8));
         } finally {
             Arrays.fill(rawKey, (byte) 0);
@@ -276,6 +350,7 @@ public class CryptoKeyService {
                 key.getKeyUid().toString(), key.getKeyName(), key.getAlgorithm(), Integer.toString(key.getKeySize()),
                 key.getPurpose(), key.getStatus().name(), Integer.toString(key.getCurrentVersion()),
                 key.getExpireAt() == null ? null : key.getExpireAt().toString(),
+                key.getAutoRotationDays() == null ? null : key.getAutoRotationDays().toString(),
                 Integer.toString(material.getKeyVersion()), material.getWrappedKey(), material.getWrappingIv(),
                 material.getWrappingAlgorithm(), material.getMaterialStatus()
         };

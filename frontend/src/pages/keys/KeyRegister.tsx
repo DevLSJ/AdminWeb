@@ -24,24 +24,35 @@ function KeyRegisterDialog({ open, onClose, onCreated }: KeyRegisterDialogProps)
   const { createKey } = useKmsMock()
   const [form, setForm] = useState(initialForm)
   const [createdUid, setCreatedUid] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!open) return
     setForm(initialForm)
     setCreatedUid('')
+    setError('')
   }, [open])
 
-  const keySizeOptions = form.algorithm === 'RSA' ? [2048, 3072, 4096] : form.algorithm === 'HMAC' ? [256, 384, 512] : [128, 192, 256]
+  const keySizeOptions = [256]
   const changeAlgorithm = (algorithm: KeyAlgorithm) => {
     const keySize = algorithm === 'RSA' ? 2048 : 256
     const purpose = algorithm === 'RSA' ? 'SIGN' : algorithm === 'HMAC' ? 'AUTH' : 'ENCRYPT'
     setForm((current) => ({ ...current, algorithm, keySize, purpose }))
   }
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const created = createKey(form)
-    setCreatedUid(created.keyUid)
-    onCreated?.(created)
+    setSubmitting(true)
+    setError('')
+    try {
+      const created = await createKey(form)
+      setCreatedUid(created.keyUid)
+      onCreated?.(created)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '키 생성에 실패했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -54,13 +65,14 @@ function KeyRegisterDialog({ open, onClose, onCreated }: KeyRegisterDialogProps)
             <Typography variant="h6" sx={{ mb: 2.5 }}>키 메타정보</Typography>
             <TextField fullWidth required disabled={Boolean(createdUid)} label="키 이름 (keyName)" placeholder="예: PAYMENT-AES-010" value={form.keyName} onChange={(event) => setForm((current) => ({ ...current, keyName: event.target.value }))} helperText="영문 대문자, 숫자, 하이픈을 사용한 식별 가능한 이름을 권장합니다." sx={{ mb: 2 }} />
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2, mb: 2 }}>
-              <FormControl fullWidth disabled={Boolean(createdUid)}><InputLabel>알고리즘 (algorithm)</InputLabel><Select label="알고리즘 (algorithm)" value={form.algorithm} onChange={(event) => changeAlgorithm(event.target.value as KeyAlgorithm)}><MenuItem value="AES">AES</MenuItem><MenuItem value="HMAC">HMAC</MenuItem><MenuItem value="RSA">RSA</MenuItem></Select></FormControl>
+              <FormControl fullWidth disabled><InputLabel>알고리즘 (algorithm)</InputLabel><Select label="알고리즘 (algorithm)" value={form.algorithm} onChange={(event) => changeAlgorithm(event.target.value as KeyAlgorithm)}><MenuItem value="AES">AES</MenuItem></Select></FormControl>
               <FormControl fullWidth disabled={Boolean(createdUid)}><InputLabel>키 길이 (keySize)</InputLabel><Select label="키 길이 (keySize)" value={form.keySize} onChange={(event) => setForm((current) => ({ ...current, keySize: Number(event.target.value) }))}>{keySizeOptions.map((size) => <MenuItem key={size} value={size}>{size} bit</MenuItem>)}</Select></FormControl>
               <FormControl fullWidth disabled={Boolean(createdUid)}><InputLabel>용도 (purpose)</InputLabel><Select label="용도 (purpose)" value={form.purpose} onChange={(event) => setForm((current) => ({ ...current, purpose: event.target.value as KeyPurpose }))}><MenuItem value="ENCRYPT">ENCRYPT · 데이터 암복호화</MenuItem><MenuItem value="SIGN">SIGN · 전자서명</MenuItem><MenuItem value="AUTH">AUTH · 메시지 인증</MenuItem><MenuItem value="WRAP">WRAP · 키 래핑</MenuItem></Select></FormControl>
               <TextField fullWidth required disabled={Boolean(createdUid)} label="유효기간 (expireAt)" type="date" value={form.expireAt} onChange={(event) => setForm((current) => ({ ...current, expireAt: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
             </Box>
             <FormControlLabel disabled={Boolean(createdUid)} control={<Switch checked={form.activateImmediately} onChange={(event) => setForm((current) => ({ ...current, activateImmediately: event.target.checked }))} />} label="생성 직후 활성 상태로 전환 (상태 이력 기록)" />
-            {createdUid && <Alert severity="success" sx={{ mt: 2.5 }}><Typography sx={{ fontWeight: 700 }}>키가 목업 생성되었습니다.</Typography><Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 12.5 }}>키 UID: {createdUid}</Typography><Typography sx={{ mt: 0.5, fontSize: 13 }}>상태: {form.activateImmediately ? '활성' : '생성'} · 무결성: 정상</Typography></Alert>}
+            {error && <Alert severity="error" sx={{ mt: 2.5 }}>{error}</Alert>}
+            {createdUid && <Alert severity="success" sx={{ mt: 2.5 }}><Typography sx={{ fontWeight: 700 }}>키가 생성되었습니다.</Typography><Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 12.5 }}>키 UID: {createdUid}</Typography><Typography sx={{ mt: 0.5, fontSize: 13 }}>상태: {form.activateImmediately ? '활성' : '생성'} · 무결성: 정상</Typography></Alert>}
           </Box>
           <Stack spacing={2}>
             <Box sx={{ p: 2.25, border: '1px solid', borderColor: 'divider', borderRadius: 2.5, bgcolor: '#fafbfe' }}>
@@ -73,7 +85,7 @@ function KeyRegisterDialog({ open, onClose, onCreated }: KeyRegisterDialogProps)
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button color="inherit" onClick={onClose}>{createdUid ? '닫기' : '취소'}</Button>
-        {!createdUid && <Button type="submit" form="key-register-form" variant="contained" startIcon={<KeyRounded />} disabled={!form.keyName.trim() || !form.expireAt}>키 자동 생성</Button>}
+        {!createdUid && <Button type="submit" form="key-register-form" variant="contained" startIcon={<KeyRounded />} disabled={submitting || !form.keyName.trim() || !form.expireAt}>{submitting ? '생성 중…' : '키 자동 생성'}</Button>}
       </DialogActions>
     </Dialog>
   )

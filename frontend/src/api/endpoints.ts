@@ -25,9 +25,12 @@ export const apiEndpoints = {
     status: (id: string) => `/api/keys/${id}/status`,
     history: (id: string) => `/api/keys/${id}/history`,
     usage: (id: string) => `/api/keys/${id}/usage`,
+    versions: (id: string) => `/api/keys/${id}/versions`,
+    rotationPolicy: (id: string) => `/api/keys/${id}/rotation-policy`,
     encryptTest: (id: string) => `/api/keys/${id}/test/encrypt`,
     decryptTest: (id: string) => `/api/keys/${id}/test/decrypt`,
     rotate: (id: string) => `/api/keys/${id}/rotate`,
+    distribute: (id: string) => `/api/keys/${id}/distribute`,
   },
   users: {
     list: '/api/users',

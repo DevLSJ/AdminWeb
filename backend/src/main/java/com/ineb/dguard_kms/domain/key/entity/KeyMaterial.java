@@ -57,16 +57,20 @@ public class KeyMaterial {
     @Column(name = "distributed_at")
     private Instant distributedAt;
 
+    @Column(name = "created_by", nullable = false, length = 100)
+    private String createdBy;
+
     protected KeyMaterial() {
     }
 
-    public KeyMaterial(CryptoKey cryptoKey, int keyVersion, String wrappedKey, String wrappingIv) {
+    public KeyMaterial(CryptoKey cryptoKey, int keyVersion, String wrappedKey, String wrappingIv, String createdBy) {
         this.cryptoKey = cryptoKey;
         this.keyVersion = keyVersion;
         this.wrappedKey = wrappedKey;
         this.wrappingIv = wrappingIv;
         this.wrappingAlgorithm = "AES-256-GCM";
         this.materialStatus = ACTIVE;
+        this.createdBy = createdBy;
     }
 
     @PrePersist
@@ -94,4 +98,5 @@ public class KeyMaterial {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getRetiredAt() { return retiredAt; }
     public Instant getDistributedAt() { return distributedAt; }
+    public String getCreatedBy() { return createdBy; }
 }

@@ -87,6 +87,16 @@ class KeyManagementIntegrationTests {
                 {"toStatus":"ACTIVE","reason":"통합 테스트 활성화"}
                 """, 200);
 
+        JsonNode updated = sendJson(client, "PUT", "/api/keys/" + keyUid, token, """
+                {"keyName":"%s-UPDATED","purpose":"ENCRYPT","expireAt":"%s"}
+                """.formatted(keyName, LocalDate.now().plusYears(2)), 200);
+        assertThat(updated.path("data").path("keyName").asText()).endsWith("-UPDATED");
+
+        JsonNode policy = sendJson(client, "PATCH", "/api/keys/" + keyUid + "/rotation-policy", token, """
+                {"days":30}
+                """, 200);
+        assertThat(policy.path("data").path("autoRotationDays").asInt()).isEqualTo(30);
+
         JsonNode encrypted = sendJson(client, "POST", "/api/keys/" + keyUid + "/test/encrypt", token, """
                 {"plaintext":"Hello DGuard"}
                 """, 200);
@@ -100,9 +110,20 @@ class KeyManagementIntegrationTests {
                 """.formatted(ciphertext, iv), 200);
         assertThat(decrypted.path("data").path("plaintext").asText()).isEqualTo("Hello DGuard");
 
+        JsonNode usage = sendJson(client, "GET", "/api/keys/" + keyUid + "/usage", token, "", 200);
+        assertThat(usage.path("data").path("total").asLong()).isEqualTo(2);
+        assertThat(usage.path("data").path("success").asLong()).isEqualTo(2);
+        assertThat(usage.path("data").path("encrypt").asLong()).isEqualTo(1);
+        assertThat(usage.path("data").path("decrypt").asLong()).isEqualTo(1);
+
         JsonNode rotated = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 200);
         assertThat(rotated.path("data").path("previousVersion").asInt()).isEqualTo(1);
         assertThat(rotated.path("data").path("newVersion").asInt()).isEqualTo(2);
+
+        JsonNode versions = sendJson(client, "GET", "/api/keys/" + keyUid + "/versions", token, "", 200);
+        assertThat(versions.path("data").size()).isEqualTo(2);
+        assertThat(versions.path("data").get(0).path("version").asInt()).isEqualTo(2);
+        assertThat(versions.path("data").get(1).path("decryptOnly").asBoolean()).isTrue();
 
         key = keyRepository.findByKeyUid(keyUid).orElseThrow();
         KeyMaterial savedV1 = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();
@@ -114,10 +135,15 @@ class KeyManagementIntegrationTests {
         JsonNode distributed = sendJson(client, "POST", "/api/keys/" + keyUid + "/distribute", token, """
                 {"target":"integration-agent","reason":"통합 테스트 배포"}
                 """, 200);
-        assertThat(distributed.path("data").path("encoding").asText()).isEqualTo("BASE64");
-        assertThat(distributed.path("data").path("wrappingAlgorithm").asText()).isEqualTo("AES-256-GCM");
-        assertThat(distributed.path("data").path("wrappedKey").asText()).isEqualTo(v2.getWrappedKey());
-        assertThat(distributed.path("data").path("wrappedKey").asText()).doesNotContain("Hello DGuard");
+        assertThat(distributed.path("data").path("status").asText()).isEqualTo("DISTRIBUTED");
+        assertThat(distributed.path("data").path("wrappedKey").isMissingNode()).isTrue();
+        assertThat(distributed.path("data").path("iv").isMissingNode()).isTrue();
+
+        JsonNode auditLogs = sendJson(client, "GET", "/api/audit-logs?page=0&size=100", token, "", 200);
+        assertThat(auditLogs.path("data").path("content")).anySatisfy(log ->
+                assertThat(log.path("targetId").asText()).isEqualTo(keyUid.toString()));
+        JsonNode auditVerification = sendJson(client, "GET", "/api/audit-logs/verify", token, "", 200);
+        assertThat(auditVerification.path("data").path("valid").asBoolean()).isTrue();
 
         key = keyRepository.findByKeyUid(keyUid).orElseThrow();
         key.updateIntegrityHash(Base64.getEncoder().encodeToString(new byte[32]));

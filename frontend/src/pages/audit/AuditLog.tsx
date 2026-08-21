@@ -26,12 +26,13 @@ import {
 } from '@mui/material'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
+import { getApiErrorMessage, verifyAuditLogs } from '../../api/kms'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import type { AuditAction, AuditListParams, AuditLog as AuditLogType } from '../../types/api'
 
-const auditActions: Array<AuditAction | 'ALL'> = ['ALL', 'LOGIN', 'LOGOUT', 'KEY_CREATE', 'KEY_STATUS_CHANGE', 'KEY_DEPLOY', 'KEY_DEPLOY_ROLLBACK', 'KEY_ROTATE', 'KEY_AUTO_ROTATION_UPDATE', 'KEY_TEST', 'USER_CREATE', 'USER_UPDATE', 'USER_VIEW_PLAIN', 'USER_PASSWORD_RESET', 'NOTICE_CREATE', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD']
+const auditActions: Array<AuditAction | 'ALL'> = ['ALL', 'LOGIN', 'LOGOUT', 'KEY_CREATE', 'KEY_UPDATE', 'KEY_STATUS_CHANGE', 'KEY_DEPLOY', 'KEY_DEPLOY_ROLLBACK', 'KEY_ROTATE', 'KEY_AUTO_ROTATION_UPDATE', 'KEY_TEST', 'USER_CREATE', 'USER_UPDATE', 'USER_VIEW_PLAIN', 'USER_PASSWORD_RESET', 'NOTICE_CREATE', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD']
 const auditActionLabels: Record<AuditAction | 'ALL', string> = {
-  ALL: '전체 행위', LOGIN: '로그인', LOGOUT: '로그아웃', KEY_CREATE: '키 생성', KEY_STATUS_CHANGE: '키 상태 변경',
+  ALL: '전체 행위', LOGIN: '로그인', LOGOUT: '로그아웃', KEY_CREATE: '키 생성', KEY_UPDATE: '키 수정', KEY_STATUS_CHANGE: '키 상태 변경',
   KEY_DEPLOY: '키 배포', KEY_DEPLOY_ROLLBACK: '키 배포 롤백', KEY_ROTATE: '키 갱신', KEY_AUTO_ROTATION_UPDATE: '자동 갱신 설정',
   KEY_TEST: '키 테스트', USER_CREATE: '사용자 생성', USER_UPDATE: '사용자 수정', USER_VIEW_PLAIN: '개인정보 원문 조회',
   USER_PASSWORD_RESET: '비밀번호 재설정', NOTICE_CREATE: '공지 생성', NOTICE_UPDATE: '공지 수정', NOTICE_DELETE: '공지 삭제', FILE_DOWNLOAD: '파일 내려받기',
@@ -43,6 +44,8 @@ function AuditLog() {
   const [params, setParams] = useState(defaultParams)
   const [verifyResult, setVerifyResult] = useState<'idle' | 'valid' | 'invalid'>('idle')
   const [detail, setDetail] = useState<AuditLogType | null>(null)
+  const [verifyError, setVerifyError] = useState('')
+  const [invalidLogUids, setInvalidLogUids] = useState<string[]>([])
 
   const filteredLogs = useMemo(() => auditLogs.filter((log) => {
     const date = log.createdAt.slice(0, 10)
@@ -52,11 +55,19 @@ function AuditLog() {
       && (params.action === 'ALL' || log.action === params.action)
   }), [auditLogs, params])
   const pageContent = filteredLogs.slice(params.page * params.size, (params.page + 1) * params.size)
-  const invalidLogs = auditLogs.filter((log) => !log.chainValid)
 
   const updateParam = <K extends keyof AuditListParams>(key: K, value: AuditListParams[K]) => setParams((current) => ({ ...current, [key]: value, page: key === 'page' ? Number(value) : 0 }))
 
-  const verifyChain = () => setVerifyResult(invalidLogs.length > 0 ? 'invalid' : 'valid')
+  const verifyChain = async () => {
+    setVerifyError('')
+    try {
+      const result = await verifyAuditLogs()
+      setInvalidLogUids(result.invalidLogUids ?? [])
+      setVerifyResult(result.valid ? 'valid' : 'invalid')
+    } catch (error) {
+      setVerifyError(getApiErrorMessage(error, '감사 로그 체인을 검증하지 못했습니다.'))
+    }
+  }
 
   const exportCsv = () => {
     const header = ['logUid', 'actor', 'action', 'targetType', 'targetId', 'createdAt', 'chainValid']
@@ -72,10 +83,11 @@ function AuditLog() {
 
   return (
     <Box>
-      <PageHeader title="감사 로그" description="모든 관리자 행위를 검색하고 append-only 해시 체인의 변조·삭제 여부를 검증합니다." action={<Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<FactCheckRounded />} onClick={verifyChain}>해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={exportCsv}>CSV 내려받기</Button></Stack>} />
+      <PageHeader title="감사 로그" description="모든 관리자 행위를 검색하고 append-only 해시 체인의 변조·삭제 여부를 검증합니다." action={<Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<FactCheckRounded />} onClick={() => void verifyChain()}>해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={exportCsv}>CSV 내려받기</Button></Stack>} />
       <Alert severity="info" sx={{ mb: 2.5 }}>감사로그는 append-only입니다. 화면과 API에서 UPDATE·DELETE 기능을 제공하지 않습니다.</Alert>
       {verifyResult === 'valid' && <Alert icon={<VerifiedRounded />} severity="success" onClose={() => setVerifyResult('idle')} sx={{ mb: 2 }}>prev_hash + row_hash 체인이 모두 정상입니다.</Alert>}
-      {verifyResult === 'invalid' && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerifyResult('idle')} sx={{ mb: 2 }}>해시 체인 검증 실패: {invalidLogs.map((log) => log.logUid).join(', ')} 구간에서 변조 또는 삭제 가능성이 발견되었습니다.</Alert>}
+      {verifyResult === 'invalid' && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerifyResult('idle')} sx={{ mb: 2 }}>해시 체인 검증 실패: {invalidLogUids.join(', ')} 구간에서 변조 또는 삭제 가능성이 발견되었습니다.</Alert>}
+      {verifyError && <Alert severity="error" onClose={() => setVerifyError('')} sx={{ mb: 2 }}>{verifyError}</Alert>}
       <FilterCard>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(150px, 0.8fr)) 1fr 1.2fr auto' }, gap: 1.5 }}>
           <TextField size="small" type="date" label="from" value={params.from} onChange={(event) => updateParam('from', event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />

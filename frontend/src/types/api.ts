@@ -49,6 +49,7 @@ export interface CryptoKey {
   status: KeyStatus
   version: number
   expireAt: string
+  autoRotationDays: AutoRotationDays
   integrityValid: boolean
   createdAt: string
   updatedAt: string
@@ -94,6 +95,29 @@ export interface KeyUsageSummary {
   decrypt: number
 }
 
+export interface KeyUsageLog {
+  id: string | number
+  operation: 'ENCRYPT' | 'DECRYPT'
+  success: boolean
+  failureReason: string | null
+  actor: string
+  usedAt: string
+}
+
+export interface KeyEncryptResult {
+  ciphertext: string
+  iv: string
+  encoding: string
+}
+
+export interface KeyDistributionResult {
+  keyUid: string
+  version: number
+  target: string
+  status: 'DISTRIBUTED'
+  distributedAt: string
+}
+
 export type UserStatus = 'ACTIVE' | 'INACTIVE'
 
 export interface UserListParams {
@@ -123,6 +147,7 @@ export type AuditAction =
   | 'LOGIN'
   | 'LOGOUT'
   | 'KEY_CREATE'
+  | 'KEY_UPDATE'
   | 'KEY_STATUS_CHANGE'
   | 'KEY_TEST'
   | 'KEY_DEPLOY'

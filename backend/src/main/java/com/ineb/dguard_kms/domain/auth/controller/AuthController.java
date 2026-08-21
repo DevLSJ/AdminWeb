@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 import com.ineb.dguard_kms.common.ApiResponse;
 import com.ineb.dguard_kms.domain.auth.dto.LoginRequest;
@@ -37,7 +38,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout() {
+    public ApiResponse<Void> logout(Authentication authentication) {
+        authService.logout(authentication == null ? null : authentication.getName());
         return ApiResponse.success(null, "로그아웃되었습니다.");
     }
 }

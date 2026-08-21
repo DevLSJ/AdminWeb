@@ -4,7 +4,10 @@
 .env.*.local
 
 # SSH keys (local development server access)
-key/
+/key/
+
+# Local Codex conversation export
+/frontend/my-chat-session.json
 
 # macOS
 .DS_Store

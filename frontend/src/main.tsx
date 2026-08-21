@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import App from './App'
 import { AuthProvider } from './contexts/AuthProvider'
-import { KmsMockProvider } from './contexts/KmsMockProvider'
+import { KmsProvider } from './contexts/KmsProvider'
 import './index.css'
 import theme from './theme/theme'
 
@@ -14,9 +14,9 @@ createRoot(document.getElementById('root')!).render(
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
-          <KmsMockProvider>
+          <KmsProvider>
             <App />
-          </KmsMockProvider>
+          </KmsProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

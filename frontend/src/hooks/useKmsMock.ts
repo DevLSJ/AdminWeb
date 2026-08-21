@@ -1,8 +1,8 @@
 import { useContext } from 'react'
-import { KmsMockContext } from '../contexts/KmsMockContext'
+import { KmsContext } from '../contexts/KmsContext'
 
 export function useKmsMock() {
-  const context = useContext(KmsMockContext)
-  if (!context) throw new Error('useKmsMock must be used inside KmsMockProvider')
+  const context = useContext(KmsContext)
+  if (!context) throw new Error('useKmsMock must be used inside KmsProvider')
   return context
 }

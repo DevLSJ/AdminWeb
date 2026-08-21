@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,8 +25,12 @@ import com.ineb.dguard_kms.domain.key.dto.KeyEncryptRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyEncryptResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyHistoryResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyRotationPolicyRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyRotationResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyStatusChangeRequest;
+import com.ineb.dguard_kms.domain.key.dto.KeyUpdateRequest;
+import com.ineb.dguard_kms.domain.key.dto.KeyUsageSummaryResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyVersionResponse;
 import com.ineb.dguard_kms.domain.key.service.CryptoKeyService;
 
 import jakarta.validation.Valid;
@@ -56,8 +61,18 @@ public class CryptoKeyController {
         return ApiResponse.success(keyService.history(keyUid), "키 상태 이력 조회에 성공했습니다.");
     }
 
+    @GetMapping("/{keyUid}/usage")
+    public ApiResponse<KeyUsageSummaryResponse> usage(@PathVariable UUID keyUid) {
+        return ApiResponse.success(keyService.usage(keyUid), "키 사용 통계 조회에 성공했습니다.");
+    }
+
+    @GetMapping("/{keyUid}/versions")
+    public ApiResponse<List<KeyVersionResponse>> versions(@PathVariable UUID keyUid) {
+        return ApiResponse.success(keyService.versions(keyUid), "키 버전 조회에 성공했습니다.");
+    }
+
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyResponse> create(
             @Valid @RequestBody KeyCreateRequest request,
             Authentication authentication
@@ -65,8 +80,33 @@ public class CryptoKeyController {
         return ApiResponse.success(keyService.create(request, authentication.getName()), "키 생성에 성공했습니다.");
     }
 
+    @PutMapping("/{keyUid}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
+    public ApiResponse<KeyResponse> update(
+            @PathVariable UUID keyUid,
+            @Valid @RequestBody KeyUpdateRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.success(
+                keyService.update(keyUid, request, authentication.getName()), "키 메타정보 수정에 성공했습니다."
+        );
+    }
+
+    @PatchMapping("/{keyUid}/rotation-policy")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
+    public ApiResponse<KeyResponse> updateRotationPolicy(
+            @PathVariable UUID keyUid,
+            @Valid @RequestBody KeyRotationPolicyRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.success(
+                keyService.updateRotationPolicy(keyUid, request, authentication.getName()),
+                "자동 갱신 정책 수정에 성공했습니다."
+        );
+    }
+
     @PatchMapping("/{keyUid}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyResponse> changeStatus(
             @PathVariable UUID keyUid,
             @Valid @RequestBody KeyStatusChangeRequest request,
@@ -79,7 +119,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/rotate")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyRotationResponse> rotate(
             @PathVariable UUID keyUid,
             Authentication authentication
@@ -88,7 +128,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/distribute")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyDistributionResponse> distribute(
             @PathVariable UUID keyUid,
             @Valid @RequestBody KeyDistributionRequest request,

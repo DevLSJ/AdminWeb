@@ -16,6 +16,7 @@ public record KeyResponse(
         KeyStatus status,
         int version,
         LocalDate expireAt,
+        Integer autoRotationDays,
         boolean integrityValid,
         Instant createdAt,
         Instant updatedAt
@@ -30,6 +31,7 @@ public record KeyResponse(
                 key.getStatus(),
                 key.getCurrentVersion(),
                 key.getExpireAt(),
+                key.getAutoRotationDays(),
                 integrityValid,
                 key.getCreatedAt(),
                 key.getUpdatedAt()

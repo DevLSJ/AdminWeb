@@ -52,6 +52,9 @@ public class CryptoKey {
     @Column(name = "integrity_hash", nullable = false, length = 128)
     private String integrityHash;
 
+    @Column(name = "auto_rotation_days")
+    private Integer autoRotationDays;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -103,6 +106,18 @@ public class CryptoKey {
         this.integrityHash = integrityHash;
     }
 
+    public void updateMetadata(String keyName, String purpose, LocalDate expireAt) {
+        this.keyName = keyName;
+        this.purpose = purpose;
+        this.expireAt = expireAt;
+        this.updatedAt = Instant.now();
+    }
+
+    public void updateAutoRotationDays(Integer autoRotationDays) {
+        this.autoRotationDays = autoRotationDays;
+        this.updatedAt = Instant.now();
+    }
+
     public Long getId() { return id; }
     public UUID getKeyUid() { return keyUid; }
     public String getKeyName() { return keyName; }
@@ -113,6 +128,7 @@ public class CryptoKey {
     public int getCurrentVersion() { return currentVersion; }
     public LocalDate getExpireAt() { return expireAt; }
     public String getIntegrityHash() { return integrityHash; }
+    public Integer getAutoRotationDays() { return autoRotationDays; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

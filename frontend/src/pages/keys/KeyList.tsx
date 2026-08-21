@@ -4,7 +4,6 @@ import {
   CheckCircleRounded,
   CloudUploadRounded,
   FilterAltOffRounded,
-  ReplayRounded,
   SearchRounded,
   ShieldOutlined,
   WarningAmberRounded,
@@ -40,7 +39,7 @@ import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/Ad
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
-import { getManualKeyStatusTransitions } from '../../mocks/adminData'
+import { getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
 import type { CryptoKey, DeploymentTargetType, KeyListParams, KeyStatus } from '../../types/api'
 import { isAdminRole } from '../../types/auth'
 import { getStatusLabel } from '../../utils/status'
@@ -62,7 +61,7 @@ const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 
 function KeyList() {
   const { user } = useAuth()
-  const { keys, deployments, changeKeyStatus, startDeployment, rollbackDeployment } = useKmsMock()
+  const { keys, loading, error, changeKeyStatus, distributeKeys } = useKmsMock()
   const isAdmin = isAdminRole(user?.role)
   const [params, setParams] = useState<KeyListParams>(defaultParams)
   const [transitionKey, setTransitionKey] = useState<CryptoKey | null>(null)
@@ -74,10 +73,10 @@ function KeyList() {
   const [deployKeyUids, setDeployKeyUids] = useState<string[]>([])
   const [targetType, setTargetType] = useState<DeploymentTargetType>('SERVER_IP')
   const [target, setTarget] = useState('')
-  const [simulateFailure, setSimulateFailure] = useState(false)
-  const [deploymentUid, setDeploymentUid] = useState('')
+  const [deploymentReason, setDeploymentReason] = useState('')
+  const [deploying, setDeploying] = useState(false)
+  const [deploymentComplete, setDeploymentComplete] = useState(false)
   const navigate = useNavigate()
-  const deployment = deployments.find((item) => item.deploymentUid === deploymentUid)
 
   const filteredKeys = useMemo(() => {
     const keyword = params.keyword.trim().toLowerCase()
@@ -109,25 +108,38 @@ function KeyList() {
     setReason('')
   }
 
-  const handleTransition = () => {
+  const handleTransition = async () => {
     if (!transitionKey || !toStatus || !reason.trim()) return
-    changeKeyStatus(transitionKey.keyUid, toStatus, reason)
-    setMessage(`${transitionKey.keyName}: ${getStatusLabel(transitionKey.status)} → ${getStatusLabel(toStatus)} 상태 전이가 반영되었습니다.`)
-    setTransitionKey(null)
+    try {
+      await changeKeyStatus(transitionKey.keyUid, toStatus, reason)
+      setMessage(`${transitionKey.keyName}: ${getStatusLabel(transitionKey.status)} → ${getStatusLabel(toStatus)} 상태 전이가 반영되었습니다.`)
+      setTransitionKey(null)
+    } catch (requestError) {
+      setMessage(requestError instanceof Error ? requestError.message : '상태 변경에 실패했습니다.')
+    }
   }
 
   const openDeployment = () => {
     setDeployKeyUids([])
     setTargetType('SERVER_IP')
     setTarget('')
-    setSimulateFailure(false)
-    setDeploymentUid('')
+    setDeploymentReason('')
+    setDeploymentComplete(false)
     setDeployOpen(true)
   }
 
-  const executeDeployment = () => {
-    if (deployKeyUids.length === 0 || !target.trim()) return
-    setDeploymentUid(startDeployment(deployKeyUids, targetType, target.trim(), simulateFailure))
+  const executeDeployment = async () => {
+    if (deployKeyUids.length === 0 || !target.trim() || !deploymentReason.trim()) return
+    setDeploying(true)
+    try {
+      await distributeKeys(deployKeyUids, target.trim(), deploymentReason.trim())
+      setDeploymentComplete(true)
+      setMessage(`${deployKeyUids.length}개 키가 배포되어 DISTRIBUTED 상태로 전환되었습니다.`)
+    } catch (requestError) {
+      setMessage(requestError instanceof Error ? requestError.message : '키 배포에 실패했습니다.')
+    } finally {
+      setDeploying(false)
+    }
   }
 
   return (
@@ -139,6 +151,8 @@ function KeyList() {
       />
 
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {loading && <Alert severity="info" sx={{ mb: 2 }}>키 목록을 불러오는 중입니다.</Alert>}
 
       <FilterCard>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 2fr) repeat(4, minmax(130px, 1fr))' }, gap: 1.5 }}>
@@ -198,18 +212,18 @@ function KeyList() {
 
       <KeyRegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} onCreated={(key) => setMessage(`${key.keyName} 키가 등록되었습니다.`)} />
 
-      <Dialog open={deployOpen} onClose={() => deployment?.status !== 'DEPLOYING' && setDeployOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={deployOpen} onClose={() => !deploying && setDeployOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>키 배포</DialogTitle>
         <DialogContent>
-          {deployment && <Alert severity={deployment.status === 'DEPLOY_FAILED' ? 'error' : deployment.status === 'DEPLOYING' ? 'info' : 'success'} sx={{ mb: 2 }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><StatusBadge status={deployment.status} /><Typography>{deployment.status === 'DEPLOYING' ? '대상 에이전트가 키를 적용하고 있습니다.' : deployment.status === 'DEPLOY_FAILED' ? '배포에 실패했습니다. 이전 버전으로 롤백할 수 있습니다.' : deployment.status === 'ROLLED_BACK' ? '이전 버전 롤백이 완료되었습니다.' : '선택한 키의 배포가 완료되었습니다.'}</Typography></Stack></Alert>}
+          {deploymentComplete && <Alert severity="success" sx={{ mb: 2 }}>배포가 완료되었습니다. 키 상태는 DISTRIBUTED로 변경되었습니다.</Alert>}
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <FormControl fullWidth disabled={Boolean(deployment)}><InputLabel>배포할 키</InputLabel><Select multiple label="배포할 키" value={deployKeyUids} renderValue={(selected) => selected.map((uid) => keys.find((key) => key.keyUid === uid)?.keyName).filter(Boolean).join(', ')} onChange={(event) => setDeployKeyUids(typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value)}>{keys.filter((key) => !['DESTROYED', 'COMPROMISED'].includes(key.status)).map((key) => <MenuItem key={key.keyUid} value={key.keyUid}><Checkbox checked={deployKeyUids.includes(key.keyUid)} /><ListItemText primary={key.keyName} secondary={`v${key.version} · ${getStatusLabel(key.status)}`} /></MenuItem>)}</Select></FormControl>
-            <FormControl fullWidth disabled={Boolean(deployment)}><InputLabel>배포 대상 유형</InputLabel><Select label="배포 대상 유형" value={targetType} onChange={(event) => setTargetType(event.target.value as DeploymentTargetType)}><MenuItem value="SERVER_IP">서버 IP</MenuItem><MenuItem value="K8S_SECRET">K8s Secret</MenuItem><MenuItem value="APP_ID">App ID</MenuItem></Select></FormControl>
-            <TextField fullWidth required disabled={Boolean(deployment)} label={targetType === 'SERVER_IP' ? '서버 IP' : targetType === 'K8S_SECRET' ? 'K8s Secret 이름' : 'App ID'} placeholder={targetType === 'SERVER_IP' ? '10.20.30.40' : targetType === 'K8S_SECRET' ? 'kms/payment-key' : 'payment-service'} value={target} onChange={(event) => setTarget(event.target.value)} />
-            <FormControl fullWidth disabled={Boolean(deployment)}><InputLabel>Mock 배포 결과</InputLabel><Select label="Mock 배포 결과" value={simulateFailure ? 'FAILURE' : 'SUCCESS'} onChange={(event) => setSimulateFailure(event.target.value === 'FAILURE')}><MenuItem value="SUCCESS">배포 성공</MenuItem><MenuItem value="FAILURE">배포 실패 · 롤백 테스트</MenuItem></Select></FormControl>
+            <FormControl fullWidth disabled={deploying || deploymentComplete}><InputLabel>배포할 키</InputLabel><Select multiple label="배포할 키" value={deployKeyUids} renderValue={(selected) => selected.map((uid) => keys.find((key) => key.keyUid === uid)?.keyName).filter(Boolean).join(', ')} onChange={(event) => setDeployKeyUids(typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value)}>{keys.filter((key) => key.status === 'ACTIVE').map((key) => <MenuItem key={key.keyUid} value={key.keyUid}><Checkbox checked={deployKeyUids.includes(key.keyUid)} /><ListItemText primary={key.keyName} secondary={`v${key.version} · ${getStatusLabel(key.status)}`} /></MenuItem>)}</Select></FormControl>
+            <FormControl fullWidth disabled={deploying || deploymentComplete}><InputLabel>배포 대상 유형</InputLabel><Select label="배포 대상 유형" value={targetType} onChange={(event) => setTargetType(event.target.value as DeploymentTargetType)}><MenuItem value="SERVER_IP">서버 IP</MenuItem><MenuItem value="K8S_SECRET">K8s Secret</MenuItem><MenuItem value="APP_ID">App ID</MenuItem></Select></FormControl>
+            <TextField fullWidth required disabled={deploying || deploymentComplete} label={targetType === 'SERVER_IP' ? '서버 IP' : targetType === 'K8S_SECRET' ? 'K8s Secret 이름' : 'App ID'} placeholder={targetType === 'SERVER_IP' ? '10.20.30.40' : targetType === 'K8S_SECRET' ? 'kms/payment-key' : 'payment-service'} value={target} onChange={(event) => setTarget(event.target.value)} />
+            <TextField fullWidth required multiline minRows={2} disabled={deploying || deploymentComplete} label="배포 사유" value={deploymentReason} onChange={(event) => setDeploymentReason(event.target.value)} />
           </Stack>
         </DialogContent>
-        <DialogActions><Button onClick={() => setDeployOpen(false)} disabled={deployment?.status === 'DEPLOYING'}>{deployment ? '닫기' : '취소'}</Button>{deployment?.status === 'DEPLOY_FAILED' && <Button color="warning" variant="contained" startIcon={<ReplayRounded />} onClick={() => rollbackDeployment(deployment.deploymentUid)}>이전 버전 롤백</Button>}{!deployment && <Button variant="contained" startIcon={<CloudUploadRounded />} disabled={deployKeyUids.length === 0 || !target.trim()} onClick={executeDeployment}>배포 실행</Button>}</DialogActions>
+        <DialogActions><Button onClick={() => setDeployOpen(false)} disabled={deploying}>{deploymentComplete ? '닫기' : '취소'}</Button>{!deploymentComplete && <Button variant="contained" startIcon={<CloudUploadRounded />} disabled={deploying || deployKeyUids.length === 0 || !target.trim() || !deploymentReason.trim()} onClick={() => void executeDeployment()}>{deploying ? '배포 중…' : '배포 실행'}</Button>}</DialogActions>
       </Dialog>
     </Box>
   )
