@@ -102,7 +102,8 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        # 서버의 self-hosted runner와 호환되는 Node 런타임 사용
+        uses: actions/checkout@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
