@@ -11,8 +11,11 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.persistence.criteria.Predicate;
 
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.crypto.IntegrityService;
@@ -71,14 +74,20 @@ public class AuditLogService {
     ) {
         Instant fromTime = from == null ? null : from.atStartOfDay(KST).toInstant();
         Instant toTime = to == null ? null : to.plusDays(1).atStartOfDay(KST).toInstant();
-        String actorFilter = actor == null || actor.isBlank() ? "" : actor.trim();
+        String actorFilter = actor == null || actor.isBlank() ? null : actor.trim().toLowerCase();
         String actionFilter = action == null || action.isBlank() || "ALL".equals(action) ? null : action;
-        Page<AuditLogResponse> result = repository.search(
-                fromTime,
-                toTime,
-                actorFilter,
-                actionFilter,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+        Specification<AuditLog> specification = (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (fromTime != null) predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), fromTime));
+            if (toTime != null) predicates.add(criteriaBuilder.lessThan(root.get("createdAt"), toTime));
+            if (actorFilter != null) {
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("actor")), "%" + actorFilter + "%"));
+            }
+            if (actionFilter != null) predicates.add(criteriaBuilder.equal(root.get("action"), actionFilter));
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+        Page<AuditLogResponse> result = repository.findAll(
+                specification, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
         ).map(log -> AuditLogResponse.from(log, verifyRow(log)));
         return PageResponse.from(result);
     }
