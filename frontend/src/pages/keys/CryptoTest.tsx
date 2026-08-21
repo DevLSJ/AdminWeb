@@ -17,7 +17,8 @@ import {
   Typography,
 } from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
-import { PageHeader, StatusChip } from '../../components/admin/AdminPage'
+import { PageHeader } from '../../components/admin/AdminPage'
+import { StatusBadge } from '../../components/common/StatusBadge'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import {
   DECRYPT_FAILURE_MESSAGE,
@@ -104,7 +105,7 @@ function CryptoTest() {
             {result && <Box sx={{ mt: 2.5, p: 2.5, borderRadius: 2, bgcolor: '#f7f8fc', border: '1px solid', borderColor: 'divider' }}><Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}><Typography sx={{ fontWeight: 700 }}>{mode === 'encrypt' ? '암호문 결과' : '평문 결과'}</Typography><Button size="small" startIcon={<ContentCopyRounded />} onClick={() => void navigator.clipboard?.writeText(result)}>복사</Button></Box><Typography sx={{ fontFamily: 'monospace', fontSize: 12.5, wordBreak: 'break-all' }}>{result}</Typography>{mode === 'encrypt' && <Typography sx={{ mt: 1.5, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>IV: {iv}</Typography>}<Alert severity="success" sx={{ mt: 2 }}>성공 사용 로그가 기록되었습니다.</Alert></Box>}
           </CardContent>
         </Card>
-        <Card><CardContent sx={{ p: 3 }}><Typography variant="h6" sx={{ mb: 2 }}>선택 키 정보</Typography>{selectedKey ? <Stack spacing={1.5}><Typography sx={{ fontWeight: 700 }}>{selectedKey.keyName}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5, wordBreak: 'break-all' }}>{selectedKey.keyUid}</Typography><StatusChip status={selectedKey.status} /><Typography sx={{ fontSize: 13 }}>알고리즘: {selectedKey.algorithm}-{selectedKey.keySize}</Typography><Typography sx={{ fontSize: 13 }}>용도: {selectedKey.purpose}</Typography><Typography sx={{ fontSize: 13 }}>무결성: {selectedKey.integrityValid ? '정상' : '위반'}</Typography></Stack> : <Typography color="text.secondary">키를 선택하세요.</Typography>}</CardContent></Card>
+        <Card><CardContent sx={{ p: 3 }}><Typography variant="h6" sx={{ mb: 2 }}>선택 키 정보</Typography>{selectedKey ? <Stack spacing={1.5}><Typography sx={{ fontWeight: 700 }}>{selectedKey.keyName}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5, wordBreak: 'break-all' }}>{selectedKey.keyUid}</Typography><Stack direction="row" spacing={1}><StatusBadge status={selectedKey.status} /><StatusBadge status={selectedKey.integrityValid ? 'VALID' : 'INVALID'} label={`무결성 ${selectedKey.integrityValid ? '정상' : '위반'}`} /></Stack><Typography sx={{ fontSize: 13 }}>알고리즘: {selectedKey.algorithm}-{selectedKey.keySize}</Typography><Typography sx={{ fontSize: 13 }}>용도: {selectedKey.purpose}</Typography></Stack> : <Typography color="text.secondary">키를 선택하세요.</Typography>}</CardContent></Card>
       </Box>
     </Box>
   )

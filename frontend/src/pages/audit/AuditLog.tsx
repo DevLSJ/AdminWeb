@@ -5,7 +5,6 @@ import {
   Box,
   Button,
   Card,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -26,6 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { StatusBadge } from '../../components/common/StatusBadge'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import type { AuditAction, AuditListParams, AuditLog as AuditLogType } from '../../types/api'
 
@@ -86,7 +86,7 @@ function AuditLog() {
         </Box>
       </FilterCard>
       <Card>
-        <TableContainer><Table sx={{ minWidth: 1080 }}><TableHead><TableRow sx={{ bgcolor: '#f8f9fc' }}><TableCell>시각 (KST)</TableCell><TableCell>행위자</TableCell><TableCell>행위</TableCell><TableCell>대상</TableCell><TableCell>설명</TableCell><TableCell>체인 검증</TableCell><TableCell align="right">상세</TableCell></TableRow></TableHead><TableBody>{pageContent.map((log) => <TableRow key={log.logUid} hover><TableCell>{log.createdAt}</TableCell><TableCell><Chip label={log.actor} size="small" variant="outlined" /></TableCell><TableCell><Typography sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 14 }}>{auditActionLabels[log.action]}</Typography></TableCell><TableCell><Typography sx={{ fontSize: 14 }}>{log.targetType}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 12.5 }}>{log.targetId}</Typography></TableCell><TableCell sx={{ maxWidth: 280 }}><Typography noWrap sx={{ fontSize: 14 }}>{log.detail}</Typography></TableCell><TableCell>{log.chainValid ? <Chip label="정상" color="success" size="small" variant="outlined" /> : <Chip label="위반" color="error" size="small" />}</TableCell><TableCell align="right"><Button size="small" onClick={() => setDetail(log)}>보기</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer>
+        <TableContainer><Table sx={{ minWidth: 1120 }}><TableHead><TableRow sx={{ bgcolor: '#f8f9fc' }}><TableCell>시각 (KST)</TableCell><TableCell>행위자</TableCell><TableCell>행위</TableCell><TableCell>대상</TableCell><TableCell>설명</TableCell><TableCell sx={{ minWidth: 112, whiteSpace: 'nowrap' }}>체인 검증</TableCell><TableCell align="right">상세</TableCell></TableRow></TableHead><TableBody>{pageContent.map((log) => <TableRow key={log.logUid} hover><TableCell>{log.createdAt}</TableCell><TableCell><StatusBadge label={log.actor} tone="neutral" /></TableCell><TableCell><Typography sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 14 }}>{auditActionLabels[log.action]}</Typography></TableCell><TableCell><Typography sx={{ fontSize: 14 }}>{log.targetType}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 12.5 }}>{log.targetId}</Typography></TableCell><TableCell sx={{ maxWidth: 280 }}><Typography noWrap sx={{ fontSize: 14 }}>{log.detail}</Typography></TableCell><TableCell sx={{ minWidth: 112, whiteSpace: 'nowrap' }}><StatusBadge status={log.chainValid ? 'VALID' : 'INVALID'} /></TableCell><TableCell align="right"><Button size="small" onClick={() => setDetail(log)}>보기</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer>
         <PaginationBar page={params.page} size={params.size} totalElements={filteredLogs.length} onPageChange={(page) => updateParam('page', page)} onSizeChange={(size) => updateParam('size', size)} />
       </Card>
       <Dialog open={Boolean(detail)} onClose={() => setDetail(null)} fullWidth maxWidth="sm"><DialogTitle>감사로그 상세</DialogTitle><DialogContent>{detail && <><InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={auditActionLabels[detail.action]} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="대상 ID" value={detail.targetId} /><InfoRow label="상세 JSON" value={<Box component="pre" sx={{ m: 0, p: 1.5, borderRadius: 2, bgcolor: '#f7f8fc', whiteSpace: 'pre-wrap', fontSize: 13.5, lineHeight: 1.6 }}>{JSON.stringify({ message: detail.detail, chainValid: detail.chainValid }, null, 2)}</Box>} /><InfoRow label="기록 시각" value={`${detail.createdAt} KST`} /></>}</DialogContent><DialogActions><Button onClick={() => setDetail(null)}>닫기</Button></DialogActions></Dialog>

@@ -16,6 +16,14 @@ const statusLabels: Record<string, string> = {
   N: '숨김',
   SUCCESS: '성공',
   FAILURE: '실패',
+  IN_PROGRESS: '진행 중',
+  PENDING: '대기',
+  VALID: '정상',
+  INVALID: '위반',
+  'S.ADMIN': 'S.Admin',
+  ADMIN: 'Admin',
+  CLIENT: 'Client',
+  DECRYPT_ONLY: '복호화 전용',
 }
 
 export function getStatusLabel(status: string) {

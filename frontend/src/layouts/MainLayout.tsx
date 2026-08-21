@@ -63,7 +63,6 @@ const menuGroups: MenuGroup[] = [
   {
     id: 'keys', label: '키 관리', icon: <KeyRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'], children: [
       { label: '키 목록', path: '/keys', icon: <ListAltRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
-      { label: '키 등록', path: '/keys/register', icon: <AddBoxRounded />, roles: ['S.ADMIN', 'ADMIN'] },
       { label: '암복호화 테스트', path: '/keys/test', icon: <ScienceRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
     ],
   },
@@ -78,8 +77,9 @@ const menuGroups: MenuGroup[] = [
 ]
 
 const pageTitles: Array<[string, string]> = [
-  ['/keys/register', '키 등록'], ['/keys/test', '암복호화 테스트'], ['/keys/', '키 상세'],
+  ['/keys/test', '암복호화 테스트'], ['/keys/', '키 상세'],
   ['/keys', '키 목록'], ['/users', '사용자 관리'], ['/audit-logs', '감사 로그'],
+  ['/my/recent-activity', '내 최근 활동'],
   ['/notices/new', '공지사항 등록'], ['/notices', '공지사항'], ['/', '대시보드'],
   ['/profile', '프로필 관리'], ['/forbidden', '접근 제한'],
 ]
@@ -149,7 +149,7 @@ function MainLayout() {
                   {group.children && showText && <Collapse in={groupOpen} timeout="auto" unmountOnExit><List disablePadding sx={{ mt: 0.4 }}>{group.children.map((child) => {
                     const isKeyDetail = child.path === '/keys'
                       && /^\/keys\/[^/]+$/.test(location.pathname)
-                      && !['/keys/register', '/keys/test'].includes(location.pathname)
+                      && location.pathname !== '/keys/test'
                     const selected = location.pathname === child.path || isKeyDetail
                     return <ListItem key={child.path} disablePadding><ListItemButton selected={selected} onClick={() => handleNavigate(child.path)} sx={{ minHeight: 44, ml: 1.3, pl: 2.4, borderRadius: 2, color: selected ? 'primary.main' : 'text.secondary', '&.Mui-selected': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08) } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 19 } }}>{child.icon}</ListItemIcon><ListItemText primary={child.label} slotProps={{ primary: { sx: { fontSize: 14.5, lineHeight: 1.5, fontWeight: selected ? 700 : 500 } } }} /></ListItemButton></ListItem>
                   })}</List></Collapse>}

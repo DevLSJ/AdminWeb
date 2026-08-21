@@ -12,10 +12,15 @@ const Forbidden = lazy(() => import('./pages/errors/Forbidden'))
 const CryptoTest = lazy(() => import('./pages/keys/CryptoTest'))
 const KeyDetail = lazy(() => import('./pages/keys/KeyDetail'))
 const KeyList = lazy(() => import('./pages/keys/KeyList'))
-const KeyRegister = lazy(() => import('./pages/keys/KeyRegister'))
 const NoticeList = lazy(() => import('./pages/notices/NoticeList'))
 const Profile = lazy(() => import('./pages/profile/Profile'))
 const UserList = lazy(() => import('./pages/users/UserList'))
+const RecentActivityPage = lazy(() => import('../map/recent-activity'))
+
+function MyRecentActivityRoute() {
+  const { user } = useAuth()
+  return <RecentActivityPage userId={user?.loginId ?? ''} />
+}
 
 function App() {
   const { isAuthenticated } = useAuth()
@@ -34,10 +39,11 @@ function App() {
             <Route path="/notices" element={<NoticeList key="notice-list" />} />
             <Route path="/notices/new" element={<NoticeList key="notice-new" autoCreate />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/my/recent-activity" element={<MyRecentActivityRoute />} />
             <Route path="/forbidden" element={<Forbidden />} />
 
             <Route element={<RequireRole allowedRoles={['S.ADMIN', 'ADMIN']} />}>
-              <Route path="/keys/register" element={<KeyRegister />} />
+              <Route path="/keys/register" element={<Navigate to="/keys" replace />} />
               <Route path="/users" element={<UserList />} />
               <Route path="/audit-logs" element={<AuditLog />} />
             </Route>

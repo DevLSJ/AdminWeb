@@ -46,7 +46,15 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/logout").permitAll()
-                        .requestMatchers("/actuator/health", "/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                // SpringDoc 직접 접근 (localhost:8080)
+                                "/api-docs", "/api-docs/**",
+                                "/swagger-ui.html", "/swagger-ui/**",
+                                // Nginx /api/* 프록시 경유 접근
+                                "/api/api-docs", "/api/api-docs/**",
+                                "/api/swagger-ui.html", "/api/swagger-ui/**"
+                        ).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(authenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

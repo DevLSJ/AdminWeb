@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# SSH keys (local development server access)
+key/
+
 # macOS
 .DS_Store
 

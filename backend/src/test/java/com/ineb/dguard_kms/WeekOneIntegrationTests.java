@@ -21,7 +21,10 @@ import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "springdoc.api-docs.path=/api/api-docs"
+)
 class WeekOneIntegrationTests {
 
     @LocalServerPort
@@ -93,6 +96,24 @@ class WeekOneIntegrationTests {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("access-control-allow-origin"))
                 .contains("http://127.0.0.1:15173");
+    }
+
+    @Test
+    void openApiDocumentIsAvailableThroughTheNginxProxyPath() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(endpoint("/api/api-docs"))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = HttpClient.newHttpClient().send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+        );
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        JsonNode document = objectMapper.readTree(response.body());
+        assertThat(document.path("openapi").asText()).startsWith("3.");
+        assertThat(document.path("paths").has("/api/auth/login")).isTrue();
+        assertThat(document.path("paths").has("/api/auth/me")).isTrue();
     }
 
     @Test

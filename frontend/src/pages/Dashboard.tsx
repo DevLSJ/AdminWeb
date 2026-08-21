@@ -22,7 +22,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   Divider,
   LinearProgress,
   MenuItem,
@@ -39,6 +38,8 @@ import {
   Typography,
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
+import { useNavigate } from 'react-router-dom'
+import { StatusBadge } from '../components/common/StatusBadge'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../types/auth'
 
@@ -64,13 +65,6 @@ const dashboardMockData = {
       note: '이번 달 42명 증가',
       color: '#32b7d8',
       icon: <PeopleAltRounded />,
-    },
-    {
-      label: '공지사항',
-      value: '28',
-      note: '현재 노출 24건',
-      color: '#4c8eda',
-      icon: <DescriptionRounded />,
     },
     {
       label: '만료 임박 키',
@@ -101,20 +95,6 @@ const dashboardMockData = {
       detail: '성공률 99.96%',
       gradient: 'linear-gradient(135deg, #7652b8 0%, #5149a8 100%)',
       icon: <LockOpenRounded />,
-    },
-    {
-      label: '감사 이벤트',
-      value: '1,286',
-      detail: '오늘 46건 기록',
-      gradient: 'linear-gradient(135deg, #35bad8 0%, #468bd9 100%)',
-      icon: <SecurityRounded />,
-    },
-    {
-      label: '공지사항',
-      value: '28',
-      detail: '게시 중 24건',
-      gradient: 'linear-gradient(135deg, #f4b326 0%, #f47a48 100%)',
-      icon: <DescriptionRounded />,
     },
   ],
   activities: [
@@ -429,6 +409,7 @@ function UsageChart({ granularity }: { granularity: UsageGranularity }) {
 
 function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [expiryDays, setExpiryDays] = useState(30)
   const [granularity, setGranularity] = useState<UsageGranularity>('daily')
   const [serverNow, setServerNow] = useState(() => new Date())
@@ -453,9 +434,7 @@ function Dashboard() {
     { label: '내가 작성한 글', value: '3', note: '현재 노출 2건', color: '#4c8eda', icon: <DescriptionRounded /> },
   ]
   const summaryItems = user?.role === 'CLIENT' ? clientSummary : dashboardMockData.summary
-  const operationItems = user?.role === 'CLIENT'
-    ? dashboardMockData.operationCards.filter((item) => item.label !== '감사 이벤트')
-    : dashboardMockData.operationCards
+  const operationItems = dashboardMockData.operationCards
   const activityItems = user?.role === 'CLIENT'
     ? [
         { title: '암호화 테스트', detail: 'PAYMENT-AES-001 테스트 성공', time: '12분 전', color: '#d92f81' },
@@ -478,20 +457,18 @@ function Dashboard() {
             {isAdminRole(user?.role) ? 'D\'Guard KMS 전체 운영·보안 현황을 확인하세요.' : '사용 가능한 키와 본인의 테스트·게시판 활동을 확인하세요.'}
           </Typography>
         </Box>
-        <Chip
+        <StatusBadge
           icon={<CheckCircleRounded />}
+          status={user?.role ?? 'CLIENT'}
           label={`${user?.role ?? ''} VIEW`}
-          color="success"
-          variant="outlined"
-          size="small"
-          sx={{ bgcolor: 'background.paper', fontWeight: 700, fontSize: 13 }}
+          sx={{ fontSize: 13 }}
         />
       </Box>
 
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' },
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)', xl: user?.role === 'CLIENT' ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)' },
           gap: 2,
           mt: 3,
         }}
@@ -580,7 +557,7 @@ function Dashboard() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', xl: 'repeat(4, 1fr)' },
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
           gap: 2,
           mt: 2,
         }}
@@ -634,10 +611,15 @@ function Dashboard() {
               <Box>
                 <Typography variant="h6">최근 활동</Typography>
                 <Typography sx={{ mt: 0.4, color: 'text.secondary', fontSize: 14 }}>
-                  최근 관리자 작업 내역
+                  {isAdminRole(user?.role) ? '최근 관리자 작업 내역' : '최근 내 작업 내역'}
                 </Typography>
               </Box>
-              <Button size="small" endIcon={<ArrowForwardRounded />} sx={{ fontSize: 14 }}>
+              <Button
+                size="small"
+                endIcon={<ArrowForwardRounded />}
+                onClick={() => navigate('/my/recent-activity')}
+                sx={{ fontSize: 14 }}
+              >
                 전체보기
               </Button>
             </Box>
@@ -676,7 +658,7 @@ function Dashboard() {
               </Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <Select size="small" value={expiryDays} onChange={(event) => setExpiryDays(Number(event.target.value))} aria-label="만료 임박 기준일" sx={{ fontSize: 14 }}><MenuItem value={7}>7일</MenuItem><MenuItem value={30}>30일</MenuItem><MenuItem value={60}>60일</MenuItem></Select>
-                <Chip label={`${expiringKeys.length}건`} color="warning" size="small" sx={{ fontWeight: 800, fontSize: 12.5 }} />
+                <StatusBadge label={`${expiringKeys.length}건`} tone="warning" minWidth={48} />
               </Stack>
             </Box>
             <TableContainer sx={{ mt: 2 }}>

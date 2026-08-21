@@ -44,10 +44,24 @@ const activitySeeds: ActivitySeed[] = [
   { timestamp: '2026-08-05T09:18:25+09:00', activityType: 'LOGIN', targetKey: null, status: 'SUCCESS', description: '관리자 콘솔에 로그인했습니다.', ipAddress: '10.20.1.21' },
 ]
 
-export const recentActivityMockData: RecentActivity[] = activitySeeds
-  .map((seed, index) => ({
-    id: `ACT-${String(index + 1).padStart(5, '0')}`,
-    userId: 'admin',
+const clientActivityPatterns: Omit<ActivitySeed, 'timestamp'>[] = [
+  { activityType: 'CRYPTO_TEST', targetKey: 'PAYMENT-AES-001', status: 'SUCCESS', description: '암호화·복호화 테스트를 실행했습니다.', version: 'v2' },
+  { activityType: 'LOGIN', targetKey: null, status: 'SUCCESS', description: '클라이언트 콘솔에 로그인했습니다.' },
+  { activityType: 'NOTICE_UPDATE', targetKey: null, status: 'SUCCESS', description: '내 게시글을 작성하거나 수정했습니다.' },
+  { activityType: 'CRYPTO_TEST', targetKey: 'MEMBER-AES-003', status: 'SUCCESS', description: '복호화 호환성 테스트를 완료했습니다.', version: 'v4' },
+  { activityType: 'LOGOUT', targetKey: null, status: 'SUCCESS', description: '클라이언트 콘솔에서 로그아웃했습니다.' },
+]
+
+const clientActivitySeeds: ActivitySeed[] = activitySeeds.slice(0, 20).map((seed, index) => ({
+  ...clientActivityPatterns[index % clientActivityPatterns.length],
+  timestamp: seed.timestamp,
+  ipAddress: `10.30.2.${21 + (index % 4)}`,
+}))
+
+function buildMockActivities(seeds: ActivitySeed[], userId: string, idPrefix: string): RecentActivity[] {
+  return seeds.map((seed, index) => ({
+    id: `ACT-${idPrefix}-${String(index + 1).padStart(5, '0')}`,
+    userId,
     timestamp: seed.timestamp,
     activityType: seed.activityType,
     targetKey: seed.targetKey,
@@ -57,6 +71,12 @@ export const recentActivityMockData: RecentActivity[] = activitySeeds
     ipAddress: seed.ipAddress ?? '10.20.1.12',
     description: seed.description,
   }))
+}
+
+export const recentActivityMockData: RecentActivity[] = [
+  ...buildMockActivities(activitySeeds, 'admin', 'A'),
+  ...buildMockActivities(clientActivitySeeds, 'client', 'C'),
+]
   .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
 
 export function getLatestMockActivities(limit = 10, userId = 'admin'): RecentActivity[] {

@@ -3,7 +3,6 @@ import {
   Box,
   Card,
   CardContent,
-  Chip,
   FormControl,
   MenuItem,
   Pagination,
@@ -11,8 +10,6 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import type { ChipProps } from '@mui/material/Chip'
-import { getStatusLabel } from '../../utils/status'
 
 interface PageHeaderProps {
   title: string
@@ -52,38 +49,6 @@ export function FilterCard({ children }: FilterCardProps) {
     <Card sx={{ mb: 2.5 }}>
       <CardContent sx={{ p: '20px !important' }}>{children}</CardContent>
     </Card>
-  )
-}
-
-const statusColors: Record<string, ChipProps['color']> = {
-  ACTIVE: 'success',
-  CREATED: 'info',
-  EXPIRED: 'warning',
-  INACTIVE: 'default',
-  DISTRIBUTED: 'secondary',
-  DEPLOYING: 'secondary',
-  DEPLOYED: 'info',
-  DEPLOY_FAILED: 'error',
-  ROTATED: 'warning',
-  DEPRECATED: 'default',
-  ROLLED_BACK: 'info',
-  COMPROMISED: 'error',
-  DESTROYED: 'default',
-  Y: 'success',
-  N: 'default',
-  SUCCESS: 'success',
-  FAILURE: 'error',
-}
-
-export function StatusChip({ status }: { status: string }) {
-  return (
-    <Chip
-      label={getStatusLabel(status)}
-      color={statusColors[status] ?? 'default'}
-      size="small"
-      variant={status === 'INACTIVE' || status === 'DESTROYED' || status === 'DEPRECATED' || status === 'N' ? 'outlined' : 'filled'}
-      sx={{ minWidth: 62, fontWeight: 700, fontSize: 12.5 }}
-    />
   )
 }
 

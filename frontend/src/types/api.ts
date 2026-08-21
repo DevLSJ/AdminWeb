@@ -106,6 +106,7 @@ export interface UserListParams {
 
 export interface AppUser {
   userUid: string
+  loginId?: string
   name: string
   phoneMasked: string
   phonePlain: string

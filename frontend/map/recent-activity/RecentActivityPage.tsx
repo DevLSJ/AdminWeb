@@ -45,13 +45,13 @@ import {
   Typography,
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
+import { StatusBadge } from '../../src/components/common/StatusBadge'
 import { mockRecentActivitySource } from './mockData'
 import type {
   RecentActivityPageResult,
   RecentActivityQuery,
   RecentActivityRequestState,
   RecentActivitySource,
-  RecentActivityStatus,
   RecentActivityType,
   RecentActivityTypeFilter,
 } from './types'
@@ -92,15 +92,6 @@ const activityTypeStyle: Record<RecentActivityType, {
   LOGIN: { label: '로그인', color: '#25a875', icon: <LoginRounded /> },
   LOGOUT: { label: '로그아웃', color: '#7a8090', icon: <LogoutRounded /> },
   NOTICE_UPDATE: { label: '게시판 활동', color: '#e09a16', icon: <DescriptionRounded /> },
-}
-
-const statusStyle: Record<RecentActivityStatus, {
-  label: string
-  color: 'success' | 'error' | 'warning'
-}> = {
-  SUCCESS: { label: '성공', color: 'success' },
-  FAILURE: { label: '실패', color: 'error' },
-  IN_PROGRESS: { label: '진행 중', color: 'warning' },
 }
 
 function formatTimestamp(timestamp: string) {
@@ -232,12 +223,10 @@ export function RecentActivityPage({
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Chip
+          <StatusBadge
             icon={<CheckCircleRounded />}
             label={pollingIntervalMs > 0 ? `${pollingIntervalMs / 1000}초 자동 갱신` : '수동 갱신'}
-            color="success"
-            variant="outlined"
-            sx={{ bgcolor: 'background.paper', fontWeight: 700 }}
+            tone="positive"
           />
           <Tooltip title={lastUpdatedAt ? `마지막 갱신 ${lastUpdatedAt.toLocaleTimeString('ko-KR')}` : '새로고침'}>
             <span>
@@ -334,7 +323,6 @@ export function RecentActivityPage({
                 </TableRow>
               ) : data.content.map((activity) => {
                 const activityStyle = activityTypeStyle[activity.activityType]
-                const resultStyle = statusStyle[activity.status]
                 return (
                   <TableRow key={activity.id} hover>
                     <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
@@ -362,7 +350,7 @@ export function RecentActivityPage({
                       <Typography sx={{ fontSize: 14, lineHeight: 1.55 }}>{activity.description}</Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <Chip label={resultStyle.label} color={resultStyle.color} variant="outlined" size="small" />
+                      <StatusBadge status={activity.status} />
                     </TableCell>
                     <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>{activity.ipAddress}</TableCell>
                   </TableRow>

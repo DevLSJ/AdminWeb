@@ -7,7 +7,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   Divider,
   Stack,
   TextField,
@@ -15,13 +14,14 @@ import {
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { PageHeader } from '../../components/admin/AdminPage'
+import { StatusBadge } from '../../components/common/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
 import type { UserRole } from '../../types/auth'
 
 const rolePresentation: Record<UserRole, { label: string; color: string; accent: string; description: string }> = {
   'S.ADMIN': { label: 'S.Admin', color: '#b51f5f', accent: '#7652b8', description: '최고 관리자' },
   ADMIN: { label: 'Admin', color: '#d92f81', accent: '#9d4cc5', description: '시스템 관리자' },
-  CLIENT: { label: 'Client', color: '#3f7fbf', accent: '#32b7d8', description: '일반 사용자' },
+  CLIENT: { label: 'Client', color: '#596273', accent: '#8b93a1', description: '일반 사용자' },
 }
 
 function Profile() {
@@ -66,7 +66,7 @@ function Profile() {
             <Avatar sx={{ width: 82, height: 82, bgcolor: alpha(roleStyle.color, 0.14), color: roleStyle.color, border: '3px solid', borderColor: alpha(roleStyle.accent, 0.28), boxShadow: `0 10px 28px ${alpha(roleStyle.color, 0.18)}` }}><AccountCircleRounded sx={{ fontSize: 52 }} /></Avatar>
             <Typography variant="h5" sx={{ mt: 2, color: roleStyle.color, fontWeight: 850, letterSpacing: '-0.025em', textShadow: `0 4px 16px ${alpha(roleStyle.color, 0.16)}` }}>{user.name}</Typography>
             <Typography sx={{ mt: 0.5, color: 'text.secondary' }}>{user.loginId}</Typography>
-            <Chip icon={<ShieldRounded />} label={`${roleStyle.label} · ${roleStyle.description}`} sx={{ mt: 2, px: 0.5, color: roleStyle.color, bgcolor: alpha(roleStyle.color, 0.1), border: '1px solid', borderColor: alpha(roleStyle.color, 0.24), fontWeight: 800 }} />
+            <StatusBadge status={user.role} icon={<ShieldRounded />} label={`${roleStyle.label} · ${roleStyle.description}`} sx={{ mt: 2 }} />
             <Divider flexItem sx={{ my: 3 }} />
             <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>사용자 UID</Typography>
             <Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 13 }}>{user.userUid}</Typography>
