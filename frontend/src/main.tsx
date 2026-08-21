@@ -8,6 +8,13 @@ import { KmsProvider } from './contexts/KmsProvider'
 import './index.css'
 import theme from './theme/theme'
 
+// A rolling deployment can replace lazy chunks while an older page is open.
+// Reload once so the browser receives the new index and matching asset hashes.
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  window.location.reload()
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider theme={theme}>

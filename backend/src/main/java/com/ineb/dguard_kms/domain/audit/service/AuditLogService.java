@@ -3,6 +3,7 @@ package com.ineb.dguard_kms.domain.audit.service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +48,8 @@ public class AuditLogService {
                 .orElseGet(() -> chainHeadRepository.saveAndFlush(new AuditChainHead((short) 1)));
         String previousHash = chainHead.getCurrentHash();
         UUID logUid = UUID.randomUUID();
-        Instant createdAt = Instant.now();
+        // PostgreSQL timestamptz stores microseconds. Hash the same precision that is persisted.
+        Instant createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
         String normalizedDetail = detail.length() > 1000 ? detail.substring(0, 1000) : detail;
         String rowHash = calculateHash(
                 logUid, actor, action, targetType, targetId, normalizedDetail, previousHash, createdAt
