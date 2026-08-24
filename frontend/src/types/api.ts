@@ -22,12 +22,7 @@ export type KeyStatus =
   | 'EXPIRED'
   | 'INACTIVE'
   | 'DISTRIBUTED'
-  | 'DEPLOYING'
-  | 'DEPLOYED'
   | 'DEPLOY_FAILED'
-  | 'ROTATED'
-  | 'DEPRECATED'
-  | 'COMPROMISED'
   | 'DESTROYED'
 
 export interface KeyListParams {
@@ -70,7 +65,7 @@ export type AutoRotationDays = 30 | 60 | 90 | null
 
 export interface KeyVersion {
   version: number
-  status: KeyStatus
+  status: KeyStatus | 'DEPRECATED'
   createdAt: string
   createdBy: string
   decryptOnly: boolean

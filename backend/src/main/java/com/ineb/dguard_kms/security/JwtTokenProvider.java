@@ -31,7 +31,7 @@ public class JwtTokenProvider {
         }
         this.signingKey = Keys.hmacShaKeyFor(secret);
         Arrays.fill(secret, (byte) 0);
-        this.expirationMillis = environment.getProperty("jwt.expiration-ms", Long.class, 86_400_000L);
+        this.expirationMillis = environment.getProperty("jwt.expiration-ms", Long.class, 3_600_000L);
         this.clock = Clock.systemUTC();
     }
 

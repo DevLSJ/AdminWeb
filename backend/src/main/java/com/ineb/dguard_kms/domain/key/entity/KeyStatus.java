@@ -6,7 +6,6 @@ public enum KeyStatus {
     EXPIRED,
     INACTIVE,
     DISTRIBUTED,
-    COMPROMISED,
-    DEACTIVATED,
+    DEPLOY_FAILED,
     DESTROYED
 }

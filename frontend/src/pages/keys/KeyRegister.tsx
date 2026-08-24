@@ -72,7 +72,7 @@ function KeyRegisterDialog({ open, onClose, onCreated }: KeyRegisterDialogProps)
             </Box>
             <FormControlLabel disabled={Boolean(createdUid)} control={<Switch checked={form.activateImmediately} onChange={(event) => setForm((current) => ({ ...current, activateImmediately: event.target.checked }))} />} label="생성 직후 활성 상태로 전환 (상태 이력 기록)" />
             {error && <Alert severity="error" sx={{ mt: 2.5 }}>{error}</Alert>}
-            {createdUid && <Alert severity="success" sx={{ mt: 2.5 }}><Typography sx={{ fontWeight: 700 }}>키가 생성되었습니다.</Typography><Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 12.5 }}>키 UID: {createdUid}</Typography><Typography sx={{ mt: 0.5, fontSize: 13 }}>상태: {form.activateImmediately ? '활성' : '생성'} · 무결성: 정상</Typography></Alert>}
+            {createdUid && <Alert severity="success" sx={{ mt: 2.5 }}><Typography sx={{ fontWeight: 700 }}>키가 생성되었습니다.</Typography><Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 12.5 }}>키 UID: {createdUid}</Typography><Typography sx={{ mt: 0.5, fontSize: 13 }}>상태: {form.activateImmediately ? '활성' : '준비'} · 무결성: 정상</Typography></Alert>}
           </Box>
           <Stack spacing={2}>
             <Box sx={{ p: 2.25, border: '1px solid', borderColor: 'divider', borderRadius: 2.5, bgcolor: '#fafbfe' }}>

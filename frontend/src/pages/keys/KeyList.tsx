@@ -56,7 +56,7 @@ const defaultParams: KeyListParams = {
 }
 
 const algorithmOptions = ['ALL', 'AES', 'HMAC', 'RSA'] as const
-const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'DEPLOYING', 'DEPLOYED', 'DEPLOY_FAILED', 'ROTATED', 'DEPRECATED', 'COMPROMISED', 'DESTROYED'] as const
+const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'DEPLOY_FAILED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 
 function KeyList() {

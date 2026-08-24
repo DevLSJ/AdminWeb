@@ -388,14 +388,12 @@ public class CryptoKeyService {
         Map<KeyStatus, Set<KeyStatus>> transitions = new EnumMap<>(KeyStatus.class);
         transitions.put(KeyStatus.CREATED, Set.of(KeyStatus.ACTIVE));
         transitions.put(KeyStatus.ACTIVE, Set.of(
-                KeyStatus.EXPIRED, KeyStatus.INACTIVE, KeyStatus.DISTRIBUTED,
-                KeyStatus.COMPROMISED, KeyStatus.DEACTIVATED
+                KeyStatus.EXPIRED, KeyStatus.INACTIVE, KeyStatus.DISTRIBUTED, KeyStatus.DEPLOY_FAILED
         ));
         transitions.put(KeyStatus.EXPIRED, Set.of(KeyStatus.INACTIVE, KeyStatus.ACTIVE));
         transitions.put(KeyStatus.INACTIVE, Set.of(KeyStatus.DESTROYED));
         transitions.put(KeyStatus.DISTRIBUTED, Set.of(KeyStatus.DESTROYED));
-        transitions.put(KeyStatus.COMPROMISED, Set.of(KeyStatus.DESTROYED));
-        transitions.put(KeyStatus.DEACTIVATED, Set.of(KeyStatus.ACTIVE, KeyStatus.DESTROYED));
+        transitions.put(KeyStatus.DEPLOY_FAILED, Set.of(KeyStatus.ACTIVE, KeyStatus.DESTROYED));
         transitions.put(KeyStatus.DESTROYED, Set.of());
         return Map.copyOf(transitions);
     }

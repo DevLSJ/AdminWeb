@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +72,8 @@ class WeekOneIntegrationTests {
         assertThat(loginBody.path("data").path("role").asText()).isEqualTo("ADMIN");
         String token = loginBody.path("data").path("token").asText();
         assertThat(token).isNotBlank();
+        JsonNode tokenClaims = objectMapper.readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
+        assertThat(tokenClaims.path("exp").asLong() - tokenClaims.path("iat").asLong()).isEqualTo(3_600L);
 
         HttpRequest meRequest = HttpRequest.newBuilder(endpoint("/api/auth/me"))
                 .header("Authorization", "Bearer " + token)

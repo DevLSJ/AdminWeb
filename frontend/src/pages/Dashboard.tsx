@@ -149,8 +149,8 @@ type UsageGranularity = 'daily' | 'monthly'
 
 interface DailyKeyStatus {
   date: string
+  ready: number
   active: number
-  created: number
   inactive: number
   expired: number
 }
@@ -167,8 +167,8 @@ const PLOT_TOP = 78
 const PLOT_BOTTOM = 224
 const CHART_LEFT = 24
 const statusSeries = [
+  { key: 'ready', label: '준비', color: '#7652b8' },
   { key: 'active', label: '활성', color: '#d92f81' },
-  { key: 'created', label: '생성', color: '#7652b8' },
   { key: 'inactive', label: '비활성', color: '#f5a623' },
   { key: 'expired', label: '만료', color: '#aeb5c4' },
 ] as const
@@ -182,8 +182,8 @@ function createDailyKeyStatusData(startDate: string, endDate: string): DailyKeyS
   while (current <= end) {
     result.push({
       date: current.toISOString().slice(0, 10),
+      ready: 5 + ((index * 3) % 7),
       active: 54 + Math.floor(index / 7) + Math.round(Math.sin(index * 0.48) * 2),
-      created: 5 + ((index * 3) % 7),
       inactive: 4 + (index % 4),
       expired: 1 + Math.floor(index / 18) + (index % 13 === 0 ? 1 : 0),
     })
@@ -206,12 +206,12 @@ function createChartData(granularity: UsageGranularity): KeyStatusChartPoint[] {
     }))
   }
 
-  const monthly = new Map<string, { active: number; created: number; inactive: number; expired: number; sampleDays: number }>()
+  const monthly = new Map<string, { ready: number; active: number; inactive: number; expired: number; sampleDays: number }>()
   dailyKeyStatusData.forEach((point) => {
     const month = point.date.slice(0, 7)
-    const current = monthly.get(month) ?? { active: 0, created: 0, inactive: 0, expired: 0, sampleDays: 0 }
+    const current = monthly.get(month) ?? { ready: 0, active: 0, inactive: 0, expired: 0, sampleDays: 0 }
+    current.ready += point.ready
     current.active += point.active
-    current.created += point.created
     current.inactive += point.inactive
     current.expired += point.expired
     current.sampleDays += 1
@@ -223,8 +223,8 @@ function createChartData(granularity: UsageGranularity): KeyStatusChartPoint[] {
     axisLabel: `${Number(month.slice(5))}월`,
     detailLabel: `${month.replace('-', '년 ')}월 · 일평균`,
     sampleDays: totals.sampleDays,
+    ready: Math.round(totals.ready / totals.sampleDays),
     active: Math.round(totals.active / totals.sampleDays),
-    created: Math.round(totals.created / totals.sampleDays),
     inactive: Math.round(totals.inactive / totals.sampleDays),
     expired: Math.round(totals.expired / totals.sampleDays),
   }))
@@ -247,7 +247,7 @@ function resolveStandardDateSnapshot(serverNow: Date) {
 }
 
 function getStatusTotal(point: DailyKeyStatus) {
-  return point.active + point.created + point.inactive + point.expired
+  return point.ready + point.active + point.inactive + point.expired
 }
 
 function buildSmoothLinePath(points: Array<{ x: number; y: number }>) {

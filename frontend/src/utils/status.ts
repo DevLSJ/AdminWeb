@@ -1,6 +1,6 @@
 const statusLabels: Record<string, string> = {
   ACTIVE: '활성',
-  CREATED: '생성',
+  CREATED: '준비',
   EXPIRED: '만료',
   INACTIVE: '비활성',
   DISTRIBUTED: '배포됨',
@@ -10,7 +10,6 @@ const statusLabels: Record<string, string> = {
   ROTATED: '순환됨',
   DEPRECATED: '구버전',
   ROLLED_BACK: '롤백 완료',
-  COMPROMISED: '침해',
   DESTROYED: '폐기',
   Y: '노출',
   N: '숨김',
