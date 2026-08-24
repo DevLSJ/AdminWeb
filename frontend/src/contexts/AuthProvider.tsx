@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import axios from 'axios'
+import { Alert, Snackbar } from '@mui/material'
 import { apiEndpoints } from '../api/endpoints'
 import { apiClient, SESSION_STORAGE_KEY, TOKEN_STORAGE_KEY } from '../api/client'
 import { AuthContext } from './AuthContext'
@@ -34,7 +35,21 @@ function readStoredSession(): AuthUser | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [user, setUser] = useState<AuthUser | null>(readStoredSession)
-  const [isInitializing, setIsInitializing] = useState(Boolean(localStorage.getItem(TOKEN_STORAGE_KEY)))
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_STORAGE_KEY))
+  const [isInitializing, setIsInitializing] = useState(Boolean(token))
+  const [sessionNoticeOpen, setSessionNoticeOpen] = useState(false)
+
+  const persistToken = (nextToken: string) => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, nextToken)
+    setToken(nextToken)
+  }
+
+  const clearSession = () => {
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(SESSION_STORAGE_KEY)
+    setToken(null)
+    setUser(null)
+  }
 
   const persistSession = (session: AuthUser) => {
     setUser(session)
@@ -55,9 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (!active) return
-        localStorage.removeItem(TOKEN_STORAGE_KEY)
-        localStorage.removeItem(SESSION_STORAGE_KEY)
-        setUser(null)
+        clearSession()
       })
       .finally(() => {
         if (active) setIsInitializing(false)
@@ -75,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: data.data.name,
         role: data.data.role,
       }
-      localStorage.setItem(TOKEN_STORAGE_KEY, data.data.token)
+      persistToken(data.data.token)
       persistSession(session)
       return { success: true, message: data.message || '로그인되었습니다.' }
     } catch (error) {
@@ -88,9 +101,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     void apiClient.post(apiEndpoints.auth.logout).catch(() => undefined)
-    localStorage.removeItem(TOKEN_STORAGE_KEY)
-    localStorage.removeItem(SESSION_STORAGE_KEY)
-    setUser(null)
+    clearSession()
+  }
+
+  const refreshSession = async (): Promise<AuthResult> => {
+    try {
+      const { data } = await apiClient.post<ApiResponse<AuthUser & { token: string }>>(apiEndpoints.auth.refresh)
+      persistToken(data.data.token)
+      persistSession({
+        userUid: data.data.userUid,
+        loginId: data.data.loginId,
+        name: data.data.name,
+        role: data.data.role,
+      })
+      return { success: true, message: data.message || '세션이 연장되었습니다.' }
+    } catch (error) {
+      const message = axios.isAxiosError<ApiResponse<never>>(error) ? error.response?.data?.message : undefined
+      return { success: false, message: message || '세션을 연장하지 못했습니다.' }
+    }
+  }
+
+  const expireSession = () => {
+    clearSession()
+    setSessionNoticeOpen(true)
   }
 
   const updateProfile = (name: string) => {
@@ -121,7 +154,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const publicAccounts = accounts.map((account) => ({ userUid: account.userUid, loginId: account.loginId, name: account.name, role: account.role }))
-  const value: AuthContextValue = { user, accounts: publicAccounts, isAuthenticated: Boolean(user && localStorage.getItem(TOKEN_STORAGE_KEY)), isInitializing, login, logout, updateProfile, changePassword, updateAccountRole }
+  const value: AuthContextValue = { user, token, accounts: publicAccounts, isAuthenticated: Boolean(user && token), isInitializing, login, logout, refreshSession, expireSession, updateProfile, changePassword, updateAccountRole }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <Snackbar open={sessionNoticeOpen} autoHideDuration={5000} onClose={() => setSessionNoticeOpen(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert severity="warning" variant="filled" onClose={() => setSessionNoticeOpen(false)}>세션이 만료되어 자동 로그아웃되었습니다.</Alert>
+      </Snackbar>
+    </AuthContext.Provider>
+  )
 }

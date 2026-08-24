@@ -35,11 +35,14 @@ export interface AuthResult {
 
 export interface AuthContextValue {
   user: AuthUser | null
+  token: string | null
   accounts: AuthUser[]
   isAuthenticated: boolean
   isInitializing: boolean
   login: (credentials: LoginCredentials) => Promise<AuthResult>
   logout: () => void
+  refreshSession: () => Promise<AuthResult>
+  expireSession: () => void
   updateProfile: (name: string) => void
   changePassword: (currentPassword: string, newPassword: string) => AuthResult
   updateAccountRole: (loginId: string, role: UserRole) => AuthResult

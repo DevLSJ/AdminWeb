@@ -2,6 +2,8 @@ import { useState, type ReactNode } from 'react'
 import {
   AccountCircleRounded,
   AddBoxRounded,
+  Brightness4Rounded,
+  Brightness7Rounded,
   ChevronLeftRounded,
   ChevronRightRounded,
   DashboardRounded,
@@ -13,14 +15,17 @@ import {
   LogoutRounded,
   MenuRounded,
   PeopleAltRounded,
+  RefreshRounded,
   ScienceRounded,
   SecurityRounded,
 } from '@mui/icons-material'
 import {
   AppBar,
+  Alert,
   Avatar,
   Box,
   Button,
+  Chip,
   Collapse,
   Divider,
   Drawer,
@@ -30,13 +35,17 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Snackbar,
+  Stack,
   Toolbar,
   Tooltip,
   Typography,
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useColorMode } from '../contexts/ColorModeContext'
 import { useAuth } from '../hooks/useAuth'
+import { useAuthTimer } from '../hooks/useAuthTimer'
 import type { UserRole } from '../types/auth'
 
 const expandedWidth = 260
@@ -90,7 +99,11 @@ function MainLayout() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ keys: true, notices: true })
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, token, logout, refreshSession, expireSession } = useAuth()
+  const { mode, toggleColorMode } = useColorMode()
+  const { formattedTime, remainingSeconds } = useAuthTimer(token, expireSession)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [feedback, setFeedback] = useState<{ severity: 'success' | 'error'; message: string } | null>(null)
   const drawerWidth = collapsed ? collapsedWidth : expandedWidth
   const currentTitle = pageTitles.find(([path]) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path))?.[1] ?? 'D\'Guard KMS'
 
@@ -107,6 +120,14 @@ function MainLayout() {
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
+  }
+
+  const handleRefreshSession = async () => {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    const result = await refreshSession()
+    setFeedback({ severity: result.success ? 'success' : 'error', message: result.message })
+    setIsRefreshing(false)
   }
 
   if (!user) return null
@@ -174,12 +195,31 @@ function MainLayout() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="fixed" elevation={0} sx={{ width: { md: `calc(100% - ${drawerWidth}px)` }, ml: { md: `${drawerWidth}px` }, transition: (theme) => theme.transitions.create(['width', 'margin-left']), borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha('#ffffff', 0.94), color: 'text.primary', backdropFilter: 'blur(12px)' }}>
+      <AppBar position="fixed" elevation={0} sx={{ width: { md: `calc(100% - ${drawerWidth}px)` }, ml: { md: `${drawerWidth}px` }, transition: (theme) => theme.transitions.create(['width', 'margin-left']), borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.background.paper, 0.94), color: 'text.primary', backdropFilter: 'blur(12px)' }}>
         <Toolbar sx={{ minHeight: '72px !important', px: { xs: 2, sm: 3.5 } }}>
           <Tooltip title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}><IconButton aria-label="사이드바 토글" onClick={() => setCollapsed((value) => !value)} sx={{ display: { xs: 'none', md: 'inline-flex' }, mr: 1.5 }}>{collapsed ? <ChevronRightRounded /> : <ChevronLeftRounded />}</IconButton></Tooltip>
           <IconButton aria-label="메뉴 열기" onClick={() => setMobileOpen(true)} sx={{ display: { md: 'none' }, mr: 1 }}><MenuRounded /></IconButton>
           <Typography sx={{ flexGrow: 1, fontSize: 18, fontWeight: 700 }}>{currentTitle}</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1.5 } }}><Button color="inherit" onClick={() => navigate('/profile')} sx={{ display: { xs: 'none', sm: 'block' }, minWidth: 0, p: 0.5, textAlign: 'right' }}><Typography sx={{ fontSize: 14.5, fontWeight: 700 }}>{user.loginId}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>{user.role}</Typography></Button><Tooltip title="로그아웃"><Button color="inherit" onClick={handleLogout} startIcon={<LogoutRounded sx={{ fontSize: 18 }} />} sx={{ minWidth: { xs: 42, sm: 'auto' }, px: { xs: 1, sm: 1.5 }, color: 'text.secondary', fontSize: 14 }}><Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>로그아웃</Box></Button></Tooltip></Box>
+          <Stack direction="row" spacing={{ xs: 0.25, sm: 0.75 }} sx={{ alignItems: 'center' }}>
+            <Button color="inherit" onClick={() => navigate('/profile')} sx={{ display: { xs: 'none', lg: 'block' }, minWidth: 0, mr: 0.5, p: 0.5, textAlign: 'right' }}><Typography sx={{ fontSize: 14.5, fontWeight: 700 }}>{user.loginId}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>{user.role}</Typography></Button>
+            <Tooltip title={mode === 'dark' ? '라이트 모드' : '다크 모드'}>
+              <IconButton aria-label={mode === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'} color="inherit" onClick={toggleColorMode}>{mode === 'dark' ? <Brightness7Rounded /> : <Brightness4Rounded />}</IconButton>
+            </Tooltip>
+            <Chip
+              aria-label={`세션 남은 시간 ${formattedTime}`}
+              label={formattedTime}
+              color={remainingSeconds <= 60 ? 'error' : remainingSeconds <= 300 ? 'warning' : 'default'}
+              size="small"
+              variant={remainingSeconds <= 300 ? 'filled' : 'outlined'}
+              sx={{ minWidth: 66, fontVariantNumeric: 'tabular-nums', '& .MuiChip-label': { px: 1 } }}
+            />
+            <Tooltip title="세션 연장">
+              <span><IconButton aria-label="세션 연장" color="inherit" disabled={isRefreshing} onClick={() => void handleRefreshSession()} size="small"><RefreshRounded sx={{ animation: isRefreshing ? 'session-spin 0.8s linear infinite' : 'none', '@keyframes session-spin': { to: { transform: 'rotate(360deg)' } } }} /></IconButton></span>
+            </Tooltip>
+            <Tooltip title="로그아웃">
+              <IconButton aria-label="로그아웃" color="inherit" onClick={handleLogout}><LogoutRounded /></IconButton>
+            </Tooltip>
+          </Stack>
         </Toolbar>
       </AppBar>
 
@@ -189,6 +229,9 @@ function MainLayout() {
       </Box>
 
       <Box component="main" sx={{ width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', pt: '72px', transition: (theme) => theme.transitions.create('width') }}><Box sx={{ width: '100%', maxWidth: 1500, mx: 'auto', p: { xs: 2, sm: 3, lg: 3.5 } }}><Outlet /></Box></Box>
+      <Snackbar open={Boolean(feedback)} autoHideDuration={3500} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert severity={feedback?.severity ?? 'success'} variant="filled" onClose={() => setFeedback(null)}>{feedback?.message}</Alert>
+      </Snackbar>
     </Box>
   )
 }

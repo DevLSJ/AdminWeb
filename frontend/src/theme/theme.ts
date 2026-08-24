@@ -1,8 +1,8 @@
-import { createTheme } from '@mui/material/styles'
+import { createTheme, type PaletteMode } from '@mui/material/styles'
 
-const theme = createTheme({
+export const createAppTheme = (mode: PaletteMode) => createTheme({
   palette: {
-    mode: 'light',
+    mode,
     primary: {
       main: '#d92f81',
       light: '#f3d4e5',
@@ -12,15 +12,13 @@ const theme = createTheme({
     secondary: {
       main: '#7652b8',
     },
-    background: {
-      default: '#f6f7fb',
-      paper: '#ffffff',
-    },
-    text: {
-      primary: '#202534',
-      secondary: '#7a8090',
-    },
-    divider: '#eceef4',
+    background: mode === 'light'
+      ? { default: '#f6f7fb', paper: '#ffffff' }
+      : { default: '#11131a', paper: '#1b1e28' },
+    text: mode === 'light'
+      ? { primary: '#202534', secondary: '#7a8090' }
+      : { primary: '#f2f3f7', secondary: '#aeb3c2' },
+    divider: mode === 'light' ? '#eceef4' : '#303442',
     success: {
       main: '#25b884',
     },
@@ -67,10 +65,12 @@ const theme = createTheme({
   components: {
     MuiCard: {
       styleOverrides: {
-        root: {
-          border: '1px solid #eef0f5',
-          boxShadow: '0 8px 30px rgba(31, 38, 54, 0.06)',
-        },
+        root: ({ theme }) => ({
+          border: `1px solid ${theme.palette.divider}`,
+          boxShadow: mode === 'light'
+            ? '0 8px 30px rgba(31, 38, 54, 0.06)'
+            : '0 8px 30px rgba(0, 0, 0, 0.22)',
+        }),
       },
     },
     MuiButton: {
@@ -132,4 +132,4 @@ const theme = createTheme({
   },
 })
 
-export default theme
+export default createAppTheme

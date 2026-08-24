@@ -80,6 +80,24 @@ class WeekOneIntegrationTests {
         assertThat(me.statusCode()).isEqualTo(200);
         assertThat(objectMapper.readTree(me.body()).path("data").path("loginId").asText()).isEqualTo("admin");
 
+        HttpRequest refreshRequest = HttpRequest.newBuilder(endpoint("/api/auth/refresh"))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        HttpResponse<String> refresh = client.send(refreshRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertThat(refresh.statusCode()).isEqualTo(200);
+        JsonNode refreshBody = objectMapper.readTree(refresh.body());
+        assertThat(refreshBody.path("data").path("token").asText()).isNotBlank();
+        assertThat(refreshBody.path("data").path("loginId").asText()).isEqualTo("admin");
+
+        HttpRequest refreshedMeRequest = HttpRequest.newBuilder(endpoint("/api/auth/me"))
+                .header("Authorization", "Bearer " + refreshBody.path("data").path("token").asText())
+                .GET()
+                .build();
+        HttpResponse<String> refreshedMe = client.send(refreshedMeRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertThat(refreshedMe.statusCode()).isEqualTo(200);
+
         HttpResponse<String> clientLogin = client.send(jsonRequest("/api/auth/login", """
                 {"loginId":"client","password":"client"}
                 """), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -132,6 +150,7 @@ class WeekOneIntegrationTests {
         assertThat(document.path("openapi").asText()).startsWith("3.");
         assertThat(document.path("paths").has("/api/auth/login")).isTrue();
         assertThat(document.path("paths").has("/api/auth/me")).isTrue();
+        assertThat(document.path("paths").has("/api/auth/refresh")).isTrue();
     }
 
     @Test

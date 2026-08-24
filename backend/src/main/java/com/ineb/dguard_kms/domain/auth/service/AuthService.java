@@ -63,6 +63,18 @@ public class AuthService {
     }
 
     @Transactional
+    public LoginResponse refresh(AdminUserDetails details) {
+        auditLogService.append(details.getUsername(), "SESSION_REFRESH", "ADMIN_USER", details.getUsername(), "세션 연장");
+        return new LoginResponse(
+                tokenProvider.createToken(details),
+                details.getUserUid(),
+                details.getUsername(),
+                details.getName(),
+                details.getRole()
+        );
+    }
+
+    @Transactional
     public void logout(String actor) {
         if (actor != null && !actor.isBlank()) {
             auditLogService.append(actor, "LOGOUT", "ADMIN_USER", actor, "로그아웃");

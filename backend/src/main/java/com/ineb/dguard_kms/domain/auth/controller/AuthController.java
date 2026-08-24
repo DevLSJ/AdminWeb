@@ -37,6 +37,11 @@ public class AuthController {
         return ApiResponse.success(MeResponse.from(user), "내 정보를 조회했습니다.");
     }
 
+    @PostMapping("/refresh")
+    public ApiResponse<LoginResponse> refresh(@AuthenticationPrincipal AdminUserDetails user) {
+        return ApiResponse.success(authService.refresh(user), "세션이 연장되었습니다.");
+    }
+
     @PostMapping("/logout")
     public ApiResponse<Void> logout(Authentication authentication) {
         authService.logout(authentication == null ? null : authentication.getName());

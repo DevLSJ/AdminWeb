@@ -14,6 +14,7 @@ export function toQueryString(params: Record<string, QueryValue>) {
 export const apiEndpoints = {
   auth: {
     login: '/api/auth/login',
+    refresh: '/api/auth/refresh',
     me: '/api/auth/me',
     logout: '/api/auth/logout',
   },
