@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import com.ineb.dguard_kms.common.ApiResponse;
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.audit.dto.AuditLogResponse;
@@ -18,6 +21,7 @@ import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
 @RestController
 @RequestMapping("/api/audit-logs")
 @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
+@Tag(name = "Audit logs")
 public class AuditLogController {
 
     private final AuditLogService service;
@@ -27,6 +31,7 @@ public class AuditLogController {
     }
 
     @GetMapping
+    @Operation(summary = "감사 로그 검색", description = "기간, 행위자, 작업 유형으로 감사 로그를 페이지 단위로 조회합니다.")
     public ApiResponse<PageResponse<AuditLogResponse>> search(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -43,6 +48,7 @@ public class AuditLogController {
     }
 
     @GetMapping("/verify")
+    @Operation(summary = "감사 로그 체인 검증", description = "감사 로그 해시 체인의 무결성을 검증합니다.")
     public ApiResponse<AuditVerificationResponse> verify() {
         return ApiResponse.success(service.verifyChain(), "감사 로그 체인 검증을 완료했습니다.");
     }

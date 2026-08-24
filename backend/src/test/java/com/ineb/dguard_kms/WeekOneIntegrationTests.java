@@ -153,9 +153,14 @@ class WeekOneIntegrationTests {
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode document = objectMapper.readTree(response.body());
         assertThat(document.path("openapi").asText()).startsWith("3.");
+        assertThat(document.path("info").path("title").asText()).isEqualTo("D'Guard KMS API");
         assertThat(document.path("paths").has("/api/auth/login")).isTrue();
         assertThat(document.path("paths").has("/api/auth/me")).isTrue();
         assertThat(document.path("paths").has("/api/auth/refresh")).isTrue();
+        assertThat(document.path("paths").path("/api/auth/login").path("post").path("summary").asText())
+                .isEqualTo("로그인");
+        assertThat(document.path("components").path("schemas").path("LoginRequest").path("description").asText())
+                .isEqualTo("로그인 요청 정보");
     }
 
     @Test

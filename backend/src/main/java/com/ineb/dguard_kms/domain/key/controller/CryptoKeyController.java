@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import com.ineb.dguard_kms.common.ApiResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyCreateRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyDecryptRequest;
@@ -38,6 +41,7 @@ import jakarta.validation.Valid;
 @Validated
 @RestController
 @RequestMapping("/api/keys")
+@Tag(name = "Keys")
 public class CryptoKeyController {
 
     private final CryptoKeyService keyService;
@@ -47,31 +51,37 @@ public class CryptoKeyController {
     }
 
     @GetMapping
+    @Operation(summary = "키 목록 조회")
     public ApiResponse<List<KeyResponse>> findAll() {
         return ApiResponse.success(keyService.findAll(), "키 목록 조회에 성공했습니다.");
     }
 
     @GetMapping("/{keyUid}")
+    @Operation(summary = "키 상세 조회")
     public ApiResponse<KeyResponse> find(@PathVariable UUID keyUid) {
         return ApiResponse.success(keyService.find(keyUid), "키 조회에 성공했습니다.");
     }
 
     @GetMapping("/{keyUid}/history")
+    @Operation(summary = "키 상태 이력 조회")
     public ApiResponse<List<KeyHistoryResponse>> history(@PathVariable UUID keyUid) {
         return ApiResponse.success(keyService.history(keyUid), "키 상태 이력 조회에 성공했습니다.");
     }
 
     @GetMapping("/{keyUid}/usage")
+    @Operation(summary = "키 사용 통계 조회")
     public ApiResponse<KeyUsageSummaryResponse> usage(@PathVariable UUID keyUid) {
         return ApiResponse.success(keyService.usage(keyUid), "키 사용 통계 조회에 성공했습니다.");
     }
 
     @GetMapping("/{keyUid}/versions")
+    @Operation(summary = "키 버전 목록 조회")
     public ApiResponse<List<KeyVersionResponse>> versions(@PathVariable UUID keyUid) {
         return ApiResponse.success(keyService.versions(keyUid), "키 버전 조회에 성공했습니다.");
     }
 
     @PostMapping
+    @Operation(summary = "키 생성", description = "AES-256 키를 생성하고 암호화된 키 재료를 저장합니다.")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyResponse> create(
             @Valid @RequestBody KeyCreateRequest request,
@@ -81,6 +91,7 @@ public class CryptoKeyController {
     }
 
     @PutMapping("/{keyUid}")
+    @Operation(summary = "키 메타정보 수정")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyResponse> update(
             @PathVariable UUID keyUid,
@@ -93,6 +104,7 @@ public class CryptoKeyController {
     }
 
     @PatchMapping("/{keyUid}/rotation-policy")
+    @Operation(summary = "자동 갱신 정책 변경")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyResponse> updateRotationPolicy(
             @PathVariable UUID keyUid,
@@ -106,6 +118,7 @@ public class CryptoKeyController {
     }
 
     @PatchMapping("/{keyUid}/status")
+    @Operation(summary = "키 상태 변경")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyResponse> changeStatus(
             @PathVariable UUID keyUid,
@@ -119,6 +132,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/rotate")
+    @Operation(summary = "키 갱신", description = "새 키 버전을 생성하고 이전 버전을 복호화 전용으로 전환합니다.")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyRotationResponse> rotate(
             @PathVariable UUID keyUid,
@@ -128,6 +142,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/distribute")
+    @Operation(summary = "키 배포")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyDistributionResponse> distribute(
             @PathVariable UUID keyUid,
@@ -141,6 +156,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/test/encrypt")
+    @Operation(summary = "암호화 테스트")
     public ApiResponse<KeyEncryptResponse> encrypt(
             @PathVariable UUID keyUid,
             @Valid @RequestBody KeyEncryptRequest request,
@@ -153,6 +169,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/test/decrypt")
+    @Operation(summary = "복호화 테스트")
     public ApiResponse<KeyDecryptResponse> decrypt(
             @PathVariable UUID keyUid,
             @Valid @RequestBody KeyDecryptRequest request,
