@@ -13,6 +13,7 @@ import java.util.Base64;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 import com.ineb.dguard_kms.crypto.CryptoOperationException;
@@ -26,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "springdoc.api-docs.path=/api/api-docs"
 )
+@Import(TestUserInitializer.class)
 class WeekOneIntegrationTests {
 
     @LocalServerPort

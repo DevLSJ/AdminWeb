@@ -10,7 +10,7 @@
 
 ### 핵심 기능
 
-- `admin/admin` 초기 관리자 로그인 및 JWT 기반 인증
+- 명시적 1회 계정 프로비저닝과 JWT 기반 인증
 - 각종 레이아웃(AppBar, Drawer, 콘텐츠 영역)
 - PBKDF2-HMAC-SHA256 기반 비밀번호 해시 및 Salt 저장
 - PBKDF2 기반 마스터키 유도와 KCV 기동 검증
@@ -92,7 +92,7 @@
 - [x] 인증 여부·역할에 따른 보호 라우팅 구현
 - [x] 반응형 AppBar, Drawer, 콘텐츠 레이아웃 구현
 - [x] 대시보드·키·사용자·감사 로그·공지사항 화면 및 라우팅 골격 구현
-- [x] `admin/admin` 초기 계정을 PBKDF2 해시와 개별 Salt로 생성
+- [x] 운영 자동 계정 생성을 제거하고 명시적 1회 프로비저닝으로 전환
 - [x] 마스터 패스프레이즈 기반 키 유도 및 KCV 검증 구현
 - [x] 패스프레이즈 불일치 시 애플리케이션 기동 중단 구현
 - [x] 인증, 해시 저장, KCV 실패, 암호문 변조 방지 통합 테스트 작성
@@ -103,7 +103,7 @@
 
 | 영역 | 파일/모듈 | 역할 |
 |---|---|---|
-| Backend | `config/DataInitializer.java` | 초기 `admin/admin`, `client/client` 계정을 해시 형태로 생성 |
+| Backend | `config/UserProvisioningInitializer.java` | 명시적으로 활성화할 때만 계정을 해시 형태로 생성 |
 | Backend | `config/SecurityConfig.java` | Stateless 보안 정책, CORS, 인증/인가 예외 응답 구성 |
 | Backend | `security/JwtTokenProvider.java` | JWT 생성·파싱·검증 |
 | Backend | `security/JwtAuthenticationFilter.java` | 요청의 Bearer 토큰을 검증하고 인증 컨텍스트 구성 |
@@ -228,12 +228,17 @@ docker start dguard-postgres
 | `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/dguard_kms` |
 | `SPRING_DATASOURCE_USERNAME` | DB 사용자 | `dguard` |
 | `SPRING_DATASOURCE_PASSWORD` | DB 비밀번호 | 필수 |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL 정책 | 개발 `create`, 운영 `validate` |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL 정책 | 기본·운영 `validate`, local 프로필 `update` |
 | `KMS_MASTER_PASSPHRASE` | 마스터키 유도 패스프레이즈 | 필수, 20자 이상 |
 | `INTEGRITY_HMAC_KEY` | 무결성 HMAC 키 | 필수 |
 | `JWT_SECRET` | JWT 서명 키 | 필수 |
 | `KMS_PBKDF2_ITERATIONS` | 마스터키 PBKDF2 반복 횟수 | `210000` |
 | `PASSWORD_PBKDF2_ITERATIONS` | 비밀번호 PBKDF2 반복 횟수 | `210000` |
+| `USER_PROVISIONING_ENABLED` | 일회성 계정 생성 활성화 | 기본 `false` |
+| `PROVISION_USER_LOGIN_ID` | 생성할 로그인 ID | 프로비저닝 시 필수 |
+| `PROVISION_USER_PASSWORD` | 생성할 계정 비밀번호 | 프로비저닝 시 필수 |
+| `PROVISION_USER_NAME` | 표시 이름 | 프로비저닝 시 필수 |
+| `PROVISION_USER_ROLE` | 계정 역할 | `ADMIN` 또는 `CLIENT` |
 
 ```bash
 export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/dguard_kms
@@ -246,6 +251,25 @@ export JWT_SECRET=local-jwt-secret-at-least-32-characters
 ```
 
 최초 기동 시 `crypto_config`에 마스터키 유도 Salt와 KCV가 기록됩니다. **같은 DB를 사용할 때는 이후에도 동일한 `KMS_MASTER_PASSPHRASE`를 사용해야 합니다.**
+
+운영 코드에는 기본 계정이나 비밀번호가 없습니다. 최초 계정은 아래처럼 프로비저닝
+모드로 한 번 생성합니다. 비밀번호는 셸 기록에 남지 않도록 대화식으로 입력하고,
+완료 후 관련 환경변수를 제거합니다.
+
+```bash
+cd backend
+read -s PROVISION_USER_PASSWORD
+export PROVISION_USER_PASSWORD
+export USER_PROVISIONING_ENABLED=true
+export PROVISION_USER_LOGIN_ID=admin
+export PROVISION_USER_NAME=관리자
+export PROVISION_USER_ROLE=ADMIN
+./gradlew bootRun --args='--spring.main.web-application-type=none'
+unset PROVISION_USER_PASSWORD USER_PROVISIONING_ENABLED \
+  PROVISION_USER_LOGIN_ID PROVISION_USER_NAME PROVISION_USER_ROLE
+```
+
+프로비저닝은 기존 `login_id`가 있으면 건너뛰므로 기존 계정을 덮어쓰지 않습니다.
 
 ### 3. Backend 실행
 
@@ -263,12 +287,8 @@ cd frontend
 VITE_API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
-터미널에 출력된 Vite 주소(기본값 <http://localhost:5173>)로 접속한 뒤 아래 초기 계정으로 로그인합니다.
-
-```text
-ID: admin
-Password: admin
-```
+터미널에 출력된 Vite 주소(기본값 <http://localhost:5173>)로 접속한 뒤 앞에서
+프로비저닝한 계정으로 로그인합니다.
 
 ### Docker Compose 배포
 
@@ -284,6 +304,22 @@ docker compose ps
 
 배포 환경에서는 프론트엔드 Nginx가 `/api/*` 요청을 백엔드로 프록시하며, 외부 서비스 포트는 `80`입니다.
 
+배포 DB에 최초 계정을 생성할 때는 서버에서 비밀번호를 대화식으로 받은 뒤,
+동일한 백엔드 이미지를 일회성 non-web 컨테이너로 실행합니다.
+
+```bash
+read -s PROVISION_USER_PASSWORD
+export PROVISION_USER_PASSWORD
+docker compose run --rm \
+  -e USER_PROVISIONING_ENABLED=true \
+  -e PROVISION_USER_LOGIN_ID=admin \
+  -e PROVISION_USER_PASSWORD \
+  -e PROVISION_USER_NAME=관리자 \
+  -e PROVISION_USER_ROLE=ADMIN \
+  backend --spring.main.web-application-type=none
+unset PROVISION_USER_PASSWORD
+```
+
 
 ### 명령어
 
@@ -292,7 +328,7 @@ docker compose ps
 ```bash
 curl -i -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"loginId":"admin","password":"admin"}'
+  -d '{"loginId":"admin","password":"<provisioned-password>"}'
 ```
 
 정상 응답의 `data.token`에 JWT가 포함됩니다.
@@ -300,8 +336,8 @@ curl -i -X POST http://localhost:8080/api/auth/login \
 #### 2) 비밀번호 저장 형태 확인
 
 ```bash
-docker exec -it dguard-postgres psql -U dguard -d dguard_kms -c \
-  'SELECT login_id, password_hash, password_salt, password_algo, password_iter FROM admin_user;'
+docker exec -it dguard-db psql -U dguard -d dguard_kms -c \
+  'SELECT login_id, role, status, password_algo, password_iter, length(password_hash) AS hash_len, length(password_salt) AS salt_len FROM admin_user;'
 ```
 
 `password` 원문 컬럼은 존재하지 않으며 `password_hash`, `password_salt`, 알고리즘과 반복 횟수만 저장됩니다.
@@ -341,7 +377,8 @@ npm run build
 ## 보안 주의사항
 
 - `.env`, DB 비밀번호, JWT 키, 마스터 패스프레이즈를 Git에 커밋하지 않습니다.
-- 예시 초기 계정은 개발·발표용입니다.
+- 운영 환경에서 `USER_PROVISIONING_ENABLED`를 상시 활성화하지 않습니다.
+- 프로비저닝 비밀번호는 Git, `.env`, 셸 명령 인자에 기록하지 않습니다.
 - 운영 환경에서는 `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`를 사용합니다.
 - 암호화된 데이터와 `crypto_config`가 있는 DB를 백업할 때 마스터 패스프레이즈도 별도의 안전한 경로로 관리합니다.
 - 마스터 패스프레이즈 변경은 단순 환경변수 교체가 아니라 키 재래핑 절차가 필요합니다.
