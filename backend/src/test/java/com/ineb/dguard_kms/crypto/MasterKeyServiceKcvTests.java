@@ -1,5 +1,6 @@
 package com.ineb.dguard_kms.crypto;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -13,6 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,10 +24,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.ineb.dguard_kms.domain.config.entity.CryptoConfigEntry;
 import com.ineb.dguard_kms.domain.config.repository.CryptoConfigRepository;
 
+@ExtendWith(OutputCaptureExtension.class)
 class MasterKeyServiceKcvTests {
 
     @Test
-    void rejectsAChangedPassphraseAgainstPersistedKcv() {
+    void rejectsAChangedPassphraseAgainstPersistedKcvAndLogsTheCause(CapturedOutput output) {
         Map<String, CryptoConfigEntry> persisted = new HashMap<>();
         CryptoConfigRepository repository = mock(CryptoConfigRepository.class);
         when(repository.findById(anyString())).thenAnswer(invocation ->
@@ -60,6 +65,12 @@ class MasterKeyServiceKcvTests {
         assertThatThrownBy(wrongPassphraseBoot::initialize)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("KCV verification failed");
+        assertThat(output.getOut() + output.getErr())
+                .contains("KCV verification failed")
+                .contains("configured KMS master passphrase does not match")
+                .contains("Application startup is aborted")
+                .doesNotContain("correct-master-passphrase-for-kcv")
+                .doesNotContain("wrong-master-passphrase-for-kcv");
     }
 
     private MockEnvironment environment(String passphrase) {

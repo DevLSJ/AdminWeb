@@ -15,6 +15,8 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -28,6 +30,7 @@ import jakarta.annotation.PreDestroy;
 @Service
 public class MasterKeyService {
 
+    private static final Logger log = LoggerFactory.getLogger(MasterKeyService.class);
     private static final String SALT_CONFIG_KEY = "master.salt";
     private static final String KCV_CONFIG_KEY = "master.kcv";
     private static final String ITERATIONS_CONFIG_KEY = "master.iterations";
@@ -125,6 +128,10 @@ public class MasterKeyService {
             Arrays.fill(actualKcv, (byte) 0);
             if (!kcvValid) {
                 Arrays.fill(derived, (byte) 0);
+                log.error(
+                        "KCV verification failed: the configured KMS master passphrase does not match "
+                                + "the persisted master key configuration. Application startup is aborted."
+                );
                 throw new IllegalStateException("Master key KCV verification failed");
             }
             this.masterKey = derived;

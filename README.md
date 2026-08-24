@@ -315,7 +315,13 @@ cd backend
 KMS_MASTER_PASSPHRASE=wrong-master-passphrase-at-least-20-chars ./gradlew bootRun
 ```
 
-로그에 `Master key KCV verification failed`가 출력되고 Spring Boot 기동이 중단되어야 합니다. 시연 후에는 원래 패스프레이즈로 복구합니다.
+로그에 아래 `ERROR` 메시지와 `Master key KCV verification failed` 예외가 출력되고 Spring Boot 기동이 중단되어야 합니다. 실제 패스프레이즈나 KCV 값은 로그에 출력되지 않습니다.
+
+```text
+KCV verification failed: the configured KMS master passphrase does not match the persisted master key configuration. Application startup is aborted.
+```
+
+시연 후에는 원래 패스프레이즈로 복구합니다.
 
 ## 테스트 및 품질 검사
 
