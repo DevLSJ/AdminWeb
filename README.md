@@ -53,8 +53,8 @@
 | Security | Spring Security, JWT | JWT 인증, JWT 0.12.6 |
 | Persistence | Spring Data JPA, Flyway | ORM 및 DB 마이그레이션 |
 | API Docs | SpringDoc OpenAPI | 3.0.3 |
-| Build/Test | Gradle Wrapper, JUnit | Gradle 9.5.1 |
-| Database | PostgreSQL / H2 | 운영 17, 로컬 프로필 H2 |
+| Build/Test | Gradle Wrapper, JUnit | 9.5.1 |
+| Database | PostgreSQL | 17 |
 
 ### Frontend
 
@@ -66,7 +66,7 @@
 | Routing | React Router DOM | 7.18 |
 | HTTP Client | Axios | 1.19 |
 | Build Tool | Vite | 8.2 |
-| Lint | Esint | 1.75 |
+| Lint | EsLint | 1.75 |
 
 ### Infrastructure & Security
 
