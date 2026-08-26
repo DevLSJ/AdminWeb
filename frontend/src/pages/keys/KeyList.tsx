@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AddRounded,
+  AccountTreeRounded,
   CheckCircleRounded,
   CloudUploadRounded,
   FilterAltOffRounded,
@@ -68,6 +69,7 @@ function KeyList() {
   const [params, setParams] = useState<KeyListParams>(defaultParams)
   const [transitionKey, setTransitionKey] = useState<CryptoKey | null>(null)
   const [registerOpen, setRegisterOpen] = useState(false)
+  const [lifecycleOpen, setLifecycleOpen] = useState(false)
   const [toStatus, setToStatus] = useState<KeyStatus | ''>('')
   const [reason, setReason] = useState('')
   const [message, setMessage] = useState('')
@@ -154,7 +156,13 @@ function KeyList() {
       <PageHeader
         title="키 목록"
         description={isAdmin ? 'KMS 관리 키를 검색하고 상태·무결성·만료 정보를 관리합니다. 키 원문과 래핑 값은 화면에 노출하지 않습니다.' : '사용 가능한 KMS 관리 키의 메타정보와 상태를 조회합니다.'}
-        action={isAdmin ? <Stack direction="row" spacing={1}><Button variant="contained" startIcon={<AddRounded />} onClick={() => setRegisterOpen(true)}>키 등록</Button><Button variant="outlined" startIcon={<CloudUploadRounded />} onClick={openDeployment}>키 배포</Button></Stack> : undefined}
+        action={(
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 1 }}>
+            <Button variant="outlined" startIcon={<AccountTreeRounded />} onClick={() => setLifecycleOpen(true)}>키 상태 변화 보기</Button>
+            {isAdmin && <Button variant="contained" startIcon={<AddRounded />} onClick={() => setRegisterOpen(true)}>키 등록</Button>}
+            {isAdmin && <Button variant="outlined" startIcon={<CloudUploadRounded />} onClick={openDeployment}>키 배포</Button>}
+          </Stack>
+        )}
       />
 
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
@@ -182,8 +190,6 @@ function KeyList() {
         </Stack>
       </FilterCard>
 
-      <KeyLifecycleGuide />
-
       <Card>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 14 }}>관리 키 {totalElements.toLocaleString()}개</Typography><FormControl size="small" sx={{ minWidth: 132 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
         <TableContainer sx={{ maxHeight: params.size === 20 ? 820 : params.size === 10 ? 620 : 440 }}>
@@ -207,6 +213,14 @@ function KeyList() {
         </TableContainer>
         <PaginationBar page={params.page} size={params.size} totalElements={totalElements} onPageChange={(page) => updateParam('page', page)} />
       </Card>
+
+      <Dialog open={lifecycleOpen} onClose={() => setLifecycleOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>키 상태 변화 목록</DialogTitle>
+        <DialogContent dividers sx={{ p: { xs: 2, sm: 2.5 } }}>
+          <KeyLifecycleGuide />
+        </DialogContent>
+        <DialogActions><Button onClick={() => setLifecycleOpen(false)}>닫기</Button></DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(transitionKey)} onClose={() => setTransitionKey(null)} fullWidth maxWidth="sm">
         <DialogTitle>키 상태 변경</DialogTitle>
