@@ -217,6 +217,23 @@ public class CryptoKeyService {
     }
 
     @Transactional
+    public void delete(UUID keyUid, String actor) {
+        CryptoKey key = findKeyForUpdate(keyUid);
+        String keyName = key.getKeyName();
+        // Deliberately do not verify the row HMAC here: an administrator must
+        // be able to remove a failed demo/tampered key that all other actions
+        // correctly block. Delete children explicitly as well as retaining the
+        // database cascades, so the operation is portable to test databases.
+        usageLogRepository.deleteByCryptoKey(key);
+        historyRepository.deleteByCryptoKey(key);
+        materialRepository.deleteByCryptoKey(key);
+        keyRepository.delete(key);
+        keyRepository.flush();
+        auditLogService.append(actor, "KEY_DELETE", "CRYPTO_KEY", keyUid.toString(),
+                keyName + " 키 영구 삭제");
+    }
+
+    @Transactional
     public KeyResponse updateRotationPolicy(UUID keyUid, KeyRotationPolicyRequest request, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
         KeyMaterial material = verifiedCurrentMaterial(key);

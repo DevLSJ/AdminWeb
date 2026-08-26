@@ -9,4 +9,5 @@ public interface KeyUsageLogRepository extends JpaRepository<KeyUsageLog, Long> 
     long countByCryptoKey(CryptoKey cryptoKey);
     long countByCryptoKeyAndResult(CryptoKey cryptoKey, String result);
     long countByCryptoKeyAndOperation(CryptoKey cryptoKey, String operation);
+    void deleteByCryptoKey(CryptoKey cryptoKey);
 }

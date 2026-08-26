@@ -244,6 +244,24 @@ class KeyManagementIntegrationTests {
     }
 
     @Test
+    void administratorCanDeleteAnIntegrityFailedDemoKey() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        String token = login(client, "admin", "admin");
+        JsonNode created = sendJson(client, "POST", "/api/keys", token, """
+                {"keyName":"DELETE-AES-%s","algorithm":"AES","keySize":256,"purpose":"ENCRYPT"}
+                """.formatted(UUID.randomUUID()), 200);
+        UUID keyUid = UUID.fromString(created.path("data").path("keyUid").asText());
+
+        var key = keyRepository.findByKeyUid(keyUid).orElseThrow();
+        key.updateIntegrityHash(Base64.getEncoder().encodeToString(new byte[32]));
+        keyRepository.saveAndFlush(key);
+
+        keyService.delete(keyUid, "admin");
+        assertThat(keyRepository.findByKeyUid(keyUid)).isEmpty();
+        assertThat(materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key)).isEmpty();
+    }
+
+    @Test
     void schemaMigrationMarkerIsResignedOnlyWhenExplicitlyMarked() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         String token = login(client, "admin", "admin");

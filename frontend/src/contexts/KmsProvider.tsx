@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import {
   changeKeyStatus as changeKeyStatusRequest,
   createKey as createKeyRequest,
+  deleteKey as deleteKeyRequest,
   decryptWithKey,
   distributeKey,
   encryptWithKey,
@@ -122,6 +123,12 @@ export function KmsProvider({ children }: { children: ReactNode }) {
     return created
   }, [refreshAuditAfterMutation, run])
 
+  const deleteKey = useCallback(async (keyUid: string) => {
+    await run(() => deleteKeyRequest(keyUid), '키를 삭제하지 못했습니다.')
+    setKeys((current) => current.filter((key) => key.keyUid !== keyUid))
+    await refreshAuditAfterMutation()
+  }, [refreshAuditAfterMutation, run])
+
   const updateKeyMetadata = useCallback(async (keyUid: string, values: Pick<CryptoKey, 'keyName' | 'purpose' | 'expireAt'>) => {
     const result = await run(() => updateKey(keyUid, values), '키 메타정보를 수정하지 못했습니다.')
     setKeys((current) => replaceKey(current, result))
@@ -178,12 +185,12 @@ export function KmsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     keys, auditLogs, keyHistories, keyVersions, keyUsage, autoRotationByKey, loading, error,
     refreshKeys, refreshAuditLogs, loadKeyDetail, loadKeyHistory, loadKeyVersions, loadKeyUsage,
-    createKey, updateKeyMetadata, changeKeyStatus, distributeKeys, rotateKey, setAutoRotation,
+    createKey, deleteKey, updateKeyMetadata, changeKeyStatus, distributeKeys, rotateKey, setAutoRotation,
     encrypt, decrypt,
   }), [
     keys, auditLogs, keyHistories, keyVersions, keyUsage, autoRotationByKey, loading, error,
     refreshKeys, refreshAuditLogs, loadKeyDetail, loadKeyHistory, loadKeyVersions, loadKeyUsage,
-    createKey, updateKeyMetadata, changeKeyStatus, distributeKeys, rotateKey, setAutoRotation,
+    createKey, deleteKey, updateKeyMetadata, changeKeyStatus, distributeKeys, rotateKey, setAutoRotation,
     encrypt, decrypt,
   ])
 

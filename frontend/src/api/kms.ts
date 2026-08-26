@@ -97,6 +97,10 @@ export async function createKey(request: CreateKeyRequest) {
   return unwrap(await apiClient.post<ApiResponse<CryptoKey>>(apiEndpoints.keys.create, request))
 }
 
+export async function deleteKey(keyUid: string) {
+  await apiClient.delete<ApiResponse<null>>(apiEndpoints.keys.delete(keyUid))
+}
+
 export async function updateKey(keyUid: string, request: UpdateKeyRequest) {
   return unwrap(await apiClient.put<ApiResponse<CryptoKey>>(apiEndpoints.keys.update(keyUid), request))
 }

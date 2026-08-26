@@ -23,6 +23,7 @@ export const apiEndpoints = {
     create: '/api/keys',
     detail: (id: string) => `/api/keys/${id}`,
     update: (id: string) => `/api/keys/${id}`,
+    delete: (id: string) => `/api/keys/${id}`,
     status: (id: string) => `/api/keys/${id}/status`,
     history: (id: string) => `/api/keys/${id}/history`,
     usage: (id: string) => `/api/keys/${id}/usage`,

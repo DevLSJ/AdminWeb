@@ -36,6 +36,7 @@ export interface KmsContextValue {
   loadKeyVersions: (keyUid: string) => Promise<KeyVersion[]>
   loadKeyUsage: (keyUid: string) => Promise<KeyUsageSummary>
   createKey: (input: CreateKeyInput) => Promise<CryptoKey>
+  deleteKey: (keyUid: string) => Promise<void>
   updateKeyMetadata: (keyUid: string, values: Pick<CryptoKey, 'keyName' | 'purpose' | 'expireAt'>) => Promise<CryptoKey>
   changeKeyStatus: (keyUid: string, status: KeyStatus, reason: string) => Promise<CryptoKey>
   distributeKeys: (keyUids: string[], target: string, reason: string) => Promise<KeyDistributionResult[]>

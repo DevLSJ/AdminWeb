@@ -9,4 +9,6 @@ import com.ineb.dguard_kms.domain.key.entity.KeyStatusHistory;
 
 public interface KeyStatusHistoryRepository extends JpaRepository<KeyStatusHistory, Long> {
     List<KeyStatusHistory> findAllByCryptoKeyOrderByChangedAtDesc(CryptoKey cryptoKey);
+
+    void deleteByCryptoKey(CryptoKey cryptoKey);
 }

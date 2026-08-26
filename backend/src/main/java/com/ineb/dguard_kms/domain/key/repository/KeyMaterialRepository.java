@@ -17,4 +17,6 @@ public interface KeyMaterialRepository extends JpaRepository<KeyMaterial, Long> 
     Optional<KeyMaterial> findByCryptoKeyAndKeyVersion(CryptoKey cryptoKey, int keyVersion);
 
     List<KeyMaterial> findAllByCryptoKeyOrderByKeyVersionDesc(CryptoKey cryptoKey);
+
+    void deleteByCryptoKey(CryptoKey cryptoKey);
 }

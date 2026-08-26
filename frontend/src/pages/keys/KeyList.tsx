@@ -4,6 +4,7 @@ import {
   AccountTreeRounded,
   CheckCircleRounded,
   CloudUploadRounded,
+  DeleteOutlineRounded,
   FilterAltOffRounded,
   SearchRounded,
   ShieldOutlined,
@@ -64,7 +65,7 @@ const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 
 function KeyList() {
   const { user } = useAuth()
-  const { keys, loading, error, changeKeyStatus, distributeKeys } = useKmsMock()
+  const { keys, loading, error, changeKeyStatus, deleteKey, distributeKeys } = useKmsMock()
   const isAdmin = isAdminRole(user?.role)
   const [params, setParams] = useState<KeyListParams>(defaultParams)
   const [transitionKey, setTransitionKey] = useState<CryptoKey | null>(null)
@@ -80,6 +81,9 @@ function KeyList() {
   const [deploymentReason, setDeploymentReason] = useState('')
   const [deploying, setDeploying] = useState(false)
   const [deploymentComplete, setDeploymentComplete] = useState(false)
+  const [deleteKeyTarget, setDeleteKeyTarget] = useState<CryptoKey | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const [pageContent, setPageContent] = useState<CryptoKey[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [listLoading, setListLoading] = useState(false)
@@ -151,6 +155,26 @@ function KeyList() {
     }
   }
 
+  const openDelete = (key: CryptoKey) => {
+    setDeleteKeyTarget(key)
+    setDeleteConfirmation('')
+  }
+
+  const executeDelete = async () => {
+    if (!deleteKeyTarget || deleteConfirmation !== deleteKeyTarget.keyName) return
+    setDeleting(true)
+    try {
+      await deleteKey(deleteKeyTarget.keyUid)
+      await loadPage()
+      setMessage(`${deleteKeyTarget.keyName} 키가 영구 삭제되었습니다.`)
+      setDeleteKeyTarget(null)
+    } catch (requestError) {
+      setMessage(requestError instanceof Error ? requestError.message : '키를 삭제하지 못했습니다.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <Box>
       <PageHeader
@@ -205,7 +229,7 @@ function KeyList() {
                   <TableCell>v{key.version}</TableCell>
                   <TableCell>{key.expireAt}</TableCell>
                   <TableCell>{key.integrityValid ? <StatusBadge status="VALID" icon={<CheckCircleRounded />} /> : <StatusBadge status="INVALID" icon={<WarningAmberRounded />} />}</TableCell>
-                  <TableCell align="right"><Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}><Button size="small" variant="text" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>{isAdmin && <Button size="small" variant="outlined" disabled={getManualKeyStatusTransitions(key.status).length === 0} onClick={() => openTransition(key)}>상태 변경</Button>}</Stack></TableCell>
+                  <TableCell align="right"><Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}><Button size="small" variant="text" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>{isAdmin && <Button size="small" variant="outlined" disabled={getManualKeyStatusTransitions(key.status).length === 0} onClick={() => openTransition(key)}>상태 변경</Button>}{isAdmin && <Button size="small" color="error" startIcon={<DeleteOutlineRounded />} onClick={() => openDelete(key)}>삭제</Button>}</Stack></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -234,6 +258,16 @@ function KeyList() {
       </Dialog>
 
       <KeyRegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} onCreated={(key) => { setMessage(`${key.keyName} 키가 등록되었습니다.`); void loadPage() }} />
+
+      <Dialog open={Boolean(deleteKeyTarget)} onClose={() => !deleting && setDeleteKeyTarget(null)} fullWidth maxWidth="sm">
+        <DialogTitle>키 영구 삭제</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>키 재료, 상태 이력, 사용 로그가 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</Alert>
+          <Typography sx={{ mb: 2 }}><strong>{deleteKeyTarget?.keyName}</strong>을 삭제하려면 아래에 키 이름을 정확히 입력하세요.</Typography>
+          <TextField fullWidth label="삭제할 키 이름" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} disabled={deleting} />
+        </DialogContent>
+        <DialogActions><Button onClick={() => setDeleteKeyTarget(null)} disabled={deleting}>취소</Button><Button color="error" variant="contained" disabled={!deleteKeyTarget || deleteConfirmation !== deleteKeyTarget.keyName || deleting} onClick={() => void executeDelete()}>{deleting ? '삭제 중…' : '영구 삭제'}</Button></DialogActions>
+      </Dialog>
 
       <Dialog open={deployOpen} onClose={() => !deploying && setDeployOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>키 배포</DialogTitle>

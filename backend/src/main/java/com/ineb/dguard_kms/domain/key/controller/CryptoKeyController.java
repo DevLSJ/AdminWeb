@@ -7,6 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -115,6 +116,17 @@ public class CryptoKeyController {
         return ApiResponse.success(
                 keyService.update(keyUid, request, authentication.getName()), "키 메타정보 수정에 성공했습니다."
         );
+    }
+
+    @DeleteMapping("/{keyUid}")
+    @Operation(summary = "키 영구 삭제", description = "시연 또는 폐기 키의 키 재료·상태 이력·사용 로그를 함께 삭제합니다.")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
+    public ApiResponse<Void> delete(
+            @PathVariable UUID keyUid,
+            Authentication authentication
+    ) {
+        keyService.delete(keyUid, authentication.getName());
+        return ApiResponse.success(null, "키가 영구 삭제되었습니다.");
     }
 
     @PatchMapping("/{keyUid}/rotation-policy")
