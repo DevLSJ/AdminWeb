@@ -9,7 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
@@ -25,8 +25,8 @@ public class KeyMaterial {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "key_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "key_id", nullable = false)
     private CryptoKey cryptoKey;
 
     @Column(name = "key_version", nullable = false)
@@ -82,17 +82,6 @@ public class KeyMaterial {
     public void markDistributed() {
         this.materialStatus = DISTRIBUTED;
         this.distributedAt = Instant.now();
-    }
-
-    public void replace(int keyVersion, byte[] wrappedKey, byte[] wrappingIv, String createdBy) {
-        this.keyVersion = keyVersion;
-        this.wrappedKey = wrappedKey.clone();
-        this.wrappingIv = wrappingIv.clone();
-        this.materialStatus = ACTIVE;
-        this.createdBy = createdBy;
-        this.createdAt = Instant.now();
-        this.retiredAt = null;
-        this.distributedAt = null;
     }
 
     public void rewrap(byte[] wrappedKey, byte[] wrappingIv) {

@@ -169,8 +169,8 @@ export function KmsProvider({ children }: { children: ReactNode }) {
     return result
   }, [loadKeyUsage, refreshAuditAfterMutation, run])
 
-  const decrypt = useCallback(async (keyUid: string, ciphertext: string, iv: string) => {
-    const result = await run(() => decryptWithKey(keyUid, ciphertext, iv), '복호화에 실패했습니다.')
+  const decrypt = useCallback(async (keyUid: string, ciphertext: string, iv: string, version?: number) => {
+    const result = await run(() => decryptWithKey(keyUid, ciphertext, iv, version), '복호화에 실패했습니다.')
     await Promise.all([loadKeyUsage(keyUid).catch(() => undefined), refreshAuditAfterMutation()])
     return result.plaintext
   }, [loadKeyUsage, refreshAuditAfterMutation, run])

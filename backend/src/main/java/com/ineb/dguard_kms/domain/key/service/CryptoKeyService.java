@@ -3,9 +3,7 @@ package com.ineb.dguard_kms.domain.key.service;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,9 +50,6 @@ import com.ineb.dguard_kms.domain.key.repository.KeyUsageLogRepository;
 public class CryptoKeyService {
 
     public static final String PENDING_SCHEMA_INTEGRITY_HASH = "PENDING_V6_SCHEMA_REALIGN";
-
-    // 상태 변경은 이 표에 정의된 단방향 전이만 허용한다.
-    private static final Map<KeyStatus, Set<KeyStatus>> ALLOWED_TRANSITIONS = createTransitions();
 
     private final CryptoKeyRepository keyRepository;
     private final KeyMaterialRepository materialRepository;
@@ -256,7 +251,7 @@ public class CryptoKeyService {
                     "USE_DISTRIBUTION_ENDPOINT"
             );
         }
-        if (!ALLOWED_TRANSITIONS.getOrDefault(from, Set.of()).contains(to)) {
+        if (!from.canTransitionTo(to)) {
             throw conflict("허용되지 않은 키 상태 전이입니다: " + from + " -> " + to, "INVALID_KEY_STATUS_TRANSITION");
         }
         key.changeStatus(to);
@@ -270,38 +265,31 @@ public class CryptoKeyService {
     @Transactional
     public KeyRotationResponse rotate(UUID keyUid, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
-        if (key.getStatus() != KeyStatus.ACTIVE && key.getStatus() != KeyStatus.DISTRIBUTED) {
-            throw conflict("ACTIVE 또는 DISTRIBUTED 키만 갱신할 수 있습니다.", "KEY_ROTATION_NOT_ALLOWED");
+        if (key.getStatus() != KeyStatus.ACTIVE) {
+            throw conflict("ACTIVE 키만 갱신할 수 있습니다.", "KEY_ROTATION_NOT_ALLOWED");
         }
 
         int previousVersion = key.getCurrentVersion();
         KeyMaterial previousMaterial = verifiedCurrentMaterial(key);
 
         byte[] rawKey = cryptoUtil.generateAes256Key();
+        byte[] wrappedBytes = null;
+        byte[] ivBytes = null;
         try {
             CryptoUtil.Base64Payload wrapped = cryptoUtil.wrapKey(rawKey);
-            KeyStatus previousStatus = key.getStatus();
             int newVersion = key.nextVersion();
-            key.changeStatus(KeyStatus.ACTIVE);
-            previousMaterial.replace(
-                    newVersion,
-                    cryptoUtil.decodeBase64(wrapped.ciphertext()),
-                    cryptoUtil.decodeBase64(wrapped.iv()),
-                    actor
-            );
+            previousMaterial.retire();
+            wrappedBytes = cryptoUtil.decodeBase64(wrapped.ciphertext());
+            ivBytes = cryptoUtil.decodeBase64(wrapped.iv());
+            materialRepository.save(new KeyMaterial(key, newVersion, wrappedBytes, ivBytes, actor));
             signIntegrity(key);
-            historyRepository.save(new KeyStatusHistory(
-                    key,
-                    previousStatus,
-                    KeyStatus.ACTIVE,
-                    "v" + previousVersion + " 마감 및 v" + newVersion + " 갱신",
-                    actor
-            ));
             auditLogService.append(actor, "KEY_ROTATE", "CRYPTO_KEY", key.getKeyUid().toString(),
                     "v" + previousVersion + " → v" + newVersion + " 키 갱신");
             return new KeyRotationResponse(key.getKeyUid(), previousVersion, newVersion, KeyResponse.from(key, true));
         } finally {
             Arrays.fill(rawKey, (byte) 0);
+            if (wrappedBytes != null) Arrays.fill(wrappedBytes, (byte) 0);
+            if (ivBytes != null) Arrays.fill(ivBytes, (byte) 0);
         }
     }
 
@@ -348,7 +336,9 @@ public class CryptoKeyService {
             );
             auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "암호화 성공");
             usageLogRepository.save(new KeyUsageLog(key, "ENCRYPT", true, null, actor));
-            return new KeyEncryptResponse(encrypted.ciphertext(), encrypted.iv(), "BASE64");
+            return new KeyEncryptResponse(
+                    encrypted.ciphertext(), encrypted.iv(), "BASE64", key.getCurrentVersion()
+            );
         } catch (KeyOperationException exception) {
             recordUsageFailure(key, "ENCRYPT", exception.getMessage(), actor);
             throw exception;
@@ -369,7 +359,7 @@ public class CryptoKeyService {
         byte[] plaintext = null;
         try {
             requireActive(key);
-            rawKey = unwrapCurrentKey(key);
+            rawKey = unwrapKeyVersion(key, request.version());
             plaintext = cryptoUtil.decryptWithKey(
                     new CryptoUtil.Base64Payload(request.ciphertext(), request.iv()), rawKey
             );
@@ -406,7 +396,20 @@ public class CryptoKeyService {
     }
 
     private byte[] unwrapCurrentKey(CryptoKey key) {
-        KeyMaterial material = verifiedCurrentMaterial(key);
+        return unwrapKeyVersion(key, key.getCurrentVersion());
+    }
+
+    private byte[] unwrapKeyVersion(CryptoKey key, Integer requestedVersion) {
+        int version = requestedVersion == null ? key.getCurrentVersion() : requestedVersion;
+        KeyMaterial material = materialRepository.findByCryptoKeyAndKeyVersion(key, version)
+                .orElseThrow(() -> new KeyOperationException(
+                        HttpStatus.NOT_FOUND,
+                        "요청한 키 버전을 찾을 수 없습니다: v" + version,
+                        "KEY_VERSION_NOT_FOUND"
+                ));
+        if (!verifyIntegrity(key, material)) {
+            throw conflict("키 무결성 검증에 실패했습니다.", "KEY_INTEGRITY_VIOLATION");
+        }
         return cryptoUtil.unwrapKey(new CryptoUtil.Base64Payload(
                 cryptoUtil.encodeBase64(material.getWrappedKey()),
                 cryptoUtil.encodeBase64(material.getWrappingIv())
@@ -477,20 +480,6 @@ public class CryptoKeyService {
                     "UNSUPPORTED_KEY_ALGORITHM"
             );
         }
-    }
-
-    private static Map<KeyStatus, Set<KeyStatus>> createTransitions() {
-        Map<KeyStatus, Set<KeyStatus>> transitions = new EnumMap<>(KeyStatus.class);
-        transitions.put(KeyStatus.CREATED, Set.of(KeyStatus.ACTIVE));
-        transitions.put(KeyStatus.ACTIVE, Set.of(
-                KeyStatus.EXPIRED, KeyStatus.INACTIVE, KeyStatus.DISTRIBUTED, KeyStatus.COMPROMISED
-        ));
-        transitions.put(KeyStatus.EXPIRED, Set.of(KeyStatus.INACTIVE, KeyStatus.ACTIVE));
-        transitions.put(KeyStatus.INACTIVE, Set.of(KeyStatus.DESTROYED));
-        transitions.put(KeyStatus.DISTRIBUTED, Set.of(KeyStatus.DESTROYED));
-        transitions.put(KeyStatus.COMPROMISED, Set.of(KeyStatus.DESTROYED));
-        transitions.put(KeyStatus.DESTROYED, Set.of());
-        return Map.copyOf(transitions);
     }
 
     private Specification<CryptoKey> keyFilters(

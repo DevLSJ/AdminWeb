@@ -103,6 +103,7 @@ export interface KeyEncryptResult {
   ciphertext: string
   iv: string
   encoding: string
+  version: number
 }
 
 export interface KeyDistributionResult {

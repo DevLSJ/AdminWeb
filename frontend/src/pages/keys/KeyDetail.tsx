@@ -8,6 +8,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom'
 import { InfoRow, PageHeader } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
+import { KeyLifecycleGuide } from '../../components/keys/KeyLifecycleGuide'
 import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
@@ -124,12 +125,35 @@ function KeyDetail() {
           </Stack>
           <Stack spacing={2.5}>
             <Card><CardContent sx={{ p: 3 }}><Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}><QueryStatsRounded color="secondary" /><Typography variant="h6">사용 통계</Typography></Box>{usage ? <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>{Object.entries(usage).map(([label, value]) => <Box key={label} sx={{ p: 1.8, borderRadius: 2, bgcolor: '#f8f9fc' }}><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>{usageLabels[label] ?? label}</Typography><Typography sx={{ mt: 0.5, fontSize: 22, fontWeight: 800 }}>{value.toLocaleString()}</Typography></Box>)}</Box> : <Typography color="text.secondary">사용 로그 요약을 불러오는 중입니다.</Typography>}</CardContent></Card>
-            <Card><CardContent sx={{ p: 3 }}><Typography variant="h6" sx={{ mb: 2 }}>{isAdmin ? '생명주기 작업' : '사용 가능한 작업'}</Typography><Stack spacing={1.2}>{isAdmin && <Button fullWidth variant="contained" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => { setToStatus(''); setReason(''); setStatusOpen(true) }}>상태 변경</Button>}<Button fullWidth variant="outlined" onClick={() => navigate(`/keys/test?key=${key.keyUid}`)}>암복호화 테스트</Button>{isAdmin && <Button fullWidth color="secondary" variant="outlined" startIcon={<AutorenewRounded />} disabled={key.status === 'DESTROYED'} onClick={() => setTab(1)}>버전 관리로 이동</Button>}</Stack></CardContent></Card>
+            <Card>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>{isAdmin ? '생명주기 작업' : '사용 가능한 작업'}</Typography>
+                <KeyLifecycleGuide currentStatus={key.status} compact />
+                <Stack spacing={1.2} sx={{ mt: 2 }}>
+                  {isAdmin && (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0}
+                      onClick={() => { setToStatus(''); setReason(''); setStatusOpen(true) }}
+                    >
+                      상태 변경
+                    </Button>
+                  )}
+                  <Button fullWidth variant="outlined" onClick={() => navigate(`/keys/test?key=${key.keyUid}`)}>암복호화 테스트</Button>
+                  {isAdmin && (
+                    <Button fullWidth color="secondary" variant="outlined" startIcon={<AutorenewRounded />} disabled={key.status === 'DESTROYED'} onClick={() => setTab(1)}>
+                      버전 관리로 이동
+                    </Button>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
           </Stack>
         </Box>
       ) : (
         <Stack spacing={2.5}>
-          <Card><CardContent sx={{ p: 3 }}><Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}><Box><Typography variant="h6">키 갱신 및 자동 순환</Typography><Typography sx={{ mt: 0.5, color: 'text.secondary' }}>새 버전은 활성화하고 기존 버전은 구버전·복호화 전용으로 보존합니다.</Typography></Box>{isAdmin && <Button variant="contained" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !['ACTIVE', 'DISTRIBUTED'].includes(key.status)} onClick={() => setRotateOpen(true)}>수동 키 갱신</Button>}</Box><Divider sx={{ my: 2.5 }} /><Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}><Typography sx={{ minWidth: 150, fontWeight: 700 }}>자동 갱신 주기</Typography><FormControl size="small" sx={{ minWidth: 180 }} disabled={!isAdmin}><InputLabel>갱신 주기</InputLabel><Select label="갱신 주기" value={autoRotation ?? 'NONE'} onChange={(event) => void updateAutoRotation(event.target.value)}><MenuItem value="NONE">미사용</MenuItem><MenuItem value={30}>30일</MenuItem><MenuItem value={60}>60일</MenuItem><MenuItem value={90}>90일</MenuItem></Select></FormControl><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>서버의 자동 갱신 정책에 저장됩니다.</Typography></Box></CardContent></Card>
+          <Card><CardContent sx={{ p: 3 }}><Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}><Box><Typography variant="h6">키 갱신 및 자동 순환</Typography><Typography sx={{ mt: 0.5, color: 'text.secondary' }}>새 버전은 활성화하고 기존 버전은 구버전·복호화 전용으로 보존합니다. 갱신은 활성화 상태에서만 가능합니다.</Typography></Box>{isAdmin && <Button variant="contained" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || key.status !== 'ACTIVE'} onClick={() => setRotateOpen(true)}>수동 키 갱신</Button>}</Box><Divider sx={{ my: 2.5 }} /><Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}><Typography sx={{ minWidth: 150, fontWeight: 700 }}>자동 갱신 주기</Typography><FormControl size="small" sx={{ minWidth: 180 }} disabled={!isAdmin}><InputLabel>갱신 주기</InputLabel><Select label="갱신 주기" value={autoRotation ?? 'NONE'} onChange={(event) => void updateAutoRotation(event.target.value)}><MenuItem value="NONE">미사용</MenuItem><MenuItem value={30}>30일</MenuItem><MenuItem value={60}>60일</MenuItem><MenuItem value={90}>90일</MenuItem></Select></FormControl><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>서버의 자동 갱신 정책에 저장됩니다.</Typography></Box></CardContent></Card>
           <Card><CardContent sx={{ p: 0 }}><Box sx={{ px: 3, pt: 3, pb: 1 }}><Typography variant="h6">버전 이력</Typography></Box><TableContainer><Table><TableHead><TableRow sx={{ bgcolor: '#f8f9fc' }}><TableCell>버전</TableCell><TableCell>상태</TableCell><TableCell>사용 범위</TableCell><TableCell>생성자</TableCell><TableCell>생성 시각</TableCell></TableRow></TableHead><TableBody>{versions.map((version) => <TableRow key={version.version} hover><TableCell><Typography sx={{ fontWeight: 800 }}>v{version.version}</Typography></TableCell><TableCell><StatusBadge status={version.status} /></TableCell><TableCell>{version.decryptOnly ? <StatusBadge status="DECRYPT_ONLY" /> : <StatusBadge status="ACTIVE" label="암호화·복호화" />}</TableCell><TableCell>{version.createdBy}</TableCell><TableCell>{version.createdAt}</TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
         </Stack>
       )}

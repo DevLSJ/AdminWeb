@@ -157,6 +157,7 @@ class KeyManagementIntegrationTests {
                 """, 200);
         String ciphertext = encrypted.path("data").path("ciphertext").asText();
         String iv = encrypted.path("data").path("iv").asText();
+        assertThat(encrypted.path("data").path("version").asInt()).isEqualTo(1);
         assertThat(Base64.getDecoder().decode(ciphertext)).hasSizeGreaterThan(16);
         assertThat(Base64.getDecoder().decode(iv)).hasSize(12);
 
@@ -178,11 +179,29 @@ class KeyManagementIntegrationTests {
         assertThat(rotated.path("data").path("newVersion").asInt()).isEqualTo(2);
 
         JsonNode versions = sendJson(client, "GET", "/api/keys/" + keyUid + "/versions", token, "", 200);
-        assertThat(versions.path("data").size()).isEqualTo(1);
+        assertThat(versions.path("data").size()).isEqualTo(2);
         assertThat(versions.path("data").get(0).path("version").asInt()).isEqualTo(2);
+        assertThat(versions.path("data").get(0).path("decryptOnly").asBoolean()).isFalse();
+        assertThat(versions.path("data").get(1).path("version").asInt()).isEqualTo(1);
+        assertThat(versions.path("data").get(1).path("decryptOnly").asBoolean()).isTrue();
+
+        JsonNode decryptedWithPreviousVersion = sendJson(
+                client,
+                "POST",
+                "/api/keys/" + keyUid + "/test/decrypt",
+                token,
+                """
+                {"ciphertext":"%s","iv":"%s","version":1}
+                """.formatted(ciphertext, iv),
+                200
+        );
+        assertThat(decryptedWithPreviousVersion.path("data").path("plaintext").asText())
+                .isEqualTo("Hello DGuard");
 
         key = keyRepository.findByKeyUid(keyUid).orElseThrow();
+        KeyMaterial retiredV1 = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();
         KeyMaterial v2 = materialRepository.findByCryptoKeyAndKeyVersion(key, 2).orElseThrow();
+        assertThat(retiredV1.getMaterialStatus()).isEqualTo(KeyMaterial.RETIRED);
         assertThat(v2.getWrappedKey()).isNotEqualTo(wrappedBeforeRotation);
         assertBinaryMaterial(v2);
 
@@ -192,6 +211,8 @@ class KeyManagementIntegrationTests {
         assertThat(distributed.path("data").path("status").asText()).isEqualTo("DISTRIBUTED");
         assertThat(distributed.path("data").path("wrappedKey").isMissingNode()).isTrue();
         assertThat(distributed.path("data").path("iv").isMissingNode()).isTrue();
+        JsonNode distributedRotation = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 409);
+        assertThat(distributedRotation.path("errorCode").asText()).isEqualTo("KEY_ROTATION_NOT_ALLOWED");
 
         JsonNode auditLogs = sendJson(client, "GET", "/api/audit-logs?page=0&size=100", token, "", 200);
         assertThat(auditLogs.path("data").path("content")).anySatisfy(log ->
@@ -205,7 +226,7 @@ class KeyManagementIntegrationTests {
         JsonNode tampered = sendJson(client, "GET", "/api/keys/" + keyUid, token, "", 409);
         assertThat(tampered.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
         JsonNode blocked = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 409);
-        assertThat(blocked.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
+        assertThat(blocked.path("errorCode").asText()).isEqualTo("KEY_ROTATION_NOT_ALLOWED");
     }
 
     @Test

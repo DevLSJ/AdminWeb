@@ -121,8 +121,8 @@ export async function encryptWithKey(keyUid: string, plaintext: string) {
   return unwrap(await apiClient.post<ApiResponse<KeyEncryptResult>>(apiEndpoints.keys.encryptTest(keyUid), { plaintext }))
 }
 
-export async function decryptWithKey(keyUid: string, ciphertext: string, iv: string) {
-  return unwrap(await apiClient.post<ApiResponse<{ plaintext: string }>>(apiEndpoints.keys.decryptTest(keyUid), { ciphertext, iv }))
+export async function decryptWithKey(keyUid: string, ciphertext: string, iv: string, version?: number) {
+  return unwrap(await apiClient.post<ApiResponse<{ plaintext: string }>>(apiEndpoints.keys.decryptTest(keyUid), { ciphertext, iv, version }))
 }
 
 export async function fetchAuditLogs() {

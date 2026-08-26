@@ -42,7 +42,7 @@ export interface KmsContextValue {
   rotateKey: (keyUid: string) => Promise<number>
   setAutoRotation: (keyUid: string, days: AutoRotationDays) => Promise<void>
   encrypt: (keyUid: string, plaintext: string) => Promise<KeyEncryptResult>
-  decrypt: (keyUid: string, ciphertext: string, iv: string) => Promise<string>
+  decrypt: (keyUid: string, ciphertext: string, iv: string, version?: number) => Promise<string>
 }
 
 export const KmsContext = createContext<KmsContextValue | null>(null)

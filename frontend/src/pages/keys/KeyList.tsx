@@ -37,6 +37,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
+import { KeyLifecycleGuide } from '../../components/keys/KeyLifecycleGuide'
 import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
@@ -180,6 +181,8 @@ function KeyList() {
           <Button size="small" color="inherit" startIcon={<FilterAltOffRounded />} onClick={() => setParams((current) => ({ ...defaultParams, size: current.size }))}>필터 초기화</Button>
         </Stack>
       </FilterCard>
+
+      <KeyLifecycleGuide />
 
       <Card>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 14 }}>관리 키 {totalElements.toLocaleString()}개</Typography><FormControl size="small" sx={{ minWidth: 132 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
