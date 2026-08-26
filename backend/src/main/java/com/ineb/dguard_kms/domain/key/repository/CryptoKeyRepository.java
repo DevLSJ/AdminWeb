@@ -1,6 +1,7 @@
 package com.ineb.dguard_kms.domain.key.repository;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,8 @@ public interface CryptoKeyRepository extends JpaRepository<CryptoKey, Long>, Jpa
     Optional<CryptoKey> findByKeyUid(UUID keyUid);
 
     boolean existsByKeyName(String keyName);
+
+    List<CryptoKey> findAllByIntegrityHash(String integrityHash);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select key from CryptoKey key where key.keyUid = :keyUid")

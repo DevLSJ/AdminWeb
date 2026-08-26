@@ -24,6 +24,7 @@ import com.ineb.dguard_kms.domain.config.repository.CryptoConfigRepository;
 import com.ineb.dguard_kms.domain.key.entity.KeyMaterial;
 import com.ineb.dguard_kms.domain.key.repository.CryptoKeyRepository;
 import com.ineb.dguard_kms.domain.key.repository.KeyMaterialRepository;
+import com.ineb.dguard_kms.domain.key.service.CryptoKeyService;
 
 import jakarta.persistence.EntityManager;
 import tools.jackson.databind.JsonNode;
@@ -50,6 +51,9 @@ class KeyManagementIntegrationTests {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private CryptoKeyService keyService;
 
     @Test
     void requiredSchemaUsesLoginIdAndPersistentMasterKeySettings() {
@@ -202,6 +206,26 @@ class KeyManagementIntegrationTests {
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
         );
         assertThat(response.statusCode()).isEqualTo(403);
+    }
+
+    @Test
+    void schemaMigrationMarkerIsResignedOnlyWhenExplicitlyMarked() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        String token = login(client, "admin", "admin");
+        String keyName = "MIGRATION-AES-" + UUID.randomUUID();
+        JsonNode created = sendJson(client, "POST", "/api/keys", token, """
+                {"keyName":"%s","algorithm":"AES","keySize":256,"purpose":"ENCRYPT"}
+                """.formatted(keyName), 200);
+        UUID keyUid = UUID.fromString(created.path("data").path("keyUid").asText());
+
+        var key = keyRepository.findByKeyUid(keyUid).orElseThrow();
+        key.updateIntegrityHash(CryptoKeyService.PENDING_SCHEMA_INTEGRITY_HASH);
+        keyRepository.saveAndFlush(key);
+
+        assertThat(keyService.resignSchemaMigratedKeys()).isEqualTo(1);
+        assertThat(sendJson(client, "GET", "/api/keys/" + keyUid, token, "", 200)
+                .path("data").path("integrityValid").asBoolean()).isTrue();
+        assertThat(keyService.resignSchemaMigratedKeys()).isZero();
     }
 
     private void assertBinaryMaterial(KeyMaterial material) {

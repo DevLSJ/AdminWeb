@@ -51,6 +51,8 @@ import com.ineb.dguard_kms.domain.key.repository.KeyUsageLogRepository;
 @Service
 public class CryptoKeyService {
 
+    public static final String PENDING_SCHEMA_INTEGRITY_HASH = "PENDING_V6_SCHEMA_REALIGN";
+
     // 상태 변경은 이 표에 정의된 단방향 전이만 허용한다.
     private static final Map<KeyStatus, Set<KeyStatus>> ALLOWED_TRANSITIONS = createTransitions();
 
@@ -167,6 +169,13 @@ public class CryptoKeyService {
         return materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key).stream()
                 .map(KeyVersionResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public int resignSchemaMigratedKeys() {
+        List<CryptoKey> pendingKeys = keyRepository.findAllByIntegrityHash(PENDING_SCHEMA_INTEGRITY_HASH);
+        pendingKeys.forEach(this::signIntegrity);
+        return pendingKeys.size();
     }
 
     @Transactional
