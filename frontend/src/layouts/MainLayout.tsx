@@ -232,10 +232,10 @@ function MainLayout() {
         <Box
           sx={{
             width: '100%',
-            maxWidth: location.pathname === '/' ? 'none' : 1500,
+            maxWidth: 'none',
             minHeight: 'calc(100vh - 72px)',
             mx: 'auto',
-            p: { xs: 2, sm: 3, lg: 3.5, xl: 4 },
+            p: { xs: 2, sm: 2.5 },
           }}
         >
           <Outlet />
