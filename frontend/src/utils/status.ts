@@ -4,6 +4,7 @@ const statusLabels: Record<string, string> = {
   EXPIRED: '만료',
   INACTIVE: '비활성',
   DISTRIBUTED: '배포됨',
+  COMPROMISED: '침해됨',
   DEPLOYING: '배포 중',
   DEPLOYED: '배포 완료',
   DEPLOY_FAILED: '배포 실패',

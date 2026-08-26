@@ -35,6 +35,7 @@ const statusToneMap: Record<string, SemanticTone> = {
   CLIENT: 'neutral',
   DECRYPT_ONLY: 'neutral',
   DEPLOY_FAILED: 'danger',
+  COMPROMISED: 'danger',
   DESTROYED: 'dark',
   FAILURE: 'danger',
   INVALID: 'danger',

@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -14,32 +16,35 @@ import jakarta.persistence.Table;
 @Table(name = "admin_user")
 public class AdminUser {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     @Column(name = "user_uid", nullable = false, unique = true, updatable = false)
     private UUID userUid;
 
-    @Id
-    @Column(name = "login_id", nullable = false, unique = true, length = 100)
+    @Column(name = "login_id", nullable = false, unique = true, length = 64)
     private String loginId;
 
     @Column(name = "password_hash", nullable = false, length = 512)
     private String passwordHash;
 
-    @Column(name = "password_salt", nullable = false, length = 128)
+    @Column(name = "password_salt", nullable = false, length = 256)
     private String passwordSalt;
 
-    @Column(name = "password_algo", nullable = false, length = 50)
+    @Column(name = "password_algo", nullable = false, length = 32)
     private String passwordAlgorithm;
 
     @Column(name = "password_iter", nullable = false)
     private int passwordIterations;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = 64)
     private String name;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 32)
     private String role;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 16)
     private String status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -47,6 +52,9 @@ public class AdminUser {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
 
     protected AdminUser() {
     }
@@ -123,4 +131,11 @@ public class AdminUser {
     public boolean isActive() {
         return "ACTIVE".equals(status);
     }
+
+    public void recordLogin() {
+        lastLoginAt = Instant.now();
+    }
+
+    public Long getId() { return id; }
+    public Instant getLastLoginAt() { return lastLoginAt; }
 }

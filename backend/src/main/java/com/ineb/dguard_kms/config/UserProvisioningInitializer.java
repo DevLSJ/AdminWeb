@@ -17,6 +17,7 @@ import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
 import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
 import com.ineb.dguard_kms.security.PasswordService;
 
+// 기본값은 비활성화이며, 운영자가 명시적으로 켠 일회성 실행에서만 계정을 만든다.
 @Component
 @ConditionalOnProperty(name = "app.user-provisioning.enabled", havingValue = "true")
 public class UserProvisioningInitializer implements ApplicationRunner {
@@ -42,6 +43,7 @@ public class UserProvisioningInitializer implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         String loginId = requiredProperty("app.user-provisioning.login-id");
+        // 재실행해도 기존 비밀번호와 권한을 덮어쓰지 않는 멱등 동작이다.
         if (userRepository.existsByLoginId(loginId)) {
             log.info("User provisioning skipped because login ID '{}' already exists", loginId);
             return;

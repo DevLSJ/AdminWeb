@@ -2,6 +2,7 @@ package com.ineb.dguard_kms.domain.key.entity;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -27,30 +28,33 @@ public class CryptoKey {
     @Column(name = "key_uid", nullable = false, unique = true, updatable = false)
     private UUID keyUid;
 
-    @Column(name = "key_name", nullable = false, unique = true, length = 120)
+    @Column(name = "key_name", nullable = false, unique = true, length = 128)
     private String keyName;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 32)
     private String algorithm;
 
     @Column(name = "key_size", nullable = false)
     private int keySize;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 32)
     private String purpose;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 16)
     private KeyStatus status;
 
-    @Column(name = "current_version", nullable = false)
-    private int currentVersion;
+    @Column(nullable = false)
+    private int version;
 
     @Column(name = "expire_at")
-    private LocalDate expireAt;
+    private Instant expireAt;
 
-    @Column(name = "integrity_hash", nullable = false, length = 128)
+    @Column(name = "integrity_hash", nullable = false, length = 512)
     private String integrityHash;
+
+    @Column(name = "created_by", nullable = false, length = 64)
+    private String createdBy;
 
     @Column(name = "auto_rotation_days")
     private Integer autoRotationDays;
@@ -68,22 +72,25 @@ public class CryptoKey {
     protected CryptoKey() {
     }
 
-    public CryptoKey(String keyName, String algorithm, int keySize, String purpose, LocalDate expireAt) {
+    public CryptoKey(String keyName, String algorithm, int keySize, String purpose, LocalDate expireAt, String createdBy) {
         this.keyUid = UUID.randomUUID();
         this.keyName = keyName;
         this.algorithm = algorithm;
         this.keySize = keySize;
         this.purpose = purpose;
         this.status = KeyStatus.CREATED;
-        this.currentVersion = 1;
-        this.expireAt = expireAt;
+        this.version = 1;
+        this.expireAt = toInstant(expireAt);
+        this.createdBy = createdBy;
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
     }
 
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
         if (keyUid == null) keyUid = UUID.randomUUID();
-        createdAt = now;
+        if (createdAt == null) createdAt = now;
         updatedAt = now;
     }
 
@@ -99,7 +106,7 @@ public class CryptoKey {
 
     public int nextVersion() {
         this.updatedAt = Instant.now();
-        return ++currentVersion;
+        return ++version;
     }
 
     public void updateIntegrityHash(String integrityHash) {
@@ -109,7 +116,7 @@ public class CryptoKey {
     public void updateMetadata(String keyName, String purpose, LocalDate expireAt) {
         this.keyName = keyName;
         this.purpose = purpose;
-        this.expireAt = expireAt;
+        this.expireAt = toInstant(expireAt);
         this.updatedAt = Instant.now();
     }
 
@@ -125,10 +132,16 @@ public class CryptoKey {
     public int getKeySize() { return keySize; }
     public String getPurpose() { return purpose; }
     public KeyStatus getStatus() { return status; }
-    public int getCurrentVersion() { return currentVersion; }
-    public LocalDate getExpireAt() { return expireAt; }
+    public int getCurrentVersion() { return version; }
+    public LocalDate getExpireAt() { return expireAt == null ? null : expireAt.atZone(ZoneOffset.UTC).toLocalDate(); }
+    public Instant getExpireAtInstant() { return expireAt; }
     public String getIntegrityHash() { return integrityHash; }
+    public String getCreatedBy() { return createdBy; }
     public Integer getAutoRotationDays() { return autoRotationDays; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    private static Instant toInstant(LocalDate value) {
+        return value == null ? null : value.atStartOfDay().toInstant(ZoneOffset.UTC);
+    }
 }

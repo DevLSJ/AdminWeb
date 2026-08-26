@@ -46,7 +46,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
                         | 비활성 | `INACTIVE` | 사용 중지되어 폐기만 가능한 키 |
                         | 만료 | `EXPIRED` | 만료되어 재활성화 또는 비활성화 가능한 키 |
                         | 배포됨 | `DISTRIBUTED` | 대상 시스템에 배포된 키 |
-                        | 배포 실패 | `DEPLOY_FAILED` | 배포 처리 실패 후 재시도 또는 폐기 가능한 키 |
+                        | 침해 | `COMPROMISED` | 키 유출·침해가 의심되어 폐기만 가능한 키 |
                         | 폐기 | `DESTROYED` | 복구할 수 없는 최종 상태 |
 
                         ## 접근 제어

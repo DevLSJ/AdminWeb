@@ -6,7 +6,6 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.List;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -31,11 +30,6 @@ import jakarta.annotation.PreDestroy;
 public class MasterKeyService {
 
     private static final Logger log = LoggerFactory.getLogger(MasterKeyService.class);
-    private static final String SALT_CONFIG_KEY = "master.salt";
-    private static final String KCV_CONFIG_KEY = "master.kcv";
-    private static final String ITERATIONS_CONFIG_KEY = "master.iterations";
-    private static final String ALGORITHM_CONFIG_KEY = "master.algorithm";
-    private static final String KEY_LENGTH_CONFIG_KEY = "master.key-length";
     private static final int MINIMUM_ITERATIONS = 210_000;
     private static final int SALT_LENGTH_BYTES = 16;
     private static final int GCM_TAG_LENGTH_BITS = 128;
@@ -76,10 +70,9 @@ public class MasterKeyService {
     }
 
     private void initializeInTransaction(char[] passphrase) {
-        var saltEntry = configRepository.findById(SALT_CONFIG_KEY);
-        var kcvEntry = configRepository.findById(KCV_CONFIG_KEY);
-        if (saltEntry.isEmpty() != kcvEntry.isEmpty()) {
-            throw new IllegalStateException("Master key configuration is incomplete");
+        var persistedConfig = configRepository.findFirstByOrderByIdAsc();
+        if (configRepository.count() > 1) {
+            throw new IllegalStateException("crypto_config must contain exactly one row");
         }
 
         int configuredIterations = environment.getProperty("kms.master.pbkdf2.iterations", Integer.class, 210_000);
@@ -88,17 +81,16 @@ public class MasterKeyService {
         validateDerivationPolicy(configuredIterations, keyLength, algorithm);
 
         try {
-            if (saltEntry.isEmpty()) {
+            if (persistedConfig.isEmpty()) {
+                // 최초 기동은 파생 정책과 KCV를 DB에 저장해 이후 기동의 동일 키 여부를 검증한다.
                 byte[] salt = new byte[SALT_LENGTH_BYTES];
                 secureRandom.nextBytes(salt);
                 byte[] derived = deriveKey(passphrase, salt, configuredIterations, keyLength, algorithm);
                 byte[] kcv = createKcv(derived);
-                configRepository.saveAll(List.of(
-                        new CryptoConfigEntry(SALT_CONFIG_KEY, Base64.getEncoder().encodeToString(salt)),
-                        new CryptoConfigEntry(KCV_CONFIG_KEY, Base64.getEncoder().encodeToString(kcv)),
-                        new CryptoConfigEntry(ITERATIONS_CONFIG_KEY, Integer.toString(configuredIterations)),
-                        new CryptoConfigEntry(ALGORITHM_CONFIG_KEY, algorithm),
-                        new CryptoConfigEntry(KEY_LENGTH_CONFIG_KEY, Integer.toString(keyLength))
+                configRepository.save(new CryptoConfigEntry(
+                        Base64.getEncoder().encodeToString(salt),
+                        Base64.getEncoder().encodeToString(kcv),
+                        configuredIterations
                 ));
                 this.masterKey = derived;
                 Arrays.fill(salt, (byte) 0);
@@ -106,19 +98,12 @@ public class MasterKeyService {
                 return;
             }
 
-            byte[] salt = Base64.getDecoder().decode(saltEntry.orElseThrow().getConfigValue());
-            byte[] expectedKcv = Base64.getDecoder().decode(kcvEntry.orElseThrow().getConfigValue());
-            int storedIterations = configRepository.findById(ITERATIONS_CONFIG_KEY)
-                    .map(CryptoConfigEntry::getConfigValue)
-                    .map(Integer::parseInt)
-                    .orElse(configuredIterations);
-            int storedKeyLength = configRepository.findById(KEY_LENGTH_CONFIG_KEY)
-                    .map(CryptoConfigEntry::getConfigValue)
-                    .map(Integer::parseInt)
-                    .orElse(keyLength);
-            String storedAlgorithm = configRepository.findById(ALGORITHM_CONFIG_KEY)
-                    .map(CryptoConfigEntry::getConfigValue)
-                    .orElse(algorithm);
+            CryptoConfigEntry config = persistedConfig.orElseThrow();
+            byte[] salt = Base64.getDecoder().decode(config.getSalt());
+            byte[] expectedKcv = Base64.getDecoder().decode(config.getKcv());
+            int storedIterations = config.getIterations();
+            int storedKeyLength = keyLength;
+            String storedAlgorithm = algorithm;
             validateDerivationPolicy(storedIterations, storedKeyLength, storedAlgorithm);
             byte[] derived = deriveKey(passphrase, salt, storedIterations, storedKeyLength, storedAlgorithm);
             byte[] actualKcv = createKcv(derived);
@@ -127,6 +112,7 @@ public class MasterKeyService {
             Arrays.fill(expectedKcv, (byte) 0);
             Arrays.fill(actualKcv, (byte) 0);
             if (!kcvValid) {
+                // 잘못된 패스프레이즈로 암호화 키를 다루기 전에 애플리케이션 기동을 중단한다.
                 Arrays.fill(derived, (byte) 0);
                 log.error(
                         "KCV verification failed: the configured KMS master passphrase does not match "
@@ -160,6 +146,7 @@ public class MasterKeyService {
     }
 
     private byte[] createKcv(byte[] key) throws GeneralSecurityException {
+        // KCV는 고정 입력의 검증값일 뿐 실제 데이터 암호화에는 항상 임의 IV를 사용한다.
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(GCM_TAG_LENGTH_BITS, KCV_IV));
         return cipher.doFinal(KCV_PLAINTEXT);
@@ -170,6 +157,7 @@ public class MasterKeyService {
         if (current == null) {
             throw new IllegalStateException("Master key is not initialized");
         }
+        // 공유 마스터키 원본을 노출하지 않고 작업별 복사본만 전달한 뒤 즉시 지운다.
         byte[] copy = current.clone();
         try {
             return operation.apply(new SecretKeySpec(copy, "AES"));

@@ -9,6 +9,7 @@ import type {
   KeyStatusHistory,
   KeyUsageSummary,
   KeyVersion,
+  KeyListParams,
   PageResponse,
 } from '../types/api'
 import { apiClient } from './client'
@@ -53,7 +54,27 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
 }
 
 export async function fetchKeys() {
-  return unwrap(await apiClient.get<ApiResponse<CryptoKey[]>>(apiEndpoints.keys.list))
+  const page = await fetchKeyPage({
+    keyword: '', algorithm: 'ALL', status: 'ALL', purpose: 'ALL', page: 0, size: 100, sort: 'createdAt,desc',
+  })
+  return page.content
+}
+
+export async function fetchKeyPage(params: KeyListParams) {
+  return unwrap(await apiClient.get<ApiResponse<PageResponse<CryptoKey>>>(
+    apiEndpoints.keys.list,
+    {
+      params: {
+        keyword: params.keyword.trim() || undefined,
+        algorithm: params.algorithm === 'ALL' ? undefined : params.algorithm,
+        status: params.status === 'ALL' ? undefined : params.status,
+        purpose: params.purpose === 'ALL' ? undefined : params.purpose,
+        page: params.page,
+        size: params.size,
+        sort: params.sort,
+      },
+    },
+  ))
 }
 
 export async function fetchKey(keyUid: string) {

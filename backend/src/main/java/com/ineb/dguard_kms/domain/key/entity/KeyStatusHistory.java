@@ -24,21 +24,21 @@ public class KeyStatusHistory {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "crypto_key_id", nullable = false)
+    @JoinColumn(name = "key_id", nullable = false)
     private CryptoKey cryptoKey;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "from_status", length = 30)
+    @Column(name = "from_status", nullable = false, length = 16)
     private KeyStatus fromStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "to_status", nullable = false, length = 30)
+    @Column(name = "to_status", nullable = false, length = 16)
     private KeyStatus toStatus;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, columnDefinition = "text")
     private String reason;
 
-    @Column(name = "changed_by", nullable = false, length = 100)
+    @Column(name = "changed_by", nullable = false, length = 64)
     private String changedBy;
 
     @Column(name = "changed_at", nullable = false, updatable = false)

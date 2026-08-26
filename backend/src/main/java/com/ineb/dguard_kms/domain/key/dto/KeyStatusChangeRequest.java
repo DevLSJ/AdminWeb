@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "키 상태 변경 요청")
 public record KeyStatusChangeRequest(
         @Schema(
-                description = "변경할 키 상태. CREATED, ACTIVE, INACTIVE, EXPIRED, DISTRIBUTED, DEPLOY_FAILED, DESTROYED",
+                description = "변경할 키 상태. CREATED, ACTIVE, INACTIVE, EXPIRED, DISTRIBUTED, COMPROMISED, DESTROYED",
                 example = "INACTIVE"
         )
         @NotNull(message = "변경 상태는 필수입니다.") KeyStatus toStatus,

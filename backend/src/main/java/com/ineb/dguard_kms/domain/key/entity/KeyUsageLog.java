@@ -22,19 +22,19 @@ public class KeyUsageLog {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "crypto_key_id", nullable = false)
+    @JoinColumn(name = "key_id", nullable = false)
     private CryptoKey cryptoKey;
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = 16)
     private String operation;
 
-    @Column(nullable = false)
-    private boolean success;
+    @Column(nullable = false, length = 8)
+    private String result;
 
-    @Column(name = "failure_reason", length = 500)
+    @Column(name = "fail_reason", columnDefinition = "text")
     private String failureReason;
 
-    @Column(name = "used_by", nullable = false, length = 100)
+    @Column(name = "used_by", nullable = false, length = 64)
     private String usedBy;
 
     @Column(name = "used_at", nullable = false, updatable = false)
@@ -46,7 +46,7 @@ public class KeyUsageLog {
     public KeyUsageLog(CryptoKey cryptoKey, String operation, boolean success, String failureReason, String usedBy) {
         this.cryptoKey = cryptoKey;
         this.operation = operation;
-        this.success = success;
+        this.result = success ? "SUCCESS" : "FAILURE";
         this.failureReason = failureReason;
         this.usedBy = usedBy;
     }
@@ -55,7 +55,8 @@ public class KeyUsageLog {
     void onCreate() { usedAt = Instant.now(); }
 
     public String getOperation() { return operation; }
-    public boolean isSuccess() { return success; }
+    public boolean isSuccess() { return "SUCCESS".equals(result); }
+    public String getResult() { return result; }
     public String getFailureReason() { return failureReason; }
     public String getUsedBy() { return usedBy; }
     public Instant getUsedAt() { return usedAt; }

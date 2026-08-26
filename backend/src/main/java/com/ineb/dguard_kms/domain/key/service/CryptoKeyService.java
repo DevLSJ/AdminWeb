@@ -10,10 +10,16 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ineb.dguard_kms.common.PageResponse;
+import com.ineb.dguard_kms.crypto.CryptoOperationException;
 import com.ineb.dguard_kms.crypto.CryptoUtil;
 import com.ineb.dguard_kms.crypto.IntegrityService;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
@@ -45,6 +51,7 @@ import com.ineb.dguard_kms.domain.key.repository.KeyUsageLogRepository;
 @Service
 public class CryptoKeyService {
 
+    // 상태 변경은 이 표에 정의된 단방향 전이만 허용한다.
     private static final Map<KeyStatus, Set<KeyStatus>> ALLOWED_TRANSITIONS = createTransitions();
 
     private final CryptoKeyRepository keyRepository;
@@ -82,16 +89,19 @@ public class CryptoKeyService {
 
         byte[] rawKey = cryptoUtil.generateAes256Key();
         try {
+            // 원시 키는 DB에 저장하지 않고 마스터키로 래핑한 값만 영속화한다.
             CryptoUtil.Base64Payload wrapped = cryptoUtil.wrapKey(rawKey);
             CryptoKey key = new CryptoKey(
-                    request.keyName().trim(), "AES", 256, request.purpose().trim(), request.expireAt()
+                    request.keyName().trim(), "AES", 256, request.purpose().trim(), request.expireAt(), actor
             );
-            KeyMaterial material = new KeyMaterial(key, 1, wrapped.ciphertext(), wrapped.iv(), actor);
-            signIntegrity(key, material);
+            KeyMaterial material = new KeyMaterial(
+                    key, 1, cryptoUtil.decodeBase64(wrapped.ciphertext()), cryptoUtil.decodeBase64(wrapped.iv()), actor
+            );
+            signIntegrity(key);
             keyRepository.save(key);
             materialRepository.save(material);
             historyRepository.save(new KeyStatusHistory(
-                    key, null, KeyStatus.CREATED, "키 최초 생성", actor
+                    key, KeyStatus.CREATED, KeyStatus.CREATED, "키 최초 생성", actor
             ));
             auditLogService.append(actor, "KEY_CREATE", "CRYPTO_KEY", key.getKeyUid().toString(),
                     key.getKeyName() + " v1 키 생성");
@@ -99,18 +109,36 @@ public class CryptoKeyService {
         } catch (DataIntegrityViolationException exception) {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
         } finally {
+            // 원시 키는 필요한 작업이 끝나는 즉시 메모리에서 지운다.
             Arrays.fill(rawKey, (byte) 0);
         }
     }
 
     @Transactional(readOnly = true)
-    public List<KeyResponse> findAll() {
-        return keyRepository.findAll().stream().map(this::responseWithIntegrity).toList();
+    public PageResponse<KeyResponse> findAll(
+            String keyword,
+            String algorithm,
+            KeyStatus status,
+            String purpose,
+            int page,
+            int size,
+            String sort
+    ) {
+        Specification<CryptoKey> filters = keyFilters(keyword, algorithm, status, purpose);
+        PageRequest pageable = PageRequest.of(
+                Math.max(page, 0),
+                Math.min(Math.max(size, 1), 100),
+                keySort(sort)
+        );
+        Page<KeyResponse> result = keyRepository.findAll(filters, pageable).map(this::responseWithIntegrity);
+        return PageResponse.from(result);
     }
 
     @Transactional(readOnly = true)
     public KeyResponse find(UUID keyUid) {
-        return responseWithIntegrity(findKey(keyUid));
+        CryptoKey key = findKey(keyUid);
+        verifiedCurrentMaterial(key);
+        return KeyResponse.from(key, true);
     }
 
     @Transactional(readOnly = true)
@@ -126,8 +154,8 @@ public class CryptoKeyService {
         CryptoKey key = findKey(keyUid);
         return new KeyUsageSummaryResponse(
                 usageLogRepository.countByCryptoKey(key),
-                usageLogRepository.countByCryptoKeyAndSuccessTrue(key),
-                usageLogRepository.countByCryptoKeyAndSuccessFalse(key),
+                usageLogRepository.countByCryptoKeyAndResult(key, "SUCCESS"),
+                usageLogRepository.countByCryptoKeyAndResult(key, "FAILURE"),
                 usageLogRepository.countByCryptoKeyAndOperation(key, "ENCRYPT"),
                 usageLogRepository.countByCryptoKeyAndOperation(key, "DECRYPT")
         );
@@ -150,7 +178,7 @@ public class CryptoKeyService {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
         }
         key.updateMetadata(keyName, request.purpose().trim(), request.expireAt());
-        signIntegrity(key, material);
+        signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key, key.getStatus(), key.getStatus(), "키 메타정보 수정", actor
         ));
@@ -170,7 +198,7 @@ public class CryptoKeyService {
             );
         }
         key.updateAutoRotationDays(days);
-        signIntegrity(key, material);
+        signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key, key.getStatus(), key.getStatus(),
                 days == null ? "자동 갱신 미사용" : "자동 갱신 주기 " + days + "일 설정", actor
@@ -182,6 +210,7 @@ public class CryptoKeyService {
 
     @Transactional
     public KeyResponse changeStatus(UUID keyUid, KeyStatusChangeRequest request, String actor) {
+        // 잠금 조회로 동시에 들어온 상태 변경·갱신 요청이 서로 덮어쓰는 것을 막는다.
         CryptoKey key = findKeyForUpdate(keyUid);
         KeyMaterial material = verifiedCurrentMaterial(key);
         KeyStatus from = key.getStatus();
@@ -197,7 +226,7 @@ public class CryptoKeyService {
             throw conflict("허용되지 않은 키 상태 전이입니다: " + from + " -> " + to, "INVALID_KEY_STATUS_TRANSITION");
         }
         key.changeStatus(to);
-        signIntegrity(key, material);
+        signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(key, from, to, request.reason().trim(), actor));
         auditLogService.append(actor, "KEY_STATUS_CHANGE", "CRYPTO_KEY", key.getKeyUid().toString(),
                 from + " → " + to + ": " + request.reason().trim());
@@ -213,7 +242,6 @@ public class CryptoKeyService {
 
         int previousVersion = key.getCurrentVersion();
         KeyMaterial previousMaterial = verifiedCurrentMaterial(key);
-        previousMaterial.retire();
 
         byte[] rawKey = cryptoUtil.generateAes256Key();
         try {
@@ -221,9 +249,13 @@ public class CryptoKeyService {
             KeyStatus previousStatus = key.getStatus();
             int newVersion = key.nextVersion();
             key.changeStatus(KeyStatus.ACTIVE);
-            KeyMaterial newMaterial = new KeyMaterial(key, newVersion, wrapped.ciphertext(), wrapped.iv(), actor);
-            signIntegrity(key, newMaterial);
-            materialRepository.save(newMaterial);
+            previousMaterial.replace(
+                    newVersion,
+                    cryptoUtil.decodeBase64(wrapped.ciphertext()),
+                    cryptoUtil.decodeBase64(wrapped.iv()),
+                    actor
+            );
+            signIntegrity(key);
             historyRepository.save(new KeyStatusHistory(
                     key,
                     previousStatus,
@@ -250,7 +282,7 @@ public class CryptoKeyService {
         KeyStatus from = key.getStatus();
         material.markDistributed();
         key.changeStatus(KeyStatus.DISTRIBUTED);
-        signIntegrity(key, material);
+        signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key,
                 from,
@@ -270,51 +302,81 @@ public class CryptoKeyService {
         );
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = KeyOperationException.class)
     public KeyEncryptResponse encrypt(UUID keyUid, KeyEncryptRequest request, String actor) {
-        CryptoKey key = activeKeyForUse(keyUid);
-        byte[] rawKey = unwrapCurrentKey(key);
+        CryptoKey key = findKeyForUpdate(keyUid);
+        byte[] rawKey = null;
         try {
+            requireActive(key);
+            rawKey = unwrapCurrentKey(key);
             CryptoUtil.Base64Payload encrypted = cryptoUtil.encryptWithKey(
                     request.plaintext().getBytes(StandardCharsets.UTF_8), rawKey
             );
-            usageLogRepository.save(new KeyUsageLog(key, "ENCRYPT", true, null, actor));
             auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "암호화 성공");
+            usageLogRepository.save(new KeyUsageLog(key, "ENCRYPT", true, null, actor));
             return new KeyEncryptResponse(encrypted.ciphertext(), encrypted.iv(), "BASE64");
+        } catch (KeyOperationException exception) {
+            recordUsageFailure(key, "ENCRYPT", exception.getMessage(), actor);
+            throw exception;
+        } catch (CryptoOperationException | IllegalArgumentException exception) {
+            recordUsageFailure(key, "ENCRYPT", exception.getMessage(), actor);
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST, "암호화 요청을 처리할 수 없습니다.", "KEY_ENCRYPTION_FAILED"
+            );
         } finally {
-            Arrays.fill(rawKey, (byte) 0);
+            if (rawKey != null) Arrays.fill(rawKey, (byte) 0);
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = KeyOperationException.class)
     public KeyDecryptResponse decrypt(UUID keyUid, KeyDecryptRequest request, String actor) {
-        CryptoKey key = activeKeyForUse(keyUid);
-        byte[] rawKey = unwrapCurrentKey(key);
+        CryptoKey key = findKeyForUpdate(keyUid);
+        byte[] rawKey = null;
         byte[] plaintext = null;
         try {
+            requireActive(key);
+            rawKey = unwrapCurrentKey(key);
             plaintext = cryptoUtil.decryptWithKey(
                     new CryptoUtil.Base64Payload(request.ciphertext(), request.iv()), rawKey
             );
-            usageLogRepository.save(new KeyUsageLog(key, "DECRYPT", true, null, actor));
             auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "복호화 성공");
+            usageLogRepository.save(new KeyUsageLog(key, "DECRYPT", true, null, actor));
             return new KeyDecryptResponse(new String(plaintext, StandardCharsets.UTF_8));
+        } catch (KeyOperationException exception) {
+            recordUsageFailure(key, "DECRYPT", exception.getMessage(), actor);
+            throw exception;
+        } catch (CryptoOperationException | IllegalArgumentException exception) {
+            recordUsageFailure(key, "DECRYPT", exception.getMessage(), actor);
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST, "복호화 요청을 처리할 수 없습니다.", "KEY_DECRYPTION_FAILED"
+            );
         } finally {
-            Arrays.fill(rawKey, (byte) 0);
+            if (rawKey != null) Arrays.fill(rawKey, (byte) 0);
             if (plaintext != null) Arrays.fill(plaintext, (byte) 0);
         }
     }
 
-    private CryptoKey activeKeyForUse(UUID keyUid) {
-        CryptoKey key = findKeyForUpdate(keyUid);
+    private void requireActive(CryptoKey key) {
         if (key.getStatus() != KeyStatus.ACTIVE) {
-            throw conflict("ACTIVE 상태의 키만 암복호화에 사용할 수 있습니다.", "KEY_NOT_ACTIVE");
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST,
+                    "ACTIVE 상태의 키만 암복호화에 사용할 수 있습니다.",
+                    "KEY_NOT_ACTIVE"
+            );
         }
-        return key;
+    }
+
+    private void recordUsageFailure(CryptoKey key, String operation, String reason, String actor) {
+        String safeReason = reason == null || reason.isBlank() ? "요청 처리 실패" : reason;
+        usageLogRepository.save(new KeyUsageLog(key, operation, false, safeReason, actor));
     }
 
     private byte[] unwrapCurrentKey(CryptoKey key) {
         KeyMaterial material = verifiedCurrentMaterial(key);
-        return cryptoUtil.unwrapKey(new CryptoUtil.Base64Payload(material.getWrappedKey(), material.getWrappingIv()));
+        return cryptoUtil.unwrapKey(new CryptoUtil.Base64Payload(
+                cryptoUtil.encodeBase64(material.getWrappedKey()),
+                cryptoUtil.encodeBase64(material.getWrappingIv())
+        ));
     }
 
     private KeyMaterial currentMaterial(CryptoKey key) {
@@ -326,6 +388,7 @@ public class CryptoKeyService {
 
     private KeyMaterial verifiedCurrentMaterial(CryptoKey key) {
         KeyMaterial material = currentMaterial(key);
+        // 키 메타데이터나 래핑 값이 변조된 경우 실제 암호 연산 전에 차단한다.
         if (!verifyIntegrity(key, material)) {
             throw conflict("키 무결성 검증에 실패했습니다.", "KEY_INTEGRITY_VIOLATION");
         }
@@ -337,22 +400,20 @@ public class CryptoKeyService {
         return KeyResponse.from(key, verifyIntegrity(key, material));
     }
 
-    private void signIntegrity(CryptoKey key, KeyMaterial material) {
-        key.updateIntegrityHash(integrityService.sign(integrityValues(key, material)));
+    private void signIntegrity(CryptoKey key) {
+        key.updateIntegrityHash(integrityService.sign(integrityValues(key)));
     }
 
     private boolean verifyIntegrity(CryptoKey key, KeyMaterial material) {
-        return integrityService.verify(key.getIntegrityHash(), integrityValues(key, material));
+        return integrityService.verify(key.getIntegrityHash(), integrityValues(key));
     }
 
-    private String[] integrityValues(CryptoKey key, KeyMaterial material) {
+    private String[] integrityValues(CryptoKey key) {
         return new String[] {
                 key.getKeyUid().toString(), key.getKeyName(), key.getAlgorithm(), Integer.toString(key.getKeySize()),
                 key.getPurpose(), key.getStatus().name(), Integer.toString(key.getCurrentVersion()),
-                key.getExpireAt() == null ? null : key.getExpireAt().toString(),
-                key.getAutoRotationDays() == null ? null : key.getAutoRotationDays().toString(),
-                Integer.toString(material.getKeyVersion()), material.getWrappedKey(), material.getWrappingIv(),
-                material.getWrappingAlgorithm(), material.getMaterialStatus()
+                key.getExpireAtInstant() == null ? "" : key.getExpireAtInstant().toString(),
+                key.getCreatedBy(), key.getCreatedAt().toString()
         };
     }
 
@@ -388,13 +449,55 @@ public class CryptoKeyService {
         Map<KeyStatus, Set<KeyStatus>> transitions = new EnumMap<>(KeyStatus.class);
         transitions.put(KeyStatus.CREATED, Set.of(KeyStatus.ACTIVE));
         transitions.put(KeyStatus.ACTIVE, Set.of(
-                KeyStatus.EXPIRED, KeyStatus.INACTIVE, KeyStatus.DISTRIBUTED, KeyStatus.DEPLOY_FAILED
+                KeyStatus.EXPIRED, KeyStatus.INACTIVE, KeyStatus.DISTRIBUTED, KeyStatus.COMPROMISED
         ));
         transitions.put(KeyStatus.EXPIRED, Set.of(KeyStatus.INACTIVE, KeyStatus.ACTIVE));
         transitions.put(KeyStatus.INACTIVE, Set.of(KeyStatus.DESTROYED));
         transitions.put(KeyStatus.DISTRIBUTED, Set.of(KeyStatus.DESTROYED));
-        transitions.put(KeyStatus.DEPLOY_FAILED, Set.of(KeyStatus.ACTIVE, KeyStatus.DESTROYED));
+        transitions.put(KeyStatus.COMPROMISED, Set.of(KeyStatus.DESTROYED));
         transitions.put(KeyStatus.DESTROYED, Set.of());
         return Map.copyOf(transitions);
+    }
+
+    private Specification<CryptoKey> keyFilters(
+            String keyword,
+            String algorithm,
+            KeyStatus status,
+            String purpose
+    ) {
+        return (root, query, builder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+            if (keyword != null && !keyword.isBlank()) {
+                String normalized = keyword.trim().toLowerCase(java.util.Locale.ROOT);
+                var nameMatch = builder.like(builder.lower(root.get("keyName")), "%" + normalized + "%");
+                try {
+                    predicates.add(builder.or(nameMatch, builder.equal(root.get("keyUid"), UUID.fromString(normalized))));
+                } catch (IllegalArgumentException ignored) {
+                    predicates.add(nameMatch);
+                }
+            }
+            if (algorithm != null && !algorithm.isBlank()) {
+                predicates.add(builder.equal(builder.upper(root.get("algorithm")), algorithm.trim().toUpperCase(java.util.Locale.ROOT)));
+            }
+            if (status != null) predicates.add(builder.equal(root.get("status"), status));
+            if (purpose != null && !purpose.isBlank()) {
+                predicates.add(builder.equal(builder.upper(root.get("purpose")), purpose.trim().toUpperCase(java.util.Locale.ROOT)));
+            }
+            return builder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+    }
+
+    private Sort keySort(String requestedSort) {
+        String[] parts = requestedSort == null ? new String[0] : requestedSort.split(",", 2);
+        String property = switch (parts.length == 0 ? "" : parts[0]) {
+            case "keyName" -> "keyName";
+            case "expireAt" -> "expireAt";
+            case "status" -> "status";
+            default -> "createdAt";
+        };
+        Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1])
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        return Sort.by(direction, property);
     }
 }

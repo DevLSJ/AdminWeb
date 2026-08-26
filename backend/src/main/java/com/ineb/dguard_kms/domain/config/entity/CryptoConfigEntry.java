@@ -1,8 +1,14 @@
 package com.ineb.dguard_kms.domain.config.entity;
 
+import java.time.Instant;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
@@ -10,25 +16,54 @@ import jakarta.persistence.Table;
 public class CryptoConfigEntry {
 
     @Id
-    @Column(name = "config_key", length = 100)
-    private String configKey;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(name = "config_value", nullable = false, length = 2048)
-    private String configValue;
+    @Column(nullable = false, length = 512)
+    private String salt;
+
+    @Column(nullable = false, length = 512)
+    private String kcv;
+
+    @Column(nullable = false)
+    private int iterations;
+
+    @Column(name = "enc_ver", nullable = false, length = 16)
+    private String encryptionVersion;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     protected CryptoConfigEntry() {
     }
 
-    public CryptoConfigEntry(String configKey, String configValue) {
-        this.configKey = configKey;
-        this.configValue = configValue;
+    public CryptoConfigEntry(String salt, String kcv, int iterations) {
+        this.salt = salt;
+        this.kcv = kcv;
+        this.iterations = iterations;
+        this.encryptionVersion = "v1";
     }
 
-    public String getConfigKey() {
-        return configKey;
+    @PrePersist
+    void onCreate() {
+        Instant now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
     }
 
-    public String getConfigValue() {
-        return configValue;
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
     }
+
+    public Long getId() { return id; }
+    public String getSalt() { return salt; }
+    public String getKcv() { return kcv; }
+    public int getIterations() { return iterations; }
+    public String getEncryptionVersion() { return encryptionVersion; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

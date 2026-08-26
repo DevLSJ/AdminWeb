@@ -37,6 +37,7 @@ public class IntegrityService {
             Mac mac = Mac.getInstance(ALGORITHM);
             mac.init(new SecretKeySpec(keyCopy, ALGORITHM));
             for (String value : values) {
+                // 길이를 먼저 포함해 ["ab", "c"]와 ["a", "bc"]가 같은 입력이 되는 것을 막는다.
                 if (value == null) {
                     mac.update(ByteBuffer.allocate(Integer.BYTES).putInt(-1).array());
                     continue;
@@ -64,6 +65,7 @@ public class IntegrityService {
         }
         byte[] actual = Base64.getDecoder().decode(sign(values));
         try {
+            // HMAC도 상수 시간 비교를 사용해 타이밍 기반 추측을 줄인다.
             return MessageDigest.isEqual(expected, actual);
         } finally {
             Arrays.fill(expected, (byte) 0);

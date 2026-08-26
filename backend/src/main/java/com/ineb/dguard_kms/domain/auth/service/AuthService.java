@@ -36,6 +36,7 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        // 계정 존재 여부와 비밀번호 오류를 같은 예외로 처리해 계정 식별 정보 노출을 줄인다.
         var user = userRepository.findByLoginId(request.loginId())
                 .filter(candidate -> candidate.isActive())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
@@ -45,12 +46,14 @@ public class AuthService {
         try {
             matches = passwordService.matches(password, user);
         } finally {
+            // 인증 직후 가변 버퍼를 지워 평문 비밀번호가 메모리에 머무는 시간을 줄인다.
             Arrays.fill(password, '\0');
         }
         if (!matches) {
             throw new BadCredentialsException("Invalid credentials");
         }
 
+        user.recordLogin();
         AdminUserDetails details = new AdminUserDetails(user);
         auditLogService.append(details.getUsername(), "LOGIN", "ADMIN_USER", details.getUsername(), "로그인 성공");
         return new LoginResponse(
@@ -64,6 +67,7 @@ public class AuthService {
 
     @Transactional
     public LoginResponse refresh(AdminUserDetails details) {
+        // 기존 토큰의 만료 시각을 수정하지 않고 새 JWT를 발급하는 sliding session 방식이다.
         auditLogService.append(details.getUsername(), "SESSION_REFRESH", "ADMIN_USER", details.getUsername(), "세션 연장");
         return new LoginResponse(
                 tokenProvider.createToken(details),

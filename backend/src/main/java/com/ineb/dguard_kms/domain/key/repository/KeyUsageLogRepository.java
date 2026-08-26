@@ -7,7 +7,6 @@ import com.ineb.dguard_kms.domain.key.entity.CryptoKey;
 
 public interface KeyUsageLogRepository extends JpaRepository<KeyUsageLog, Long> {
     long countByCryptoKey(CryptoKey cryptoKey);
-    long countByCryptoKeyAndSuccessTrue(CryptoKey cryptoKey);
-    long countByCryptoKeyAndSuccessFalse(CryptoKey cryptoKey);
+    long countByCryptoKeyAndResult(CryptoKey cryptoKey, String result);
     long countByCryptoKeyAndOperation(CryptoKey cryptoKey, String operation);
 }

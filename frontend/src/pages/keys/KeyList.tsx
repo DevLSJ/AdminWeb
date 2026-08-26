@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   AddRounded,
   CheckCircleRounded,
@@ -43,6 +43,7 @@ import { getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
 import type { CryptoKey, DeploymentTargetType, KeyListParams, KeyStatus } from '../../types/api'
 import { isAdminRole } from '../../types/auth'
 import { getStatusLabel } from '../../utils/status'
+import { fetchKeyPage, getApiErrorMessage } from '../../api/kms'
 import KeyRegisterDialog from './KeyRegister'
 
 const defaultParams: KeyListParams = {
@@ -56,7 +57,7 @@ const defaultParams: KeyListParams = {
 }
 
 const algorithmOptions = ['ALL', 'AES', 'HMAC', 'RSA'] as const
-const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'DEPLOY_FAILED', 'DESTROYED'] as const
+const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 
 function KeyList() {
@@ -76,27 +77,30 @@ function KeyList() {
   const [deploymentReason, setDeploymentReason] = useState('')
   const [deploying, setDeploying] = useState(false)
   const [deploymentComplete, setDeploymentComplete] = useState(false)
+  const [pageContent, setPageContent] = useState<CryptoKey[]>([])
+  const [totalElements, setTotalElements] = useState(0)
+  const [listLoading, setListLoading] = useState(false)
+  const [listError, setListError] = useState('')
   const navigate = useNavigate()
 
-  const filteredKeys = useMemo(() => {
-    const keyword = params.keyword.trim().toLowerCase()
-    const result = keys.filter((key) => {
-      const keywordMatched = !keyword || key.keyName.toLowerCase().includes(keyword) || key.keyUid.toLowerCase().includes(keyword)
-      return keywordMatched
-        && (params.algorithm === 'ALL' || key.algorithm === params.algorithm)
-        && (params.status === 'ALL' || key.status === params.status)
-        && (params.purpose === 'ALL' || key.purpose === params.purpose)
-    })
+  const loadPage = useCallback(async () => {
+    setListLoading(true)
+    try {
+      const result = await fetchKeyPage(params)
+      setPageContent(result.content)
+      setTotalElements(result.totalElements)
+      setListError('')
+    } catch (requestError) {
+      setListError(getApiErrorMessage(requestError, '키 목록을 불러오지 못했습니다.'))
+    } finally {
+      setListLoading(false)
+    }
+  }, [params])
 
-    const [field, direction] = params.sort.split(',')
-    return [...result].sort((a, b) => {
-      const left = String(a[field as keyof CryptoKey])
-      const right = String(b[field as keyof CryptoKey])
-      return direction === 'asc' ? left.localeCompare(right) : right.localeCompare(left)
-    })
-  }, [keys, params])
-
-  const pageContent = filteredKeys.slice(params.page * params.size, (params.page + 1) * params.size)
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadPage(), 200)
+    return () => window.clearTimeout(timer)
+  }, [loadPage])
 
   const updateParam = <K extends keyof KeyListParams>(key: K, value: KeyListParams[K]) => {
     setParams((current) => ({ ...current, [key]: value, page: key === 'page' ? Number(value) : 0 }))
@@ -112,6 +116,7 @@ function KeyList() {
     if (!transitionKey || !toStatus || !reason.trim()) return
     try {
       await changeKeyStatus(transitionKey.keyUid, toStatus, reason)
+      await loadPage()
       setMessage(`${transitionKey.keyName}: ${getStatusLabel(transitionKey.status)} → ${getStatusLabel(toStatus)} 상태 전이가 반영되었습니다.`)
       setTransitionKey(null)
     } catch (requestError) {
@@ -133,6 +138,7 @@ function KeyList() {
     setDeploying(true)
     try {
       await distributeKeys(deployKeyUids, target.trim(), deploymentReason.trim())
+      await loadPage()
       setDeploymentComplete(true)
       setMessage(`${deployKeyUids.length}개 키가 배포되어 DISTRIBUTED 상태로 전환되었습니다.`)
     } catch (requestError) {
@@ -151,8 +157,8 @@ function KeyList() {
       />
 
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {loading && <Alert severity="info" sx={{ mb: 2 }}>키 목록을 불러오는 중입니다.</Alert>}
+      {(error || listError) && <Alert severity="error" sx={{ mb: 2 }}>{listError || error}</Alert>}
+      {(loading || listLoading) && <Alert severity="info" sx={{ mb: 2 }}>키 목록을 불러오는 중입니다.</Alert>}
 
       <FilterCard>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 2fr) repeat(4, minmax(130px, 1fr))' }, gap: 1.5 }}>
@@ -176,7 +182,7 @@ function KeyList() {
       </FilterCard>
 
       <Card>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 14 }}>관리 키 {filteredKeys.length.toLocaleString()}개</Typography><FormControl size="small" sx={{ minWidth: 132 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 14 }}>관리 키 {totalElements.toLocaleString()}개</Typography><FormControl size="small" sx={{ minWidth: 132 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
         <TableContainer sx={{ maxHeight: params.size === 20 ? 820 : params.size === 10 ? 620 : 440 }}>
           <Table stickyHeader sx={{ minWidth: 1050 }}>
             <TableHead><TableRow><TableCell>키 이름 / UID</TableCell><TableCell>알고리즘</TableCell><TableCell>용도</TableCell><TableCell>상태</TableCell><TableCell>버전</TableCell><TableCell>만료일</TableCell><TableCell>무결성</TableCell><TableCell align="right">관리</TableCell></TableRow></TableHead>
@@ -196,7 +202,7 @@ function KeyList() {
             </TableBody>
           </Table>
         </TableContainer>
-        <PaginationBar page={params.page} size={params.size} totalElements={filteredKeys.length} onPageChange={(page) => updateParam('page', page)} />
+        <PaginationBar page={params.page} size={params.size} totalElements={totalElements} onPageChange={(page) => updateParam('page', page)} />
       </Card>
 
       <Dialog open={Boolean(transitionKey)} onClose={() => setTransitionKey(null)} fullWidth maxWidth="sm">
@@ -210,7 +216,7 @@ function KeyList() {
         <DialogActions><Button onClick={() => setTransitionKey(null)}>취소</Button><Button variant="contained" disabled={!toStatus || !reason.trim()} onClick={handleTransition}>변경 적용</Button></DialogActions>
       </Dialog>
 
-      <KeyRegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} onCreated={(key) => setMessage(`${key.keyName} 키가 등록되었습니다.`)} />
+      <KeyRegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} onCreated={(key) => { setMessage(`${key.keyName} 키가 등록되었습니다.`); void loadPage() }} />
 
       <Dialog open={deployOpen} onClose={() => !deploying && setDeployOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>키 배포</DialogTitle>

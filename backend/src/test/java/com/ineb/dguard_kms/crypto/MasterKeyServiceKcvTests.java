@@ -3,15 +3,13 @@ package com.ineb.dguard_kms.crypto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.security.SecureRandom;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,14 +27,14 @@ class MasterKeyServiceKcvTests {
 
     @Test
     void rejectsAChangedPassphraseAgainstPersistedKcvAndLogsTheCause(CapturedOutput output) {
-        Map<String, CryptoConfigEntry> persisted = new HashMap<>();
+        AtomicReference<CryptoConfigEntry> persisted = new AtomicReference<>();
         CryptoConfigRepository repository = mock(CryptoConfigRepository.class);
-        when(repository.findById(anyString())).thenAnswer(invocation ->
-                Optional.ofNullable(persisted.get(invocation.getArgument(0, String.class))));
-        when(repository.saveAll(any())).thenAnswer(invocation -> {
-            Iterable<CryptoConfigEntry> entries = invocation.getArgument(0);
-            entries.forEach(entry -> persisted.put(entry.getConfigKey(), entry));
-            return entries;
+        when(repository.findFirstByOrderByIdAsc()).thenAnswer(invocation -> Optional.ofNullable(persisted.get()));
+        when(repository.count()).thenAnswer(invocation -> persisted.get() == null ? 0L : 1L);
+        when(repository.save(any(CryptoConfigEntry.class))).thenAnswer(invocation -> {
+            CryptoConfigEntry entry = invocation.getArgument(0);
+            persisted.set(entry);
+            return entry;
         });
 
         TransactionTemplate transactions = mock(TransactionTemplate.class);

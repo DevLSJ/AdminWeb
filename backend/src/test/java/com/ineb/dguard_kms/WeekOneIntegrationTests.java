@@ -169,7 +169,7 @@ class WeekOneIntegrationTests {
         CryptoUtil.EncryptedPayload first = cryptoUtil.encrypt(plaintext);
         CryptoUtil.EncryptedPayload second = cryptoUtil.encrypt(plaintext);
 
-        assertThat(first.iv()).hasSize(16).isNotEqualTo(second.iv());
+        assertThat(first.iv()).hasSize(12).isNotEqualTo(second.iv());
         assertThat(cryptoUtil.decrypt(first)).isEqualTo(plaintext);
 
         byte[] damaged = first.ciphertext();

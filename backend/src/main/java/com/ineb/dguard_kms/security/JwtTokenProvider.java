@@ -26,6 +26,7 @@ public class JwtTokenProvider {
     public JwtTokenProvider(Environment environment) {
         String configuredSecret = environment.getRequiredProperty("jwt.secret");
         byte[] secret = configuredSecret.getBytes(StandardCharsets.UTF_8);
+        // HS256 서명 키는 최소 256비트 이상이어야 한다.
         if (secret.length < 32) {
             throw new IllegalStateException("JWT secret must contain at least 32 bytes");
         }
@@ -38,6 +39,7 @@ public class JwtTokenProvider {
     public String createToken(AdminUserDetails user) {
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plusMillis(expirationMillis);
+        // exp는 프론트 세션 타이머와 서버의 만료 검증이 공유하는 기준 시각이다.
         return Jwts.builder()
                 .subject(user.getUsername())
                 .claim("uid", user.getUserUid().toString())
@@ -50,6 +52,7 @@ public class JwtTokenProvider {
     }
 
     public Claims parseClaims(String token) throws JwtException {
+        // 서명, 토큰 형식, exp 만료 검증이 모두 성공한 경우에만 Claims를 반환한다.
         return Jwts.parser()
                 .verifyWith(signingKey)
                 .clock(() -> Date.from(clock.instant()))

@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class CryptoUtil {
 
-    public static final int IV_LENGTH_BYTES = 16;
+    public static final int IV_LENGTH_BYTES = 12;
     private static final int GCM_TAG_LENGTH_BITS = 128;
 
     private final MasterKeyService masterKeyService;
@@ -32,6 +32,7 @@ public class CryptoUtil {
             throw new IllegalArgumentException("Plaintext must not be null");
         }
         byte[] iv = new byte[IV_LENGTH_BYTES];
+        // AES-GCM은 같은 키에서 IV 재사용이 위험하므로 매 암호화마다 새 IV를 만든다.
         secureRandom.nextBytes(iv);
         return masterKeyService.withMasterKey(key -> encrypt(plaintext, key, iv));
     }
@@ -143,6 +144,7 @@ public class CryptoUtil {
 
     public record EncryptedPayload(byte[] iv, byte[] ciphertext) {
         public EncryptedPayload {
+            // 배열의 외부 변경으로 암호문이나 IV가 변조되지 않도록 방어적 복사한다.
             iv = Arrays.copyOf(iv, iv.length);
             ciphertext = Arrays.copyOf(ciphertext, ciphertext.length);
         }

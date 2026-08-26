@@ -30,6 +30,7 @@ public class PasswordService {
     }
 
     public PasswordHash hash(char[] password) {
+        // 계정마다 새 Salt를 사용해 같은 비밀번호도 서로 다른 해시가 저장되게 한다.
         byte[] salt = new byte[SALT_LENGTH_BYTES];
         secureRandom.nextBytes(salt);
         byte[] hash = derive(password, salt, defaultIterations, ALGORITHM);
@@ -59,6 +60,7 @@ public class PasswordService {
         byte[] actual = null;
         try {
             actual = derive(candidate, salt, user.getPasswordIterations(), user.getPasswordAlgorithm());
+            // 상수 시간 비교로 해시 비교 과정의 타이밍 정보 노출을 줄인다.
             return MessageDigest.isEqual(expected, actual);
         } finally {
             Arrays.fill(salt, (byte) 0);

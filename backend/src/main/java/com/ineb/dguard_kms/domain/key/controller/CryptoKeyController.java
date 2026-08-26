@@ -13,12 +13,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.ineb.dguard_kms.common.ApiResponse;
+import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyCreateRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyDecryptRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyDecryptResponse;
@@ -34,6 +36,7 @@ import com.ineb.dguard_kms.domain.key.dto.KeyStatusChangeRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyUpdateRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyUsageSummaryResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyVersionResponse;
+import com.ineb.dguard_kms.domain.key.entity.KeyStatus;
 import com.ineb.dguard_kms.domain.key.service.CryptoKeyService;
 
 import jakarta.validation.Valid;
@@ -52,8 +55,19 @@ public class CryptoKeyController {
 
     @GetMapping
     @Operation(summary = "키 목록 조회")
-    public ApiResponse<List<KeyResponse>> findAll() {
-        return ApiResponse.success(keyService.findAll(), "키 목록 조회에 성공했습니다.");
+    public ApiResponse<PageResponse<KeyResponse>> findAll(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String algorithm,
+            @RequestParam(required = false) KeyStatus status,
+            @RequestParam(required = false) String purpose,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort
+    ) {
+        return ApiResponse.success(
+                keyService.findAll(keyword, algorithm, status, purpose, page, size, sort),
+                "키 목록 조회에 성공했습니다."
+        );
     }
 
     @GetMapping("/{keyUid}")

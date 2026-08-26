@@ -8,6 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -51,14 +53,26 @@ class KeyManagementIntegrationTests {
 
     @Test
     void requiredSchemaUsesLoginIdAndPersistentMasterKeySettings() {
-        assertThat(entityManager.getMetamodel().entity(AdminUser.class).getId(String.class).getName())
-                .isEqualTo("loginId");
-        assertThat(configRepository.findById("master.salt")).isPresent();
-        assertThat(configRepository.findById("master.kcv")).isPresent();
-        assertThat(configRepository.findById("master.algorithm").orElseThrow().getConfigValue())
-                .isEqualTo("PBKDF2WithHmacSHA256");
-        assertThat(Integer.parseInt(configRepository.findById("master.iterations").orElseThrow().getConfigValue()))
-                .isGreaterThanOrEqualTo(210_000);
+        assertThat(entityManager.getMetamodel().entity(AdminUser.class).getId(Long.class).getName())
+                .isEqualTo("id");
+        assertThat(configRepository.count()).isEqualTo(1);
+        var config = configRepository.findFirstByOrderByIdAsc().orElseThrow();
+        assertThat(config.getSalt()).isNotBlank();
+        assertThat(config.getKcv()).isNotBlank();
+        assertThat(config.getIterations()).isGreaterThanOrEqualTo(210_000);
+        assertThat(config.getEncryptionVersion()).isEqualTo("v1");
+    }
+
+    @Test
+    void weekOneAndTwoTablesContainEveryRequiredColumn() {
+        assertColumns("crypto_config", "id", "salt", "kcv", "iterations", "enc_ver", "created_at", "updated_at");
+        assertColumns("admin_user", "id", "login_id", "name", "password_hash", "password_salt",
+                "password_algo", "password_iter", "role", "status", "last_login_at", "created_at", "updated_at");
+        assertColumns("crypto_key", "id", "key_uid", "key_name", "algorithm", "key_size", "purpose", "status",
+                "version", "expire_at", "integrity_hash", "created_by", "created_at", "updated_at");
+        assertColumns("key_material", "id", "key_id", "wrapped_key", "iv", "wrap_algo", "created_at");
+        assertColumns("key_status_history", "id", "key_id", "from_status", "to_status", "reason", "changed_by", "changed_at");
+        assertColumns("key_usage_log", "id", "key_id", "operation", "result", "fail_reason", "used_by", "used_at");
     }
 
     @Test
@@ -79,11 +93,33 @@ class KeyManagementIntegrationTests {
         UUID keyUid = UUID.fromString(created.path("data").path("keyUid").asText());
         assertThat(created.path("data").has("wrappedKey")).isFalse();
 
+        JsonNode filtered = sendJson(
+                client,
+                "GET",
+                "/api/keys?keyword=" + keyUid + "&algorithm=AES&status=CREATED&purpose=ENCRYPT&page=0&size=5",
+                token,
+                "",
+                200
+        );
+        assertThat(filtered.path("data").path("totalElements").asLong()).isEqualTo(1);
+        assertThat(filtered.path("data").path("content").get(0).path("keyUid").asText())
+                .isEqualTo(keyUid.toString());
+
         var key = keyRepository.findByKeyUid(keyUid).orElseThrow();
         KeyMaterial v1 = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();
         assertThat(Base64.getDecoder().decode(key.getIntegrityHash())).hasSize(32);
         assertThat(created.path("data").path("integrityValid").asBoolean()).isTrue();
-        assertBase64Material(v1);
+        assertBinaryMaterial(v1);
+
+        JsonNode forbidden = sendJson(client, "PATCH", "/api/keys/" + keyUid + "/status", token, """
+                {"toStatus":"DESTROYED","reason":"금지 전이 검증"}
+                """, 409);
+        assertThat(forbidden.path("errorCode").asText()).isEqualTo("INVALID_KEY_STATUS_TRANSITION");
+
+        JsonNode inactiveUse = sendJson(client, "POST", "/api/keys/" + keyUid + "/test/encrypt", token, """
+                {"plaintext":"CREATED 상태 차단"}
+                """, 400);
+        assertThat(inactiveUse.path("errorCode").asText()).isEqualTo("KEY_NOT_ACTIVE");
 
         sendJson(client, "PATCH", "/api/keys/" + keyUid + "/status", token, """
                 {"toStatus":"ACTIVE","reason":"통합 테스트 활성화"}
@@ -105,7 +141,7 @@ class KeyManagementIntegrationTests {
         String ciphertext = encrypted.path("data").path("ciphertext").asText();
         String iv = encrypted.path("data").path("iv").asText();
         assertThat(Base64.getDecoder().decode(ciphertext)).hasSizeGreaterThan(16);
-        assertThat(Base64.getDecoder().decode(iv)).hasSize(16);
+        assertThat(Base64.getDecoder().decode(iv)).hasSize(12);
 
         JsonNode decrypted = sendJson(client, "POST", "/api/keys/" + keyUid + "/test/decrypt", token, """
                 {"ciphertext":"%s","iv":"%s"}
@@ -113,26 +149,25 @@ class KeyManagementIntegrationTests {
         assertThat(decrypted.path("data").path("plaintext").asText()).isEqualTo("Hello DGuard");
 
         JsonNode usage = sendJson(client, "GET", "/api/keys/" + keyUid + "/usage", token, "", 200);
-        assertThat(usage.path("data").path("total").asLong()).isEqualTo(2);
+        assertThat(usage.path("data").path("total").asLong()).isEqualTo(3);
         assertThat(usage.path("data").path("success").asLong()).isEqualTo(2);
-        assertThat(usage.path("data").path("encrypt").asLong()).isEqualTo(1);
+        assertThat(usage.path("data").path("failure").asLong()).isEqualTo(1);
+        assertThat(usage.path("data").path("encrypt").asLong()).isEqualTo(2);
         assertThat(usage.path("data").path("decrypt").asLong()).isEqualTo(1);
 
+        byte[] wrappedBeforeRotation = v1.getWrappedKey();
         JsonNode rotated = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 200);
         assertThat(rotated.path("data").path("previousVersion").asInt()).isEqualTo(1);
         assertThat(rotated.path("data").path("newVersion").asInt()).isEqualTo(2);
 
         JsonNode versions = sendJson(client, "GET", "/api/keys/" + keyUid + "/versions", token, "", 200);
-        assertThat(versions.path("data").size()).isEqualTo(2);
+        assertThat(versions.path("data").size()).isEqualTo(1);
         assertThat(versions.path("data").get(0).path("version").asInt()).isEqualTo(2);
-        assertThat(versions.path("data").get(1).path("decryptOnly").asBoolean()).isTrue();
 
         key = keyRepository.findByKeyUid(keyUid).orElseThrow();
-        KeyMaterial savedV1 = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();
         KeyMaterial v2 = materialRepository.findByCryptoKeyAndKeyVersion(key, 2).orElseThrow();
-        assertThat(savedV1.getMaterialStatus()).isEqualTo(KeyMaterial.RETIRED);
-        assertThat(v2.getWrappedKey()).isNotEqualTo(savedV1.getWrappedKey());
-        assertBase64Material(v2);
+        assertThat(v2.getWrappedKey()).isNotEqualTo(wrappedBeforeRotation);
+        assertBinaryMaterial(v2);
 
         JsonNode distributed = sendJson(client, "POST", "/api/keys/" + keyUid + "/distribute", token, """
                 {"target":"integration-agent","reason":"통합 테스트 배포"}
@@ -150,8 +185,8 @@ class KeyManagementIntegrationTests {
         key = keyRepository.findByKeyUid(keyUid).orElseThrow();
         key.updateIntegrityHash(Base64.getEncoder().encodeToString(new byte[32]));
         keyRepository.saveAndFlush(key);
-        JsonNode tampered = sendJson(client, "GET", "/api/keys/" + keyUid, token, "", 200);
-        assertThat(tampered.path("data").path("integrityValid").asBoolean()).isFalse();
+        JsonNode tampered = sendJson(client, "GET", "/api/keys/" + keyUid, token, "", 409);
+        assertThat(tampered.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
         JsonNode blocked = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 409);
         assertThat(blocked.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
     }
@@ -169,10 +204,22 @@ class KeyManagementIntegrationTests {
         assertThat(response.statusCode()).isEqualTo(403);
     }
 
-    private void assertBase64Material(KeyMaterial material) {
-        assertThat(Base64.getDecoder().decode(material.getWrappingIv())).hasSize(16);
-        assertThat(Base64.getDecoder().decode(material.getWrappedKey())).hasSize(48);
-        assertThat(material.getWrappedKey()).doesNotContain("=").doesNotContain("AES");
+    private void assertBinaryMaterial(KeyMaterial material) {
+        assertThat(material.getWrappingIv()).hasSize(12);
+        assertThat(material.getWrappedKey()).hasSize(48);
+        assertThat(new String(material.getWrappedKey(), StandardCharsets.UTF_8)).doesNotContain("AES");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertColumns(String tableName, String... requiredColumns) {
+        List<String> columns = entityManager.createNativeQuery("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = :tableName
+                """, String.class)
+                .setParameter("tableName", tableName)
+                .getResultList();
+        assertThat(Set.copyOf(columns)).contains(requiredColumns);
     }
 
     private String login(HttpClient client, String loginId, String password) throws Exception {

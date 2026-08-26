@@ -9,16 +9,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(
-        name = "key_material",
-        uniqueConstraints = @UniqueConstraint(name = "uk_key_material_version", columnNames = { "crypto_key_id", "key_version" })
-)
+@Table(name = "key_material")
 public class KeyMaterial {
 
     public static final String ACTIVE = "ACTIVE";
@@ -29,20 +25,20 @@ public class KeyMaterial {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "crypto_key_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "key_id", nullable = false, unique = true)
     private CryptoKey cryptoKey;
 
     @Column(name = "key_version", nullable = false)
     private int keyVersion;
 
-    @Column(name = "wrapped_key", nullable = false, length = 4096)
-    private String wrappedKey;
+    @Column(name = "wrapped_key", nullable = false, columnDefinition = "bytea")
+    private byte[] wrappedKey;
 
-    @Column(name = "wrapping_iv", nullable = false, length = 128)
-    private String wrappingIv;
+    @Column(name = "iv", nullable = false, columnDefinition = "bytea")
+    private byte[] wrappingIv;
 
-    @Column(name = "wrapping_algorithm", nullable = false, length = 50)
+    @Column(name = "wrap_algo", nullable = false, length = 32)
     private String wrappingAlgorithm;
 
     @Column(name = "material_status", nullable = false, length = 30)
@@ -63,11 +59,11 @@ public class KeyMaterial {
     protected KeyMaterial() {
     }
 
-    public KeyMaterial(CryptoKey cryptoKey, int keyVersion, String wrappedKey, String wrappingIv, String createdBy) {
+    public KeyMaterial(CryptoKey cryptoKey, int keyVersion, byte[] wrappedKey, byte[] wrappingIv, String createdBy) {
         this.cryptoKey = cryptoKey;
         this.keyVersion = keyVersion;
-        this.wrappedKey = wrappedKey;
-        this.wrappingIv = wrappingIv;
+        this.wrappedKey = wrappedKey.clone();
+        this.wrappingIv = wrappingIv.clone();
         this.wrappingAlgorithm = "AES-256-GCM";
         this.materialStatus = ACTIVE;
         this.createdBy = createdBy;
@@ -88,11 +84,22 @@ public class KeyMaterial {
         this.distributedAt = Instant.now();
     }
 
+    public void replace(int keyVersion, byte[] wrappedKey, byte[] wrappingIv, String createdBy) {
+        this.keyVersion = keyVersion;
+        this.wrappedKey = wrappedKey.clone();
+        this.wrappingIv = wrappingIv.clone();
+        this.materialStatus = ACTIVE;
+        this.createdBy = createdBy;
+        this.createdAt = Instant.now();
+        this.retiredAt = null;
+        this.distributedAt = null;
+    }
+
     public Long getId() { return id; }
     public CryptoKey getCryptoKey() { return cryptoKey; }
     public int getKeyVersion() { return keyVersion; }
-    public String getWrappedKey() { return wrappedKey; }
-    public String getWrappingIv() { return wrappingIv; }
+    public byte[] getWrappedKey() { return wrappedKey.clone(); }
+    public byte[] getWrappingIv() { return wrappingIv.clone(); }
     public String getWrappingAlgorithm() { return wrappingAlgorithm; }
     public String getMaterialStatus() { return materialStatus; }
     public Instant getCreatedAt() { return createdAt; }
