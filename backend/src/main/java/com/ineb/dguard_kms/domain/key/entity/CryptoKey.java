@@ -3,6 +3,7 @@ package com.ineb.dguard_kms.domain.key.entity;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -82,13 +83,17 @@ public class CryptoKey {
         this.version = 1;
         this.expireAt = toInstant(expireAt);
         this.createdBy = createdBy;
-        this.createdAt = Instant.now();
+        // PostgreSQL TIMESTAMPTZ stores microsecond precision.  The integrity
+        // signature includes this value, so sign the exact precision that will
+        // be persisted rather than an Instant with nanoseconds that PostgreSQL
+        // truncates on write.
+        this.createdAt = databaseTimestampNow();
         this.updatedAt = this.createdAt;
     }
 
     @PrePersist
     void onCreate() {
-        Instant now = Instant.now();
+        Instant now = databaseTimestampNow();
         if (keyUid == null) keyUid = UUID.randomUUID();
         if (createdAt == null) createdAt = now;
         updatedAt = now;
@@ -143,5 +148,9 @@ public class CryptoKey {
 
     private static Instant toInstant(LocalDate value) {
         return value == null ? null : value.atStartOfDay().toInstant(ZoneOffset.UTC);
+    }
+
+    private static Instant databaseTimestampNow() {
+        return Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 }

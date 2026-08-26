@@ -124,6 +124,7 @@ class KeyManagementIntegrationTests {
 
         var key = keyRepository.findByKeyUid(keyUid).orElseThrow();
         KeyMaterial v1 = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();
+        assertThat(key.getCreatedAt().getNano() % 1_000).isZero();
         assertThat(Base64.getDecoder().decode(key.getIntegrityHash())).hasSize(32);
         assertThat(created.path("data").path("integrityValid").asBoolean()).isTrue();
         assertBinaryMaterial(v1);
