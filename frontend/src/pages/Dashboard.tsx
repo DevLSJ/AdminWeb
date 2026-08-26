@@ -449,7 +449,13 @@ function Dashboard() {
   }, [])
 
   return (
-    <Box>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: 'calc(100vh - 128px)',
+        flexDirection: 'column',
+      }}
+    >
       <Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2 }}>
         <Box>
           <Typography variant="h5">대시보드</Typography>
@@ -468,7 +474,12 @@ function Dashboard() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)', xl: user?.role === 'CLIENT' ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)' },
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, minmax(0, 1fr))',
+            lg: 'repeat(3, minmax(0, 1fr))',
+            xl: user?.role === 'CLIENT' ? 'repeat(4, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))',
+          },
           gap: 2,
           mt: 3,
         }}
@@ -481,12 +492,12 @@ function Dashboard() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2fr) minmax(300px, 0.85fr)' },
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2.1fr) minmax(320px, 0.9fr)' },
           gap: 2,
           mt: 2,
         }}
       >
-        <Card className="dashboard-card chart-card">
+        <Card className="dashboard-card chart-card" sx={{ minWidth: 0 }}>
           <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
               <Box>
@@ -504,7 +515,7 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="dashboard-card">
+        <Card className="dashboard-card" sx={{ minWidth: 0 }}>
           <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
             <Typography variant="h6">키 상태</Typography>
             <Typography sx={{ mt: 0.4, color: 'text.secondary', fontSize: 14 }}>
@@ -600,7 +611,7 @@ function Dashboard() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', xl: 'minmax(300px, 0.85fr) minmax(0, 1.65fr)' },
+          gridTemplateColumns: { xs: '1fr', xl: 'minmax(340px, 0.9fr) minmax(0, 1.7fr)' },
           gap: 2,
           mt: 2,
         }}

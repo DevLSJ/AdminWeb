@@ -228,7 +228,19 @@ function MainLayout() {
         <Drawer variant="permanent" open sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: drawerWidth, overflowX: 'hidden', transition: (theme) => theme.transitions.create('width'), borderRight: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' } }}>{renderDrawer()}</Drawer>
       </Box>
 
-      <Box component="main" sx={{ width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', pt: '72px', transition: (theme) => theme.transitions.create('width') }}><Box sx={{ width: '100%', maxWidth: 1500, mx: 'auto', p: { xs: 2, sm: 3, lg: 3.5 } }}><Outlet /></Box></Box>
+      <Box component="main" sx={{ width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', pt: '72px', transition: (theme) => theme.transitions.create('width') }}>
+        <Box
+          sx={{
+            width: '100%',
+            maxWidth: location.pathname === '/' ? 'none' : 1500,
+            minHeight: 'calc(100vh - 72px)',
+            mx: 'auto',
+            p: { xs: 2, sm: 3, lg: 3.5, xl: 4 },
+          }}
+        >
+          <Outlet />
+        </Box>
+      </Box>
       <Snackbar open={Boolean(feedback)} autoHideDuration={3500} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert severity={feedback?.severity ?? 'success'} variant="filled" onClose={() => setFeedback(null)}>{feedback?.message}</Alert>
       </Snackbar>
