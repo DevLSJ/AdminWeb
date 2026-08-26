@@ -179,6 +179,31 @@ public class CryptoKeyService {
     }
 
     @Transactional
+    public int rewrapLegacyKeyMaterials() {
+        List<KeyMaterial> legacyMaterials = materialRepository.findAllWithLegacyWrappingIv();
+        for (KeyMaterial material : legacyMaterials) {
+            byte[] rawKey = null;
+            byte[] wrappedBytes = null;
+            byte[] ivBytes = null;
+            try {
+                rawKey = cryptoUtil.unwrapKey(new CryptoUtil.Base64Payload(
+                        cryptoUtil.encodeBase64(material.getWrappedKey()),
+                        cryptoUtil.encodeBase64(material.getWrappingIv())
+                ));
+                CryptoUtil.Base64Payload rewrapped = cryptoUtil.wrapKey(rawKey);
+                wrappedBytes = cryptoUtil.decodeBase64(rewrapped.ciphertext());
+                ivBytes = cryptoUtil.decodeBase64(rewrapped.iv());
+                material.rewrap(wrappedBytes, ivBytes);
+            } finally {
+                if (rawKey != null) Arrays.fill(rawKey, (byte) 0);
+                if (wrappedBytes != null) Arrays.fill(wrappedBytes, (byte) 0);
+                if (ivBytes != null) Arrays.fill(ivBytes, (byte) 0);
+            }
+        }
+        return legacyMaterials.size();
+    }
+
+    @Transactional
     public KeyResponse update(UUID keyUid, KeyUpdateRequest request, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
         KeyMaterial material = verifiedCurrentMaterial(key);

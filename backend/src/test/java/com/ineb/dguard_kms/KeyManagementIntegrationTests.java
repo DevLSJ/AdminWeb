@@ -7,11 +7,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.Base64;
 import java.util.UUID;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +25,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
+import com.ineb.dguard_kms.crypto.CryptoUtil;
+import com.ineb.dguard_kms.crypto.MasterKeyService;
 import com.ineb.dguard_kms.domain.config.repository.CryptoConfigRepository;
 import com.ineb.dguard_kms.domain.key.entity.KeyMaterial;
 import com.ineb.dguard_kms.domain.key.repository.CryptoKeyRepository;
@@ -54,6 +61,12 @@ class KeyManagementIntegrationTests {
 
     @Autowired
     private CryptoKeyService keyService;
+
+    @Autowired
+    private CryptoUtil cryptoUtil;
+
+    @Autowired
+    private MasterKeyService masterKeyService;
 
     @Test
     void requiredSchemaUsesLoginIdAndPersistentMasterKeySettings() {
@@ -226,6 +239,47 @@ class KeyManagementIntegrationTests {
         assertThat(sendJson(client, "GET", "/api/keys/" + keyUid, token, "", 200)
                 .path("data").path("integrityValid").asBoolean()).isTrue();
         assertThat(keyService.resignSchemaMigratedKeys()).isZero();
+    }
+
+    @Test
+    void legacySixteenByteWrappingIvIsRewrappedToTwelveBytes() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        String token = login(client, "admin", "admin");
+        JsonNode created = sendJson(client, "POST", "/api/keys", token, """
+                {"keyName":"LEGACY-IV-%s","algorithm":"AES","keySize":256,"purpose":"ENCRYPT"}
+                """.formatted(UUID.randomUUID()), 200);
+        UUID keyUid = UUID.fromString(created.path("data").path("keyUid").asText());
+        var key = keyRepository.findByKeyUid(keyUid).orElseThrow();
+        KeyMaterial material = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();
+
+        byte[] rawKey = cryptoUtil.unwrapKey(new CryptoUtil.Base64Payload(
+                cryptoUtil.encodeBase64(material.getWrappedKey()),
+                cryptoUtil.encodeBase64(material.getWrappingIv())
+        ));
+        byte[] legacyIv = new byte[CryptoUtil.LEGACY_IV_LENGTH_BYTES];
+        new SecureRandom().nextBytes(legacyIv);
+        byte[] legacyWrapped = null;
+        try {
+            legacyWrapped = masterKeyService.withMasterKey(masterKey -> {
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(Cipher.ENCRYPT_MODE, masterKey, new GCMParameterSpec(128, legacyIv));
+                return cipher.doFinal(rawKey);
+            });
+            material.rewrap(legacyWrapped, legacyIv);
+            materialRepository.saveAndFlush(material);
+
+            assertThat(keyService.rewrapLegacyKeyMaterials()).isEqualTo(1);
+            entityManager.clear();
+            KeyMaterial migrated = materialRepository.findByCryptoKeyAndKeyVersion(
+                    keyRepository.findByKeyUid(keyUid).orElseThrow(), 1
+            ).orElseThrow();
+            assertThat(migrated.getWrappingIv()).hasSize(CryptoUtil.IV_LENGTH_BYTES);
+            assertThat(keyService.rewrapLegacyKeyMaterials()).isZero();
+        } finally {
+            Arrays.fill(rawKey, (byte) 0);
+            Arrays.fill(legacyIv, (byte) 0);
+            if (legacyWrapped != null) Arrays.fill(legacyWrapped, (byte) 0);
+        }
     }
 
     private void assertBinaryMaterial(KeyMaterial material) {

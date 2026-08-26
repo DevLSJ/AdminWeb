@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 public class CryptoUtil {
 
     public static final int IV_LENGTH_BYTES = 12;
+    public static final int LEGACY_IV_LENGTH_BYTES = 16;
     private static final int GCM_TAG_LENGTH_BITS = 128;
 
     private final MasterKeyService masterKeyService;
@@ -112,8 +113,9 @@ public class CryptoUtil {
     }
 
     private void validatePayload(EncryptedPayload payload) {
-        if (payload == null || payload.iv().length != IV_LENGTH_BYTES) {
-            throw new IllegalArgumentException("A " + IV_LENGTH_BYTES + "-byte IV is required");
+        if (payload == null || (payload.iv().length != IV_LENGTH_BYTES
+                && payload.iv().length != LEGACY_IV_LENGTH_BYTES)) {
+            throw new IllegalArgumentException("A 12-byte IV is required (legacy 16-byte IV is accepted for migration)");
         }
         if (payload.ciphertext().length < 16) {
             throw new IllegalArgumentException("Ciphertext must include a GCM authentication tag");

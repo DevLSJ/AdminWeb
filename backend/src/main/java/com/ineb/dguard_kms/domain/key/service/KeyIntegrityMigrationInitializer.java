@@ -19,6 +19,10 @@ public class KeyIntegrityMigrationInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        int rewrapped = keyService.rewrapLegacyKeyMaterials();
+        if (rewrapped > 0) {
+            log.info("Re-wrapped {} legacy key materials with 12-byte GCM IVs", rewrapped);
+        }
         int resigned = keyService.resignSchemaMigratedKeys();
         if (resigned > 0) {
             log.info("Re-signed {} legacy key integrity hashes after the week-two schema migration", resigned);

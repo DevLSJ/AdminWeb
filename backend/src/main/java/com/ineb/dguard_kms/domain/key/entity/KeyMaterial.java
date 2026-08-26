@@ -95,6 +95,12 @@ public class KeyMaterial {
         this.distributedAt = null;
     }
 
+    public void rewrap(byte[] wrappedKey, byte[] wrappingIv) {
+        this.wrappedKey = wrappedKey.clone();
+        this.wrappingIv = wrappingIv.clone();
+        this.wrappingAlgorithm = "AES-256-GCM";
+    }
+
     public Long getId() { return id; }
     public CryptoKey getCryptoKey() { return cryptoKey; }
     public int getKeyVersion() { return keyVersion; }
