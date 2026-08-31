@@ -89,8 +89,13 @@ jobs:
 
     steps:
       - name: Checkout
-        # 서버의 self-hosted runner와 호환되는 Node 런타임 사용
-        uses: actions/checkout@v4
+        # 기본 작업공간의 오래된 권한/소유권 문제와 격리된 경로를 사용한다.
+        uses: actions/checkout@v5
+        with:
+          path: _deploy/source
+          sparse-checkout: docker-compose.yml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -104,7 +109,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          install -m 600 docker-compose.yml /home/dguard/app/docker-compose.yml
+          install -m 600 "$GITHUB_WORKSPACE/_deploy/source/docker-compose.yml" /home/dguard/app/docker-compose.yml
           cd /home/dguard/app
 
           if [ ! -f .env ]; then
