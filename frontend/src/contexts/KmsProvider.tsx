@@ -119,9 +119,13 @@ export function KmsProvider({ children }: { children: ReactNode }) {
       )
     }
     setKeys((current) => replaceKey(current, created))
+    await Promise.all([
+      loadKeyVersions(created.keyUid).catch(() => undefined),
+      loadKeyHistory(created.keyUid).catch(() => undefined),
+    ])
     await refreshAuditAfterMutation()
     return created
-  }, [refreshAuditAfterMutation, run])
+  }, [loadKeyHistory, loadKeyVersions, refreshAuditAfterMutation, run])
 
   const deleteKey = useCallback(async (keyUid: string) => {
     await run(() => deleteKeyRequest(keyUid), '키를 삭제하지 못했습니다.')
@@ -176,7 +180,7 @@ export function KmsProvider({ children }: { children: ReactNode }) {
     return result
   }, [loadKeyUsage, refreshAuditAfterMutation, run])
 
-  const decrypt = useCallback(async (keyUid: string, ciphertext: string, iv: string, version?: number) => {
+  const decrypt = useCallback(async (keyUid: string, ciphertext: string, iv: string | null, version?: number) => {
     const result = await run(() => decryptWithKey(keyUid, ciphertext, iv, version), '복호화에 실패했습니다.')
     await Promise.all([loadKeyUsage(keyUid).catch(() => undefined), refreshAuditAfterMutation()])
     return result.plaintext

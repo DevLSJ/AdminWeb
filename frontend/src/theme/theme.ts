@@ -90,8 +90,8 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
         root: {
           fontSize: '0.875rem',
           lineHeight: 1.55,
-          paddingTop: 14,
-          paddingBottom: 14,
+          paddingTop: 9,
+          paddingBottom: 9,
         },
         head: {
           fontSize: '0.875rem',
@@ -122,6 +122,32 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
     MuiDialogTitle: {
       styleOverrides: {
         root: { fontSize: '1.15rem', fontWeight: 750 },
+      },
+    },
+    MuiDialog: {
+      defaultProps: {
+        slotProps: {
+          backdrop: {
+            sx: {
+              backgroundColor: 'rgba(15, 18, 28, 0.5)',
+              backdropFilter: 'blur(9px)',
+            },
+          },
+        },
+      },
+    },
+    MuiTabs: {
+      styleOverrides: {
+        root: {
+          minHeight: 42,
+          backgroundColor: mode === 'light' ? 'rgba(255,255,255,0.86)' : 'rgba(27,30,40,0.86)',
+          backdropFilter: 'blur(12px)',
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: { minHeight: 42, paddingTop: 8, paddingBottom: 8 },
       },
     },
     MuiTextField: {

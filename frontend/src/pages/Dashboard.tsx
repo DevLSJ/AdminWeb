@@ -42,6 +42,8 @@ import { useNavigate } from 'react-router-dom'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../types/auth'
+import { fetchDashboardSummary } from '../api/kms'
+import type { DashboardSummary } from '../types/api'
 
 const dashboardMockData = {
   summary: [
@@ -51,6 +53,7 @@ const dashboardMockData = {
       note: '지난달 대비 8개 증가',
       color: '#d92f81',
       icon: <VpnKeyRounded />,
+      href: '/keys',
     },
     {
       label: '활성 키',
@@ -58,6 +61,7 @@ const dashboardMockData = {
       note: '전체 키의 78%',
       color: '#7652b8',
       icon: <CheckCircleRounded />,
+      href: '/keys',
     },
     {
       label: '등록 사용자',
@@ -65,6 +69,7 @@ const dashboardMockData = {
       note: '이번 달 42명 증가',
       color: '#32b7d8',
       icon: <PeopleAltRounded />,
+      href: '/users',
     },
     {
       label: '만료 임박 키',
@@ -72,6 +77,7 @@ const dashboardMockData = {
       note: '30일 이내 ACTIVE 키',
       color: '#ef7c45',
       icon: <AccessTimeRounded />,
+      href: '/keys',
     },
     {
       label: '무결성 위반',
@@ -79,6 +85,7 @@ const dashboardMockData = {
       note: '모든 데이터 정상',
       color: '#f5a623',
       icon: <SecurityRounded />,
+      href: '/keys',
     },
   ],
   operationCards: [
@@ -117,11 +124,13 @@ interface SummaryCardProps {
   note: string
   color: string
   icon: ReactNode
+  href: string
 }
 
-function SummaryCard({ label, value, note, color, icon }: SummaryCardProps) {
+function SummaryCard({ label, value, note, color, icon, href }: SummaryCardProps) {
+  const navigate = useNavigate()
   return (
-    <Card className="dashboard-card" sx={{ height: '100%' }}>
+    <Card className="dashboard-card dashboard-nav-card" role="link" tabIndex={0} onClick={() => navigate(href)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(href) }} sx={{ height: '100%', cursor: 'pointer', '&:focus-visible': { outline: '3px solid', outlineColor: 'secondary.main', outlineOffset: 2 } }}>
       <CardContent sx={{ p: '20px !important' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Box>
@@ -397,7 +406,7 @@ function UsageChart({ granularity }: { granularity: UsageGranularity }) {
             </g>
 
             <line x1={linePoints[safeActiveIndex].x} x2={linePoints[safeActiveIndex].x} y1={PLOT_TOP} y2={PLOT_BOTTOM} stroke="#7652b8" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.65" pointerEvents="none" />
-            {chartData.map((point, index) => <g key={`${point.date}-axis`}><text x={CHART_LEFT + index * unitWidth + unitWidth / 2} y="246" fill={index === safeActiveIndex ? '#7652b8' : '#9299a8'} fontSize={granularity === 'monthly' || index === safeActiveIndex ? 11 : 10} fontWeight={index === safeActiveIndex ? 800 : 500} textAnchor="middle">{point.axisLabel}</text><rect x={CHART_LEFT + index * unitWidth} y={PLOT_TOP} width={unitWidth} height={PLOT_BOTTOM - PLOT_TOP + 28} fill="transparent" onPointerEnter={() => !dragging && setActiveIndex(index)} /></g>)}
+            {chartData.map((point, index) => <g key={`${point.date}-axis`}><text x={CHART_LEFT + index * unitWidth + unitWidth / 2} y="246" fill={index === safeActiveIndex ? '#7652b8' : '#9299a8'} fontSize={granularity === 'monthly' || index === safeActiveIndex ? 11 : 10} fontWeight={index === safeActiveIndex ? 800 : 500} textAnchor="middle">{point.axisLabel}</text><rect role="button" aria-label={`${point.detailLabel} 상세 수치 선택`} tabIndex={0} x={CHART_LEFT + index * unitWidth} y={PLOT_TOP} width={unitWidth} height={PLOT_BOTTOM - PLOT_TOP + 28} fill="transparent" cursor="pointer" onPointerEnter={() => !dragging && setActiveIndex(index)} onClick={() => focusDate(index)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') focusDate(index) }} /></g>)}
           </Box>
         </Box>
 
@@ -413,6 +422,7 @@ function Dashboard() {
   const [expiryDays, setExpiryDays] = useState(30)
   const [granularity, setGranularity] = useState<UsageGranularity>('daily')
   const [serverNow, setServerNow] = useState(() => new Date())
+  const [liveSummary, setLiveSummary] = useState<DashboardSummary | null>(null)
   const expiringKeys = dashboardMockData.expiringKeys.filter((key) => key.days <= expiryDays)
   const standardDateSnapshot = useMemo(() => resolveStandardDateSnapshot(serverNow), [serverNow])
   const standardDateTotal = getStatusTotal(standardDateSnapshot)
@@ -430,10 +440,17 @@ function Dashboard() {
   const clientSummary = [
     dashboardMockData.summary[0],
     dashboardMockData.summary[1],
-    { label: '내 테스트 호출', value: '148', note: '이번 달 성공 147건', color: '#32b7d8', icon: <ScienceRounded /> },
-    { label: '내가 작성한 글', value: '3', note: '현재 노출 2건', color: '#4c8eda', icon: <DescriptionRounded /> },
+    { label: '내 테스트 호출', value: '148', note: '이번 달 성공 147건', color: '#32b7d8', icon: <ScienceRounded />, href: '/keys/test' },
+    { label: '내가 작성한 글', value: '3', note: '현재 노출 2건', color: '#4c8eda', icon: <DescriptionRounded />, href: '/notices' },
   ]
-  const summaryItems = user?.role === 'CLIENT' ? clientSummary : dashboardMockData.summary
+  const adminSummary = liveSummary ? [
+    { ...dashboardMockData.summary[0], value: liveSummary.totalKeys.toLocaleString(), note: 'DB에 저장된 전체 관리 키' },
+    { ...dashboardMockData.summary[1], value: liveSummary.encryptCapableKeys.toLocaleString(), note: `복호화 가능 ${liveSummary.decryptCapableKeys.toLocaleString()}개` },
+    { ...dashboardMockData.summary[2], label: '전체 암호 작업', value: liveSummary.totalOperations.toLocaleString(), note: `성공 ${liveSummary.successfulOperations.toLocaleString()} · 실패 ${liveSummary.failedOperations.toLocaleString()}`, href: '/keys/test', icon: <ScienceRounded /> },
+    { ...dashboardMockData.summary[3], label: '폐기 키', value: liveSummary.destroyedKeys.toLocaleString(), note: '키 값 NULL 처리 완료', href: '/keys' },
+    { ...dashboardMockData.summary[4], value: liveSummary.integrityViolations.toLocaleString(), note: liveSummary.integrityViolations ? '즉시 확인이 필요합니다' : '모든 키 무결성 정상' },
+  ] : dashboardMockData.summary
+  const summaryItems = user?.role === 'CLIENT' ? clientSummary : adminSummary
   const operationItems = dashboardMockData.operationCards
   const activityItems = user?.role === 'CLIENT'
     ? [
@@ -446,6 +463,10 @@ function Dashboard() {
   useEffect(() => {
     const timer = window.setInterval(() => setServerNow(new Date()), 60_000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    void fetchDashboardSummary().then(setLiveSummary).catch(() => undefined)
   }, [])
 
   return (

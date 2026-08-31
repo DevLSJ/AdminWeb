@@ -1,15 +1,4 @@
-import type {
-  AppUser,
-  Notice,
-} from '../types/api'
-
-export const mockUsers: AppUser[] = [
-  { userUid: 'usr-auth-admin', loginId: 'admin', name: '최고 관리자', phoneMasked: '010-****-5678', phonePlain: '010-1234-5678', emailMasked: 'ad***@example.com', emailPlain: 'admin@example.com', status: 'ACTIVE', integrityValid: true, encVer: 1, createdAt: '2026-04-11 09:11:02', updatedAt: '2026-08-10 12:41:00' },
-  { userUid: 'usr-auth-manager', loginId: 'manager', name: '일반 관리자', phoneMasked: '010-****-1024', phonePlain: '010-7391-1024', emailMasked: 'ma***@example.com', emailPlain: 'manager@example.com', status: 'ACTIVE', integrityValid: true, encVer: 1, createdAt: '2026-05-01 13:45:22', updatedAt: '2026-07-22 09:14:11' },
-  { userUid: 'usr-auth-client', loginId: 'client', name: '클라이언트 사용자', phoneMasked: '010-****-8841', phonePlain: '010-2204-8841', emailMasked: 'cl***@example.com', emailPlain: 'client@example.com', status: 'INACTIVE', integrityValid: true, encVer: 1, createdAt: '2026-01-20 16:31:02', updatedAt: '2026-08-02 11:24:51' },
-  { userUid: 'usr-auth-auditor', loginId: 'auditor', name: '감사 관리자', phoneMasked: '010-****-9920', phonePlain: '010-5518-9920', emailMasked: 'au***@example.com', emailPlain: 'auditor@example.com', status: 'ACTIVE', integrityValid: false, encVer: 1, createdAt: '2026-03-08 08:18:14', updatedAt: '2026-08-18 10:05:22' },
-  { userUid: 'usr-auth-operator', loginId: 'operator', name: '운영 클라이언트', phoneMasked: '010-****-7732', phonePlain: '010-9811-7732', emailMasked: 'op***@example.com', emailPlain: 'operator@example.com', status: 'ACTIVE', integrityValid: true, encVer: 1, createdAt: '2026-06-17 12:51:09', updatedAt: '2026-06-17 12:51:09' },
-]
+import type { Notice } from '../types/api'
 
 
 export const mockNotices: Notice[] = [

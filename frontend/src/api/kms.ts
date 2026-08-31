@@ -1,7 +1,13 @@
 import axios from 'axios'
 import type {
   ApiResponse,
+  AppUser,
+  AppUserPlain,
   AuditLog,
+  AuditListParams,
+  AuditVerification,
+  DashboardSummary,
+  DashboardTrend,
   CryptoKey,
   KeyDistributionResult,
   KeyEncryptResult,
@@ -11,6 +17,8 @@ import type {
   KeyVersion,
   KeyListParams,
   PageResponse,
+  UserListParams,
+  UserStatus,
 } from '../types/api'
 import { apiClient } from './client'
 import { apiEndpoints } from './endpoints'
@@ -19,8 +27,10 @@ export interface CreateKeyRequest {
   keyName: string
   algorithm: CryptoKey['algorithm']
   keySize: number
+  mode: CryptoKey['mode']
   purpose: CryptoKey['purpose']
   expireAt: string
+  autoRotationDays: number | null
 }
 
 export interface UpdateKeyRequest {
@@ -36,14 +46,17 @@ export interface RotationResult {
   key: CryptoKey
 }
 
-type ListPayload<T> = T[] | PageResponse<T>
+export interface CreateUserRequest {
+  name: string
+  phone: string
+  email: string
+  password: string
+}
+
+export type UpdateUserRequest = Omit<CreateUserRequest, 'password'>
 
 function unwrap<T>(response: { data: ApiResponse<T> }) {
   return response.data.data
-}
-
-function asList<T>(payload: ListPayload<T>) {
-  return Array.isArray(payload) ? payload : payload.content
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string) {
@@ -117,7 +130,7 @@ export async function distributeKey(keyUid: string, target: string, reason: stri
   return unwrap(await apiClient.post<ApiResponse<KeyDistributionResult>>(apiEndpoints.keys.distribute(keyUid), { target, reason }))
 }
 
-export async function updateRotationPolicy(keyUid: string, days: 30 | 60 | 90 | null) {
+export async function updateRotationPolicy(keyUid: string, days: number | null) {
   return unwrap(await apiClient.patch<ApiResponse<CryptoKey>>(apiEndpoints.keys.rotationPolicy(keyUid), { days }))
 }
 
@@ -125,18 +138,97 @@ export async function encryptWithKey(keyUid: string, plaintext: string) {
   return unwrap(await apiClient.post<ApiResponse<KeyEncryptResult>>(apiEndpoints.keys.encryptTest(keyUid), { plaintext }))
 }
 
-export async function decryptWithKey(keyUid: string, ciphertext: string, iv: string, version?: number) {
+export async function decryptWithKey(keyUid: string, ciphertext: string, iv: string | null, version?: number) {
   return unwrap(await apiClient.post<ApiResponse<{ plaintext: string }>>(apiEndpoints.keys.decryptTest(keyUid), { ciphertext, iv, version }))
 }
 
-export async function fetchAuditLogs() {
-  const payload = unwrap(await apiClient.get<ApiResponse<ListPayload<AuditLog>>>(
-    apiEndpoints.auditLogs.list,
-    { params: { page: 0, size: 100 } },
+export async function fetchDashboardSummary() {
+  return unwrap(await apiClient.get<ApiResponse<DashboardSummary>>(apiEndpoints.dashboard.summary))
+}
+
+export async function fetchDashboardTrend(from: string, to: string, interval: 'DAY' | 'MONTH') {
+  return unwrap(await apiClient.get<ApiResponse<DashboardTrend>>(
+    apiEndpoints.dashboard.usageTrend,
+    { params: { from, to, interval } },
   ))
-  return asList(payload)
+}
+
+export async function fetchAuditLogs() {
+  return (await fetchAuditLogPage({
+    from: '', to: '', actor: '', action: 'ALL', page: 0, size: 100,
+  })).content
 }
 
 export async function verifyAuditLogs() {
-  return unwrap(await apiClient.get<ApiResponse<{ valid: boolean; invalidLogUids?: string[] }>>(apiEndpoints.auditLogs.verify))
+  return unwrap(await apiClient.get<ApiResponse<AuditVerification>>(apiEndpoints.auditLogs.verify))
+}
+
+export async function fetchAuditLogPage(params: AuditListParams) {
+  return unwrap(await apiClient.get<ApiResponse<PageResponse<AuditLog>>>(
+    apiEndpoints.auditLogs.list,
+    {
+      params: {
+        from: params.from || undefined,
+        to: params.to || undefined,
+        actor: params.actor.trim() || undefined,
+        action: params.action === 'ALL' ? undefined : params.action,
+        page: params.page,
+        size: params.size,
+      },
+    },
+  ))
+}
+
+export async function exportAuditLogs(params: AuditListParams) {
+  const response = await apiClient.get<Blob>(apiEndpoints.auditLogs.export, {
+    params: {
+      from: params.from || undefined,
+      to: params.to || undefined,
+      actor: params.actor.trim() || undefined,
+      action: params.action === 'ALL' ? undefined : params.action,
+    },
+    responseType: 'blob',
+  })
+  const disposition = String(response.headers['content-disposition'] ?? '')
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? 'audit-logs.csv'
+  return { blob: response.data, filename }
+}
+
+export async function fetchUserPage(params: UserListParams) {
+  return unwrap(await apiClient.get<ApiResponse<PageResponse<AppUser>>>(
+    apiEndpoints.users.list,
+    {
+      params: {
+        name: params.name.trim() || undefined,
+        phone: params.phone.trim() || undefined,
+        status: params.status === 'ALL' ? undefined : params.status,
+        page: params.page,
+        size: params.size,
+      },
+    },
+  ))
+}
+
+export async function fetchUser(userUid: string) {
+  return unwrap(await apiClient.get<ApiResponse<AppUser>>(apiEndpoints.users.detail(userUid)))
+}
+
+export async function createUser(request: CreateUserRequest) {
+  return unwrap(await apiClient.post<ApiResponse<AppUser>>(apiEndpoints.users.create, request))
+}
+
+export async function updateUser(userUid: string, request: UpdateUserRequest) {
+  return unwrap(await apiClient.put<ApiResponse<AppUser>>(apiEndpoints.users.update(userUid), request))
+}
+
+export async function fetchUserPlain(userUid: string, reason: string) {
+  return unwrap(await apiClient.post<ApiResponse<AppUserPlain>>(apiEndpoints.users.plain(userUid), { reason }))
+}
+
+export async function changeUserStatus(userUid: string, status: UserStatus) {
+  return unwrap(await apiClient.patch<ApiResponse<AppUser>>(apiEndpoints.users.status(userUid), { status }))
+}
+
+export async function resetUserPassword(userUid: string, password: string) {
+  await apiClient.post<ApiResponse<null>>(apiEndpoints.users.password(userUid), { password })
 }

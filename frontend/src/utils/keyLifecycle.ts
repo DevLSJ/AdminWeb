@@ -9,6 +9,8 @@ interface KeyStatusMetadata {
 export const keyStatusOrder: KeyStatus[] = [
   'CREATED',
   'ACTIVE',
+  'REACTIVATED',
+  'DEACTIVATED',
   'EXPIRED',
   'INACTIVE',
   'DISTRIBUTED',
@@ -19,6 +21,8 @@ export const keyStatusOrder: KeyStatus[] = [
 export const keyStatusMetadata: Record<KeyStatus, KeyStatusMetadata> = {
   CREATED: { label: '생성됨', description: '키가 생성됐으나 아직 암복호화에 사용할 수 없습니다.' },
   ACTIVE: { label: '활성화', description: '최신 버전으로 암호화하고 모든 보존 버전으로 복호화할 수 있습니다.' },
+  REACTIVATED: { label: '재활성화', description: '새 데이터 암호화만 허용되며 복호화는 차단됩니다.' },
+  DEACTIVATED: { label: '비활성화', description: '기존 데이터 복호화만 허용되며 신규 암호화는 차단됩니다.' },
   EXPIRED: { label: '만료됨', description: '유효기간이 만료됐으며 사유를 입력해 재활성화할 수 있습니다.' },
   INACTIVE: { label: '비활성화', description: '사용이 중지됐으며 폐기만 가능합니다.' },
   DISTRIBUTED: { label: '배포됨', description: '외부 시스템에 배포된 사실이 기록된 상태입니다.' },
@@ -28,12 +32,22 @@ export const keyStatusMetadata: Record<KeyStatus, KeyStatusMetadata> = {
 
 export const keyStatusTransitions: Record<KeyStatus, KeyStatus[]> = {
   CREATED: ['ACTIVE'],
-  ACTIVE: ['EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED'],
-  EXPIRED: ['INACTIVE', 'ACTIVE'],
+  ACTIVE: ['DEACTIVATED', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED'],
+  REACTIVATED: ['DEACTIVATED', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED'],
+  DEACTIVATED: ['REACTIVATED', 'DESTROYED'],
+  EXPIRED: ['INACTIVE', 'REACTIVATED'],
   INACTIVE: ['DESTROYED'],
   DISTRIBUTED: ['DESTROYED'],
   COMPROMISED: ['DESTROYED'],
   DESTROYED: [],
+}
+
+export function canEncryptWithStatus(status: KeyStatus) {
+  return status === 'ACTIVE' || status === 'REACTIVATED'
+}
+
+export function canDecryptWithStatus(status: KeyStatus) {
+  return status === 'ACTIVE' || status === 'DEACTIVATED'
 }
 
 export function getAllowedKeyStatusTransitions(status: KeyStatus) {

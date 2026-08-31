@@ -159,8 +159,15 @@ class WeekOneIntegrationTests {
         assertThat(document.path("paths").has("/api/auth/refresh")).isTrue();
         assertThat(document.path("paths").path("/api/auth/login").path("post").path("summary").asText())
                 .isEqualTo("로그인");
+        assertThat(document.path("paths").path("/api/auth/login").path("post").path("security"))
+                .isEmpty();
         assertThat(document.path("components").path("schemas").path("LoginRequest").path("description").asText())
                 .isEqualTo("로그인 요청 정보");
+        JsonNode rotationDays = document.path("components").path("schemas")
+                .path("KeyRotationPolicyRequest").path("properties").path("days");
+        assertThat(rotationDays.path("minimum").asInt()).isEqualTo(30);
+        assertThat(rotationDays.path("maximum").asInt()).isEqualTo(90);
+        assertThat(rotationDays.path("multipleOf").asInt()).isEqualTo(30);
     }
 
     @Test

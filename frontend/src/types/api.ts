@@ -15,10 +15,13 @@ export interface PageResponse<T> {
 
 export type SortDirection = 'asc' | 'desc'
 export type KeyAlgorithm = 'AES' | 'HMAC' | 'RSA'
+export type KeyMode = 'GCM' | 'CBC' | 'OAEP_SHA256'
 export type KeyPurpose = 'ENCRYPT' | 'SIGN' | 'AUTH' | 'WRAP'
 export type KeyStatus =
   | 'CREATED'
   | 'ACTIVE'
+  | 'REACTIVATED'
+  | 'DEACTIVATED'
   | 'EXPIRED'
   | 'INACTIVE'
   | 'DISTRIBUTED'
@@ -39,6 +42,7 @@ export interface CryptoKey {
   keyUid: string
   keyName: string
   algorithm: KeyAlgorithm
+  mode: KeyMode
   keySize: number
   purpose: KeyPurpose
   status: KeyStatus
@@ -54,6 +58,8 @@ export interface KeyStatusHistory {
   id: string
   fromStatus: KeyStatus | null
   toStatus: KeyStatus
+  operation: string
+  keyVersion: number
   reason: string
   changedBy: string
   changedAt: string
@@ -61,7 +67,7 @@ export interface KeyStatusHistory {
 
 export type DeploymentTargetType = 'SERVER_IP' | 'K8S_SECRET' | 'APP_ID'
 export type DeploymentStatus = 'DEPLOYING' | 'DEPLOYED' | 'DEPLOY_FAILED' | 'ROLLED_BACK'
-export type AutoRotationDays = 30 | 60 | 90 | null
+export type AutoRotationDays = number | null
 
 export interface KeyVersion {
   version: number
@@ -101,9 +107,35 @@ export interface KeyUsageLog {
 
 export interface KeyEncryptResult {
   ciphertext: string
-  iv: string
+  iv: string | null
   encoding: string
   version: number
+}
+
+export interface DashboardSummary {
+  totalKeys: number
+  encryptCapableKeys: number
+  decryptCapableKeys: number
+  destroyedKeys: number
+  integrityViolations: number
+  totalOperations: number
+  successfulOperations: number
+  failedOperations: number
+}
+
+export interface DashboardTrendPoint {
+  period: string
+  keysCreated: number
+  encryptions: number
+  decryptions: number
+  totalOperations: number
+}
+
+export interface DashboardTrend {
+  from: string
+  to: string
+  interval: 'DAY' | 'MONTH'
+  points: DashboardTrendPoint[]
 }
 
 export interface KeyDistributionResult {
@@ -126,24 +158,32 @@ export interface UserListParams {
 
 export interface AppUser {
   userUid: string
-  loginId?: string
-  name: string
+  nameMasked: string
   phoneMasked: string
-  phonePlain: string
   emailMasked: string
-  emailPlain: string
   status: UserStatus
   integrityValid: boolean
   encVer: number
+  createdBy: string
   createdAt: string
   updatedAt: string
+}
+
+export interface AppUserPlain {
+  userUid: string
+  name: string
+  phone: string
+  email: string
+  encVer: number
 }
 
 export type AuditAction =
   | 'LOGIN'
   | 'LOGOUT'
+  | 'SESSION_REFRESH'
   | 'KEY_CREATE'
   | 'KEY_UPDATE'
+  | 'KEY_DELETE'
   | 'KEY_STATUS_CHANGE'
   | 'KEY_TEST'
   | 'KEY_DEPLOY'
@@ -153,7 +193,9 @@ export type AuditAction =
   | 'USER_CREATE'
   | 'USER_UPDATE'
   | 'USER_VIEW_PLAIN'
+  | 'USER_STATUS_CHANGE'
   | 'USER_PASSWORD_RESET'
+  | 'AUDIT_EXPORT'
   | 'NOTICE_CREATE'
   | 'NOTICE_UPDATE'
   | 'NOTICE_DELETE'
@@ -177,6 +219,14 @@ export interface AuditLog {
   detail: string
   createdAt: string
   chainValid: boolean
+}
+
+export interface AuditVerification {
+  valid: boolean
+  checkedCount: number
+  invalidLogUids: string[]
+  headValid: boolean
+  verifiedAt: string
 }
 
 export interface NoticeListParams {

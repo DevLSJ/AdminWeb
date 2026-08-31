@@ -14,12 +14,21 @@ class KeyStatusTests {
         Map<KeyStatus, Set<KeyStatus>> expected = Map.of(
                 KeyStatus.CREATED, Set.of(KeyStatus.ACTIVE),
                 KeyStatus.ACTIVE, Set.of(
+                        KeyStatus.DEACTIVATED,
                         KeyStatus.EXPIRED,
                         KeyStatus.INACTIVE,
                         KeyStatus.DISTRIBUTED,
                         KeyStatus.COMPROMISED
                 ),
-                KeyStatus.EXPIRED, Set.of(KeyStatus.INACTIVE, KeyStatus.ACTIVE),
+                KeyStatus.REACTIVATED, Set.of(
+                        KeyStatus.DEACTIVATED,
+                        KeyStatus.EXPIRED,
+                        KeyStatus.INACTIVE,
+                        KeyStatus.DISTRIBUTED,
+                        KeyStatus.COMPROMISED
+                ),
+                KeyStatus.DEACTIVATED, Set.of(KeyStatus.REACTIVATED, KeyStatus.DESTROYED),
+                KeyStatus.EXPIRED, Set.of(KeyStatus.INACTIVE, KeyStatus.REACTIVATED),
                 KeyStatus.INACTIVE, Set.of(KeyStatus.DESTROYED),
                 KeyStatus.DISTRIBUTED, Set.of(KeyStatus.DESTROYED),
                 KeyStatus.COMPROMISED, Set.of(KeyStatus.DESTROYED),

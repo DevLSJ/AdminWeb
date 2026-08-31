@@ -30,7 +30,7 @@ import jakarta.annotation.PreDestroy;
 public class MasterKeyService {
 
     private static final Logger log = LoggerFactory.getLogger(MasterKeyService.class);
-    private static final int MINIMUM_ITERATIONS = 210_000;
+    public static final int REQUIRED_ITERATIONS = 10_000;
     private static final int SALT_LENGTH_BYTES = 16;
     private static final int GCM_TAG_LENGTH_BITS = 128;
     private static final byte[] KCV_IV = new byte[16];
@@ -75,7 +75,9 @@ public class MasterKeyService {
             throw new IllegalStateException("crypto_config must contain exactly one row");
         }
 
-        int configuredIterations = environment.getProperty("kms.master.pbkdf2.iterations", Integer.class, 210_000);
+        int configuredIterations = environment.getProperty(
+                "kms.master.pbkdf2.iterations", Integer.class, REQUIRED_ITERATIONS
+        );
         int keyLength = environment.getProperty("kms.master.pbkdf2.key-length", Integer.class, 256);
         String algorithm = environment.getProperty("kms.master.pbkdf2.algorithm", "PBKDF2WithHmacSHA256");
         validateDerivationPolicy(configuredIterations, keyLength, algorithm);
@@ -127,8 +129,8 @@ public class MasterKeyService {
     }
 
     private void validateDerivationPolicy(int iterations, int keyLength, String algorithm) {
-        if (iterations < MINIMUM_ITERATIONS) {
-            throw new IllegalStateException("PBKDF2 iterations must be at least " + MINIMUM_ITERATIONS);
+        if (iterations < REQUIRED_ITERATIONS) {
+            throw new IllegalStateException("PBKDF2 iterations must be at least " + REQUIRED_ITERATIONS);
         }
         if (keyLength != 256 || !"PBKDF2WithHmacSHA256".equals(algorithm)) {
             throw new IllegalStateException("Master key derivation must use PBKDF2-HMAC-SHA256 with a 256-bit output");

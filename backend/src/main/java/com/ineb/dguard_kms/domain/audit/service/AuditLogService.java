@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -72,24 +73,38 @@ public class AuditLogService {
             int page,
             int size
     ) {
-        Instant fromTime = from == null ? null : from.atStartOfDay(KST).toInstant();
-        Instant toTime = to == null ? null : to.plusDays(1).atStartOfDay(KST).toInstant();
-        String actorFilter = actor == null || actor.isBlank() ? null : actor.trim().toLowerCase();
-        String actionFilter = action == null || action.isBlank() || "ALL".equals(action) ? null : action;
-        Specification<AuditLog> specification = (root, query, criteriaBuilder) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (fromTime != null) predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), fromTime));
-            if (toTime != null) predicates.add(criteriaBuilder.lessThan(root.get("createdAt"), toTime));
-            if (actorFilter != null) {
-                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("actor")), "%" + actorFilter + "%"));
-            }
-            if (actionFilter != null) predicates.add(criteriaBuilder.equal(root.get("action"), actionFilter));
-            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
-        };
         Page<AuditLogResponse> result = repository.findAll(
-                specification, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+                specification(from, to, actor, action),
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
         ).map(log -> AuditLogResponse.from(log, verifyRow(log)));
         return PageResponse.from(result);
+    }
+
+    @Transactional
+    public byte[] exportCsv(LocalDate from, LocalDate to, String actorFilter, String action, String actor) {
+        List<AuditLog> logs = repository.findAll(
+                specification(from, to, actorFilter, action),
+                Sort.by(Sort.Direction.ASC, "createdAt")
+        );
+        if (logs.size() > 10_000) {
+            throw new IllegalArgumentException("감사 로그 CSV는 한 번에 10,000건까지 내려받을 수 있습니다.");
+        }
+        StringBuilder csv = new StringBuilder("\uFEFFlogUid,actor,action,targetType,targetId,detail,createdAt,previousHash,rowHash,rowValid\r\n");
+        for (AuditLog log : logs) {
+            csv.append(csv(log.getLogUid()))
+                    .append(',').append(csv(log.getActor()))
+                    .append(',').append(csv(log.getAction()))
+                    .append(',').append(csv(log.getTargetType()))
+                    .append(',').append(csv(log.getTargetId()))
+                    .append(',').append(csv(log.getDetail()))
+                    .append(',').append(csv(log.getCreatedAt()))
+                    .append(',').append(csv(log.getPreviousHash()))
+                    .append(',').append(csv(log.getRowHash()))
+                    .append(',').append(verifyRow(log))
+                    .append("\r\n");
+        }
+        append(actor, "AUDIT_EXPORT", "AUDIT_LOG", "CSV", "감사 로그 CSV 내보내기: " + logs.size() + "건");
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Transactional(readOnly = true)
@@ -107,7 +122,47 @@ public class AuditLogService {
                 .map(AuditChainHead::getCurrentHash)
                 .orElse(null);
         boolean headValid = java.util.Objects.equals(expectedPreviousHash, storedHead);
-        return new AuditVerificationResponse(invalid.isEmpty() && headValid, logs.size(), List.copyOf(invalid));
+        if (!headValid && !logs.isEmpty()) {
+            UUID lastUid = logs.get(logs.size() - 1).getLogUid();
+            if (!invalid.contains(lastUid)) invalid.add(lastUid);
+        }
+        return new AuditVerificationResponse(
+                invalid.isEmpty() && headValid,
+                logs.size(),
+                List.copyOf(invalid),
+                headValid,
+                Instant.now().truncatedTo(ChronoUnit.MILLIS)
+        );
+    }
+
+    private Specification<AuditLog> specification(
+            LocalDate from,
+            LocalDate to,
+            String actor,
+            String action
+    ) {
+        Instant fromTime = from == null ? null : from.atStartOfDay(KST).toInstant();
+        Instant toTime = to == null ? null : to.plusDays(1).atStartOfDay(KST).toInstant();
+        String actorFilter = actor == null || actor.isBlank() ? null : actor.trim().toLowerCase();
+        String actionFilter = action == null || action.isBlank() || "ALL".equalsIgnoreCase(action)
+                ? null
+                : action.trim().toUpperCase();
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (fromTime != null) predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), fromTime));
+            if (toTime != null) predicates.add(criteriaBuilder.lessThan(root.get("createdAt"), toTime));
+            if (actorFilter != null) {
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("actor")), "%" + actorFilter + "%"));
+            }
+            if (actionFilter != null) predicates.add(criteriaBuilder.equal(root.get("action"), actionFilter));
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private String csv(Object value) {
+        String text = value == null ? "" : value.toString();
+        if (!text.isEmpty() && "=+-@".indexOf(text.charAt(0)) >= 0) text = "'" + text;
+        return '"' + text.replace("\"", "\"\"") + '"';
     }
 
     private boolean verifyRow(AuditLog log) {

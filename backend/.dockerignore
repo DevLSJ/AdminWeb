@@ -1,0 +1,8 @@
+.gradle
+build
+out
+.git
+.gitignore
+*.log
+*.tmp
+src/test

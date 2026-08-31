@@ -16,4 +16,8 @@ public record LoginRequest(
         @Schema(description = "사용자 비밀번호", format = "password", writeOnly = true)
         String password
 ) {
+    @Override
+    public String toString() {
+        return "LoginRequest[loginId=" + loginId + ", password=REDACTED]";
+    }
 }

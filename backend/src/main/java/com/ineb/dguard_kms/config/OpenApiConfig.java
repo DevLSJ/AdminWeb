@@ -1,5 +1,9 @@
 package com.ineb.dguard_kms.config;
 
+import java.math.BigDecimal;
+
+import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
@@ -9,6 +13,7 @@ import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.models.media.Schema;
 
 @Configuration
 @OpenAPIDefinition(
@@ -78,4 +83,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
         description = "로그인 응답의 JWT를 Bearer 토큰으로 입력합니다."
 )
 public class OpenApiConfig {
+
+    @Bean
+    OpenApiCustomizer keyRotationPolicySchemaCustomizer() {
+        return openApi -> {
+            if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) return;
+            var requestSchema = openApi.getComponents().getSchemas().get("KeyRotationPolicyRequest");
+            if (requestSchema == null || requestSchema.getProperties() == null) return;
+            Object daysProperty = requestSchema.getProperties().get("days");
+            if (!(daysProperty instanceof Schema<?> daysSchema)) return;
+            daysSchema.setMinimum(BigDecimal.valueOf(30));
+            daysSchema.setMaximum(BigDecimal.valueOf(90));
+            daysSchema.setMultipleOf(BigDecimal.valueOf(30));
+        };
+    }
 }

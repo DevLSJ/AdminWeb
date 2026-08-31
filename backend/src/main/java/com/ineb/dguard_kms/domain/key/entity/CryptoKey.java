@@ -35,6 +35,9 @@ public class CryptoKey {
     @Column(nullable = false, length = 32)
     private String algorithm;
 
+    @Column(name = "crypto_mode", nullable = false, length = 32)
+    private String mode;
+
     @Column(name = "key_size", nullable = false)
     private int keySize;
 
@@ -60,6 +63,9 @@ public class CryptoKey {
     @Column(name = "auto_rotation_days")
     private Integer autoRotationDays;
 
+    @Column(name = "public_key", columnDefinition = "text")
+    private String publicKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -73,16 +79,29 @@ public class CryptoKey {
     protected CryptoKey() {
     }
 
-    public CryptoKey(String keyName, String algorithm, int keySize, String purpose, LocalDate expireAt, String createdBy) {
+    public CryptoKey(
+            String keyName,
+            String algorithm,
+            String mode,
+            int keySize,
+            String purpose,
+            LocalDate expireAt,
+            Integer autoRotationDays,
+            String publicKey,
+            String createdBy
+    ) {
         this.keyUid = UUID.randomUUID();
         this.keyName = keyName;
         this.algorithm = algorithm;
+        this.mode = mode;
         this.keySize = keySize;
         this.purpose = purpose;
         this.status = KeyStatus.CREATED;
         this.version = 1;
         this.expireAt = toInstant(expireAt);
         this.createdBy = createdBy;
+        this.autoRotationDays = autoRotationDays;
+        this.publicKey = publicKey;
         // PostgreSQL TIMESTAMPTZ stores microsecond precision.  The integrity
         // signature includes this value, so sign the exact precision that will
         // be persisted rather than an Instant with nanoseconds that PostgreSQL
@@ -130,10 +149,21 @@ public class CryptoKey {
         this.updatedAt = Instant.now();
     }
 
+    public void destroyPublicKey() {
+        this.publicKey = null;
+        this.updatedAt = Instant.now();
+    }
+
+    public void updatePublicKey(String publicKey) {
+        this.publicKey = publicKey;
+        this.updatedAt = Instant.now();
+    }
+
     public Long getId() { return id; }
     public UUID getKeyUid() { return keyUid; }
     public String getKeyName() { return keyName; }
     public String getAlgorithm() { return algorithm; }
+    public String getMode() { return mode; }
     public int getKeySize() { return keySize; }
     public String getPurpose() { return purpose; }
     public KeyStatus getStatus() { return status; }
@@ -143,6 +173,7 @@ public class CryptoKey {
     public String getIntegrityHash() { return integrityHash; }
     public String getCreatedBy() { return createdBy; }
     public Integer getAutoRotationDays() { return autoRotationDays; }
+    public String getPublicKey() { return publicKey; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 

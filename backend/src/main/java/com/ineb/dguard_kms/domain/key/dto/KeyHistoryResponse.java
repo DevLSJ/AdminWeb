@@ -15,6 +15,10 @@ public record KeyHistoryResponse(
         KeyStatus fromStatus,
         @Schema(description = "변경 후 키 상태")
         KeyStatus toStatus,
+        @Schema(description = "생명주기 작업 유형", example = "KEY_ROTATE")
+        String operation,
+        @Schema(description = "작업 당시 암호 키 버전", example = "2")
+        int keyVersion,
         @Schema(description = "상태 변경 사유")
         String reason,
         @Schema(description = "상태를 변경한 로그인 ID")
@@ -25,6 +29,7 @@ public record KeyHistoryResponse(
     public static KeyHistoryResponse from(KeyStatusHistory history) {
         return new KeyHistoryResponse(
                 history.getId(), history.getFromStatus(), history.getToStatus(),
+                history.getOperation(), history.getKeyVersion(),
                 history.getReason(), history.getChangedBy(), history.getChangedAt()
         );
     }

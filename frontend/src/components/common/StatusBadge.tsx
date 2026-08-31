@@ -17,6 +17,8 @@ const semanticColors: Record<SemanticTone, { background: string; text: string; b
 
 const statusToneMap: Record<string, SemanticTone> = {
   ACTIVE: 'positive',
+  REACTIVATED: 'accent',
+  DEACTIVATED: 'warning',
   DEPLOYED: 'positive',
   DISTRIBUTED: 'positive',
   Y: 'positive',

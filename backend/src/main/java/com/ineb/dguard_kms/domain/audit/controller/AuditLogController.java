@@ -1,9 +1,16 @@
 package com.ineb.dguard_kms.domain.audit.controller;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,6 +24,7 @@ import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.audit.dto.AuditLogResponse;
 import com.ineb.dguard_kms.domain.audit.dto.AuditVerificationResponse;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
+import com.ineb.dguard_kms.security.AdminUserDetails;
 
 @RestController
 @RequestMapping("/api/audit-logs")
@@ -51,5 +59,23 @@ public class AuditLogController {
     @Operation(summary = "감사 로그 체인 검증", description = "감사 로그 해시 체인의 무결성을 검증합니다.")
     public ApiResponse<AuditVerificationResponse> verify() {
         return ApiResponse.success(service.verifyChain(), "감사 로그 체인 검증을 완료했습니다.");
+    }
+
+    @GetMapping("/export")
+    @Operation(summary = "감사 로그 CSV 내보내기", description = "검색 조건에 맞는 감사 로그와 체인 해시를 CSV로 내보냅니다.")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String actor,
+            @RequestParam(required = false) String action,
+            @AuthenticationPrincipal AdminUserDetails currentUser
+    ) {
+        byte[] csv = service.exportCsv(from, to, actor, action, currentUser.getUsername());
+        String filename = "audit-logs-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".csv";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .contentLength(csv.length)
+                .body(csv);
     }
 }

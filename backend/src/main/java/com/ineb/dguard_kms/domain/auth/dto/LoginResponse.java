@@ -17,4 +17,9 @@ public record LoginResponse(
         @Schema(description = "사용자 역할", allowableValues = { "ADMIN", "CLIENT" }, example = "ADMIN")
         String role
 ) {
+    @Override
+    public String toString() {
+        return "LoginResponse[token=REDACTED, userUid=" + userUid + ", loginId=" + loginId
+                + ", name=" + name + ", role=" + role + "]";
+    }
 }

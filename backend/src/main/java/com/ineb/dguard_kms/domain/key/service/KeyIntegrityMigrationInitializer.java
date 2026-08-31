@@ -27,5 +27,9 @@ public class KeyIntegrityMigrationInitializer implements ApplicationRunner {
         if (resigned > 0) {
             log.info("Re-signed {} legacy key integrity hashes after the week-two schema migration", resigned);
         }
+        int materialResigned = keyService.resignSchemaMigratedMaterials();
+        if (materialResigned > 0) {
+            log.info("Re-signed {} key-material integrity hashes after the enterprise schema migration", materialResigned);
+        }
     }
 }

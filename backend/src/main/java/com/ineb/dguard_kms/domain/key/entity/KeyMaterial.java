@@ -32,10 +32,10 @@ public class KeyMaterial {
     @Column(name = "key_version", nullable = false)
     private int keyVersion;
 
-    @Column(name = "wrapped_key", nullable = false, columnDefinition = "bytea")
+    @Column(name = "wrapped_key", columnDefinition = "bytea")
     private byte[] wrappedKey;
 
-    @Column(name = "iv", nullable = false, columnDefinition = "bytea")
+    @Column(name = "iv", columnDefinition = "bytea")
     private byte[] wrappingIv;
 
     @Column(name = "wrap_algo", nullable = false, length = 32)
@@ -55,6 +55,9 @@ public class KeyMaterial {
 
     @Column(name = "created_by", nullable = false, length = 100)
     private String createdBy;
+
+    @Column(name = "integrity_hash", nullable = false, length = 512)
+    private String integrityHash;
 
     protected KeyMaterial() {
     }
@@ -90,15 +93,30 @@ public class KeyMaterial {
         this.wrappingAlgorithm = "AES-256-GCM";
     }
 
+    public void destroy() {
+        if (wrappedKey != null) java.util.Arrays.fill(wrappedKey, (byte) 0);
+        if (wrappingIv != null) java.util.Arrays.fill(wrappingIv, (byte) 0);
+        this.wrappedKey = null;
+        this.wrappingIv = null;
+        this.materialStatus = "DESTROYED";
+        this.retiredAt = Instant.now();
+    }
+
+    public void updateIntegrityHash(String integrityHash) {
+        this.integrityHash = integrityHash;
+    }
+
     public Long getId() { return id; }
     public CryptoKey getCryptoKey() { return cryptoKey; }
     public int getKeyVersion() { return keyVersion; }
-    public byte[] getWrappedKey() { return wrappedKey.clone(); }
-    public byte[] getWrappingIv() { return wrappingIv.clone(); }
+    public byte[] getWrappedKey() { return wrappedKey == null ? null : wrappedKey.clone(); }
+    public byte[] getWrappingIv() { return wrappingIv == null ? null : wrappingIv.clone(); }
     public String getWrappingAlgorithm() { return wrappingAlgorithm; }
     public String getMaterialStatus() { return materialStatus; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getRetiredAt() { return retiredAt; }
     public Instant getDistributedAt() { return distributedAt; }
     public String getCreatedBy() { return createdBy; }
+    public String getIntegrityHash() { return integrityHash; }
+    public boolean isDestroyed() { return wrappedKey == null && wrappingIv == null && "DESTROYED".equals(materialStatus); }
 }

@@ -1,10 +1,12 @@
 package com.ineb.dguard_kms.domain.key.service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,6 +31,8 @@ import com.ineb.dguard_kms.domain.key.dto.KeyDistributionResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyEncryptRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyEncryptResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyHistoryResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyIntegrityItemResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyIntegrityReportResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyRotationPolicyRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyRotationResponse;
@@ -50,6 +54,7 @@ import com.ineb.dguard_kms.domain.key.repository.KeyUsageLogRepository;
 public class CryptoKeyService {
 
     public static final String PENDING_SCHEMA_INTEGRITY_HASH = "PENDING_V6_SCHEMA_REALIGN";
+    public static final String PENDING_MATERIAL_INTEGRITY_HASH = "PENDING_V8_MATERIAL_SIGN";
 
     private final CryptoKeyRepository keyRepository;
     private final KeyMaterialRepository materialRepository;
@@ -79,26 +84,37 @@ public class CryptoKeyService {
 
     @Transactional
     public KeyResponse create(KeyCreateRequest request, String actor) {
-        validateManagedKeyPolicy(request.algorithm(), request.keySize());
+        ManagedKeyPolicy policy = validateManagedKeyPolicy(request.algorithm(), request.mode(), request.keySize());
+        validateRotationDays(request.autoRotationDays());
         if (keyRepository.existsByKeyName(request.keyName().trim())) {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
         }
 
-        byte[] rawKey = cryptoUtil.generateAes256Key();
+        byte[] rawKey = null;
         try {
+            String publicKey = null;
+            if ("AES".equals(policy.algorithm())) {
+                rawKey = cryptoUtil.generateAesKey(policy.keySize());
+            } else {
+                KeyPair keyPair = cryptoUtil.generateRsaKeyPair(policy.keySize());
+                rawKey = keyPair.getPrivate().getEncoded();
+                publicKey = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+            }
             // 원시 키는 DB에 저장하지 않고 마스터키로 래핑한 값만 영속화한다.
             CryptoUtil.Base64Payload wrapped = cryptoUtil.wrapKey(rawKey);
             CryptoKey key = new CryptoKey(
-                    request.keyName().trim(), "AES", 256, request.purpose().trim(), request.expireAt(), actor
+                    request.keyName().trim(), policy.algorithm(), policy.mode(), policy.keySize(),
+                    request.purpose().trim(), request.expireAt(), request.autoRotationDays(), publicKey, actor
             );
             KeyMaterial material = new KeyMaterial(
                     key, 1, cryptoUtil.decodeBase64(wrapped.ciphertext()), cryptoUtil.decodeBase64(wrapped.iv()), actor
             );
             signIntegrity(key);
+            signMaterial(key, material);
             keyRepository.save(key);
             materialRepository.save(material);
             historyRepository.save(new KeyStatusHistory(
-                    key, KeyStatus.CREATED, KeyStatus.CREATED, "키 최초 생성", actor
+                    key, KeyStatus.CREATED, KeyStatus.CREATED, "CREATE", "키 최초 생성", actor
             ));
             auditLogService.append(actor, "KEY_CREATE", "CRYPTO_KEY", key.getKeyUid().toString(),
                     key.getKeyName() + " v1 키 생성");
@@ -107,7 +123,7 @@ public class CryptoKeyService {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
         } finally {
             // 원시 키는 필요한 작업이 끝나는 즉시 메모리에서 지운다.
-            Arrays.fill(rawKey, (byte) 0);
+            if (rawKey != null) Arrays.fill(rawKey, (byte) 0);
         }
     }
 
@@ -166,11 +182,60 @@ public class CryptoKeyService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public KeyIntegrityReportResponse verifyAllIntegrity() {
+        List<KeyIntegrityItemResponse> results = keyRepository.findAll(Sort.by("keyUid")).stream()
+                .map(this::verifyKeyAndAllVersions)
+                .toList();
+        long valid = results.stream().filter(KeyIntegrityItemResponse::valid).count();
+        return new KeyIntegrityReportResponse(
+                Instant.now(), results.size(), valid, results.size() - valid, results
+        );
+    }
+
+    private KeyIntegrityItemResponse verifyKeyAndAllVersions(CryptoKey key) {
+        List<String> violations = new java.util.ArrayList<>();
+        List<Integer> invalidVersions = new java.util.ArrayList<>();
+        if (!integrityService.verify(key.getIntegrityHash(), integrityValues(key))) {
+            violations.add("KEY_METADATA_HMAC_MISMATCH");
+        }
+        List<KeyMaterial> materials = materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key);
+        if (materials.stream().noneMatch(material -> material.getKeyVersion() == key.getCurrentVersion())) {
+            violations.add("CURRENT_KEY_MATERIAL_MISSING");
+        }
+        for (KeyMaterial material : materials) {
+            if (!integrityService.verify(material.getIntegrityHash(), materialIntegrityValues(key, material))) {
+                invalidVersions.add(material.getKeyVersion());
+            }
+            if (key.getStatus() == KeyStatus.DESTROYED && !material.isDestroyed()) {
+                violations.add("DESTROYED_KEY_VALUE_NOT_NULL:v" + material.getKeyVersion());
+            }
+            if (key.getStatus() != KeyStatus.DESTROYED && material.isDestroyed()) {
+                violations.add("LIVE_KEY_VALUE_MISSING:v" + material.getKeyVersion());
+            }
+        }
+        if (!invalidVersions.isEmpty()) violations.add("KEY_MATERIAL_HMAC_MISMATCH");
+        if (key.getStatus() == KeyStatus.DESTROYED && key.getPublicKey() != null) {
+            violations.add("DESTROYED_PUBLIC_KEY_NOT_NULL");
+        }
+        return new KeyIntegrityItemResponse(
+                key.getKeyUid(), key.getKeyName(), key.getStatus(), violations.isEmpty(),
+                List.copyOf(invalidVersions), List.copyOf(violations)
+        );
+    }
+
     @Transactional
     public int resignSchemaMigratedKeys() {
         List<CryptoKey> pendingKeys = keyRepository.findAllByIntegrityHash(PENDING_SCHEMA_INTEGRITY_HASH);
         pendingKeys.forEach(this::signIntegrity);
         return pendingKeys.size();
+    }
+
+    @Transactional
+    public int resignSchemaMigratedMaterials() {
+        List<KeyMaterial> pendingMaterials = materialRepository.findAllByIntegrityHash(PENDING_MATERIAL_INTEGRITY_HASH);
+        pendingMaterials.forEach(material -> signMaterial(material.getCryptoKey(), material));
+        return pendingMaterials.size();
     }
 
     @Transactional
@@ -189,6 +254,7 @@ public class CryptoKeyService {
                 wrappedBytes = cryptoUtil.decodeBase64(rewrapped.ciphertext());
                 ivBytes = cryptoUtil.decodeBase64(rewrapped.iv());
                 material.rewrap(wrappedBytes, ivBytes);
+                signMaterial(material.getCryptoKey(), material);
             } finally {
                 if (rawKey != null) Arrays.fill(rawKey, (byte) 0);
                 if (wrappedBytes != null) Arrays.fill(wrappedBytes, (byte) 0);
@@ -209,7 +275,7 @@ public class CryptoKeyService {
         key.updateMetadata(keyName, request.purpose().trim(), request.expireAt());
         signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
-                key, key.getStatus(), key.getStatus(), "키 메타정보 수정", actor
+                key, key.getStatus(), key.getStatus(), "METADATA_UPDATE", "키 메타정보 수정", actor
         ));
         auditLogService.append(actor, "KEY_UPDATE", "CRYPTO_KEY", key.getKeyUid().toString(),
                 key.getKeyName() + " 메타정보 수정");
@@ -238,15 +304,12 @@ public class CryptoKeyService {
         CryptoKey key = findKeyForUpdate(keyUid);
         KeyMaterial material = verifiedCurrentMaterial(key);
         Integer days = request.days();
-        if (days != null && !Set.of(30, 60, 90).contains(days)) {
-            throw new KeyOperationException(
-                    HttpStatus.BAD_REQUEST, "자동 갱신 주기는 30, 60, 90일만 지원합니다.", "INVALID_ROTATION_POLICY"
-            );
-        }
+        validateRotationDays(days);
         key.updateAutoRotationDays(days);
         signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key, key.getStatus(), key.getStatus(),
+                "ROTATION_POLICY_UPDATE",
                 days == null ? "자동 갱신 미사용" : "자동 갱신 주기 " + days + "일 설정", actor
         ));
         auditLogService.append(actor, "KEY_AUTO_ROTATION_UPDATE", "CRYPTO_KEY", key.getKeyUid().toString(),
@@ -272,8 +335,15 @@ public class CryptoKeyService {
             throw conflict("허용되지 않은 키 상태 전이입니다: " + from + " -> " + to, "INVALID_KEY_STATUS_TRANSITION");
         }
         key.changeStatus(to);
+        if (to == KeyStatus.DESTROYED) {
+            for (KeyMaterial version : materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key)) {
+                version.destroy();
+                signMaterial(key, version);
+            }
+            key.destroyPublicKey();
+        }
         signIntegrity(key);
-        historyRepository.save(new KeyStatusHistory(key, from, to, request.reason().trim(), actor));
+        historyRepository.save(new KeyStatusHistory(key, from, to, "STATUS_CHANGE", request.reason().trim(), actor));
         auditLogService.append(actor, "KEY_STATUS_CHANGE", "CRYPTO_KEY", key.getKeyUid().toString(),
                 from + " → " + to + ": " + request.reason().trim());
         return KeyResponse.from(key, true);
@@ -282,29 +352,73 @@ public class CryptoKeyService {
     @Transactional
     public KeyRotationResponse rotate(UUID keyUid, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
-        if (key.getStatus() != KeyStatus.ACTIVE) {
-            throw conflict("ACTIVE 키만 갱신할 수 있습니다.", "KEY_ROTATION_NOT_ALLOWED");
+        return rotateLocked(key, actor);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UUID> autoRotationCandidates() {
+        Instant now = Instant.now();
+        return keyRepository.findAll().stream()
+                .filter(key -> key.getAutoRotationDays() != null && key.getStatus().canEncrypt())
+                .filter(key -> materialRepository.findByCryptoKeyAndKeyVersion(key, key.getCurrentVersion())
+                        .map(material -> !material.getCreatedAt()
+                                .plusSeconds(key.getAutoRotationDays() * 86_400L).isAfter(now))
+                        .orElse(false))
+                .map(CryptoKey::getKeyUid)
+                .toList();
+    }
+
+    @Transactional
+    public boolean rotateIfDue(UUID keyUid, String actor) {
+        CryptoKey key = findKeyForUpdate(keyUid);
+        Integer days = key.getAutoRotationDays();
+        if (days == null || !key.getStatus().canEncrypt()) return false;
+        KeyMaterial material = verifiedCurrentMaterial(key);
+        if (material.getCreatedAt().plusSeconds(days * 86_400L).isAfter(Instant.now())) return false;
+        rotateLocked(key, actor);
+        return true;
+    }
+
+    private KeyRotationResponse rotateLocked(CryptoKey key, String actor) {
+        if (!key.getStatus().canEncrypt()) {
+            throw conflict("암호화 가능한 키만 갱신할 수 있습니다.", "KEY_ROTATION_NOT_ALLOWED");
         }
 
         int previousVersion = key.getCurrentVersion();
         KeyMaterial previousMaterial = verifiedCurrentMaterial(key);
 
-        byte[] rawKey = cryptoUtil.generateAes256Key();
+        byte[] rawKey = null;
         byte[] wrappedBytes = null;
         byte[] ivBytes = null;
         try {
+            String publicKey = null;
+            if ("AES".equals(key.getAlgorithm())) {
+                rawKey = cryptoUtil.generateAesKey(key.getKeySize());
+            } else {
+                KeyPair keyPair = cryptoUtil.generateRsaKeyPair(key.getKeySize());
+                rawKey = keyPair.getPrivate().getEncoded();
+                publicKey = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+            }
             CryptoUtil.Base64Payload wrapped = cryptoUtil.wrapKey(rawKey);
             int newVersion = key.nextVersion();
             previousMaterial.retire();
+            signMaterial(key, previousMaterial);
             wrappedBytes = cryptoUtil.decodeBase64(wrapped.ciphertext());
             ivBytes = cryptoUtil.decodeBase64(wrapped.iv());
-            materialRepository.save(new KeyMaterial(key, newVersion, wrappedBytes, ivBytes, actor));
+            KeyMaterial newMaterial = new KeyMaterial(key, newVersion, wrappedBytes, ivBytes, actor);
+            if (publicKey != null) key.updatePublicKey(publicKey);
+            signMaterial(key, newMaterial);
+            materialRepository.save(newMaterial);
             signIntegrity(key);
+            historyRepository.save(new KeyStatusHistory(
+                    key, key.getStatus(), key.getStatus(), "KEY_ROTATE",
+                    "키 재료 v" + previousVersion + " → v" + newVersion + " 갱신", actor
+            ));
             auditLogService.append(actor, "KEY_ROTATE", "CRYPTO_KEY", key.getKeyUid().toString(),
                     "v" + previousVersion + " → v" + newVersion + " 키 갱신");
             return new KeyRotationResponse(key.getKeyUid(), previousVersion, newVersion, KeyResponse.from(key, true));
         } finally {
-            Arrays.fill(rawKey, (byte) 0);
+            if (rawKey != null) Arrays.fill(rawKey, (byte) 0);
             if (wrappedBytes != null) Arrays.fill(wrappedBytes, (byte) 0);
             if (ivBytes != null) Arrays.fill(ivBytes, (byte) 0);
         }
@@ -320,12 +434,14 @@ public class CryptoKeyService {
         KeyMaterial material = verifiedCurrentMaterial(key);
         KeyStatus from = key.getStatus();
         material.markDistributed();
+        signMaterial(key, material);
         key.changeStatus(KeyStatus.DISTRIBUTED);
         signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key,
                 from,
                 KeyStatus.DISTRIBUTED,
+                "DISTRIBUTE",
                 request.reason().trim() + " (대상: " + request.target().trim() + ")",
                 actor
         ));
@@ -346,15 +462,35 @@ public class CryptoKeyService {
         CryptoKey key = findKeyForUpdate(keyUid);
         byte[] rawKey = null;
         try {
-            requireActive(key);
-            rawKey = unwrapCurrentKey(key);
-            CryptoUtil.Base64Payload encrypted = cryptoUtil.encryptWithKey(
-                    request.plaintext().getBytes(StandardCharsets.UTF_8), rawKey
-            );
+            requireEncryptAllowed(key);
+            int requestedVersion = request.version() == null ? key.getCurrentVersion() : request.version();
+            if (requestedVersion != key.getCurrentVersion()) {
+                throw new KeyOperationException(
+                        HttpStatus.BAD_REQUEST,
+                        "과거 키 버전은 복호화 전용입니다.",
+                        "KEY_VERSION_ENCRYPT_NOT_ALLOWED"
+                );
+            }
+            String ciphertext;
+            String iv;
+            if ("RSA".equals(key.getAlgorithm())) {
+                verifiedCurrentMaterial(key);
+                ciphertext = cryptoUtil.encryptRsa(
+                        request.plaintext().getBytes(StandardCharsets.UTF_8), key.getPublicKey()
+                );
+                iv = null;
+            } else {
+                rawKey = unwrapKeyVersion(key, requestedVersion);
+                CryptoUtil.Base64Payload encrypted = cryptoUtil.encryptAes(
+                        request.plaintext().getBytes(StandardCharsets.UTF_8), rawKey, key.getMode()
+                );
+                ciphertext = encrypted.ciphertext();
+                iv = encrypted.iv();
+            }
             auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "암호화 성공");
             usageLogRepository.save(new KeyUsageLog(key, "ENCRYPT", true, null, actor));
             return new KeyEncryptResponse(
-                    encrypted.ciphertext(), encrypted.iv(), "BASE64", key.getCurrentVersion()
+                    ciphertext, iv, "BASE64", requestedVersion
             );
         } catch (KeyOperationException exception) {
             recordUsageFailure(key, "ENCRYPT", exception.getMessage(), actor);
@@ -375,11 +511,18 @@ public class CryptoKeyService {
         byte[] rawKey = null;
         byte[] plaintext = null;
         try {
-            requireActive(key);
+            requireDecryptAllowed(key);
             rawKey = unwrapKeyVersion(key, request.version());
-            plaintext = cryptoUtil.decryptWithKey(
-                    new CryptoUtil.Base64Payload(request.ciphertext(), request.iv()), rawKey
-            );
+            if ("RSA".equals(key.getAlgorithm())) {
+                plaintext = cryptoUtil.decryptRsa(request.ciphertext(), rawKey);
+            } else {
+                if (request.iv() == null || request.iv().isBlank()) {
+                    throw new IllegalArgumentException("AES 복호화에는 IV가 필요합니다.");
+                }
+                plaintext = cryptoUtil.decryptAes(
+                        new CryptoUtil.Base64Payload(request.ciphertext(), request.iv()), rawKey, key.getMode()
+                );
+            }
             auditLogService.append(actor, "KEY_TEST", "CRYPTO_KEY", key.getKeyUid().toString(), "복호화 성공");
             usageLogRepository.save(new KeyUsageLog(key, "DECRYPT", true, null, actor));
             return new KeyDecryptResponse(new String(plaintext, StandardCharsets.UTF_8));
@@ -397,12 +540,24 @@ public class CryptoKeyService {
         }
     }
 
-    private void requireActive(CryptoKey key) {
-        if (key.getStatus() != KeyStatus.ACTIVE) {
+    private void requireEncryptAllowed(CryptoKey key) {
+        if (!key.getStatus().canEncrypt()) {
+            String code = key.getStatus() == KeyStatus.CREATED ? "KEY_NOT_ACTIVE" : "KEY_ENCRYPT_NOT_ALLOWED";
             throw new KeyOperationException(
                     HttpStatus.BAD_REQUEST,
-                    "ACTIVE 상태의 키만 암복호화에 사용할 수 있습니다.",
-                    "KEY_NOT_ACTIVE"
+                    "현재 키 상태에서는 암호화할 수 없습니다.",
+                    code
+            );
+        }
+    }
+
+    private void requireDecryptAllowed(CryptoKey key) {
+        if (!key.getStatus().canDecrypt()) {
+            String code = key.getStatus() == KeyStatus.CREATED ? "KEY_NOT_ACTIVE" : "KEY_DECRYPT_NOT_ALLOWED";
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST,
+                    "현재 키 상태에서는 복호화할 수 없습니다.",
+                    code
             );
         }
     }
@@ -410,10 +565,6 @@ public class CryptoKeyService {
     private void recordUsageFailure(CryptoKey key, String operation, String reason, String actor) {
         String safeReason = reason == null || reason.isBlank() ? "요청 처리 실패" : reason;
         usageLogRepository.save(new KeyUsageLog(key, operation, false, safeReason, actor));
-    }
-
-    private byte[] unwrapCurrentKey(CryptoKey key) {
-        return unwrapKeyVersion(key, key.getCurrentVersion());
     }
 
     private byte[] unwrapKeyVersion(CryptoKey key, Integer requestedVersion) {
@@ -458,17 +609,41 @@ public class CryptoKeyService {
         key.updateIntegrityHash(integrityService.sign(integrityValues(key)));
     }
 
+    private void signMaterial(CryptoKey key, KeyMaterial material) {
+        material.updateIntegrityHash(integrityService.sign(materialIntegrityValues(key, material)));
+    }
+
     private boolean verifyIntegrity(CryptoKey key, KeyMaterial material) {
-        return integrityService.verify(key.getIntegrityHash(), integrityValues(key));
+        return integrityService.verify(key.getIntegrityHash(), integrityValues(key))
+                && integrityService.verify(material.getIntegrityHash(), materialIntegrityValues(key, material));
     }
 
     private String[] integrityValues(CryptoKey key) {
         return new String[] {
-                key.getKeyUid().toString(), key.getKeyName(), key.getAlgorithm(), Integer.toString(key.getKeySize()),
+                key.getKeyUid().toString(), key.getKeyName(), key.getAlgorithm(), key.getMode(),
+                Integer.toString(key.getKeySize()),
                 key.getPurpose(), key.getStatus().name(), Integer.toString(key.getCurrentVersion()),
                 key.getExpireAtInstant() == null ? "" : key.getExpireAtInstant().toString(),
-                key.getCreatedBy(), key.getCreatedAt().toString()
+                key.getCreatedBy(), key.getCreatedAt().toString(),
+                key.getAutoRotationDays() == null ? "" : key.getAutoRotationDays().toString(),
+                key.getPublicKey() == null ? "" : key.getPublicKey()
         };
+    }
+
+    private String[] materialIntegrityValues(CryptoKey key, KeyMaterial material) {
+        byte[] wrapped = material.getWrappedKey();
+        byte[] iv = material.getWrappingIv();
+        try {
+            return new String[] {
+                    key.getKeyUid().toString(), Integer.toString(material.getKeyVersion()),
+                    wrapped == null ? "" : Base64.getEncoder().encodeToString(wrapped),
+                    iv == null ? "" : Base64.getEncoder().encodeToString(iv),
+                    material.getWrappingAlgorithm(), material.getMaterialStatus(), material.getCreatedBy()
+            };
+        } finally {
+            if (wrapped != null) Arrays.fill(wrapped, (byte) 0);
+            if (iv != null) Arrays.fill(iv, (byte) 0);
+        }
     }
 
     private CryptoKey findKey(UUID keyUid) {
@@ -489,15 +664,39 @@ public class CryptoKeyService {
         return new KeyOperationException(HttpStatus.CONFLICT, message, code);
     }
 
-    private void validateManagedKeyPolicy(String algorithm, int keySize) {
-        if (!"AES".equalsIgnoreCase(algorithm) || keySize != 256) {
+    private ManagedKeyPolicy validateManagedKeyPolicy(String requestedAlgorithm, String requestedMode, int keySize) {
+        String algorithm = requestedAlgorithm.trim().toUpperCase(Locale.ROOT);
+        String mode = requestedMode == null || requestedMode.isBlank()
+                ? ("RSA".equals(algorithm) ? "OAEP_SHA256" : "GCM")
+                : requestedMode.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+        boolean valid = switch (algorithm) {
+            case "AES" -> (keySize == 128 || keySize == 192 || keySize == 256)
+                    && ("GCM".equals(mode) || "CBC".equals(mode));
+            case "RSA" -> (keySize == 2048 || keySize == 3072 || keySize == 4096)
+                    && ("OAEP_SHA256".equals(mode) || "OAEP".equals(mode));
+            default -> false;
+        };
+        if (!valid) {
             throw new KeyOperationException(
                     HttpStatus.BAD_REQUEST,
-                    "현재 관리 키는 AES-256만 지원합니다.",
+                    "지원 정책은 AES(128/192/256, GCM/CBC) 또는 RSA(2048/3072/4096, OAEP_SHA256)입니다.",
                     "UNSUPPORTED_KEY_ALGORITHM"
             );
         }
+        return new ManagedKeyPolicy(algorithm, "OAEP".equals(mode) ? "OAEP_SHA256" : mode, keySize);
     }
+
+    private void validateRotationDays(Integer days) {
+        if (days != null && (days < 1 || days > 3650)) {
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST,
+                    "자동 갱신 주기는 1~3650일 범위의 일 단위 값이어야 합니다.",
+                    "INVALID_ROTATION_POLICY"
+            );
+        }
+    }
+
+    private record ManagedKeyPolicy(String algorithm, String mode, int keySize) { }
 
     private Specification<CryptoKey> keyFilters(
             String keyword,

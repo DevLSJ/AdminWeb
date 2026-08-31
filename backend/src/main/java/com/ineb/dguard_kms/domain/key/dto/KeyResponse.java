@@ -17,6 +17,8 @@ public record KeyResponse(
         String keyName,
         @Schema(description = "암호 알고리즘", example = "AES")
         String algorithm,
+        @Schema(description = "암호 모드", example = "GCM")
+        String mode,
         @Schema(description = "키 길이(비트)", example = "256")
         int keySize,
         @Schema(description = "키 사용 목적", example = "PAYMENT_ENCRYPTION")
@@ -41,6 +43,7 @@ public record KeyResponse(
                 key.getKeyUid(),
                 key.getKeyName(),
                 key.getAlgorithm(),
+                key.getMode(),
                 key.getKeySize(),
                 key.getPurpose(),
                 key.getStatus(),

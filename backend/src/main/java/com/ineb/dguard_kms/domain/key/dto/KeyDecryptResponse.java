@@ -4,4 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "복호화 테스트 결과")
 public record KeyDecryptResponse(@Schema(description = "복호화된 원문") String plaintext) {
+    @Override
+    public String toString() {
+        return "KeyDecryptResponse[plaintext=REDACTED]";
+    }
 }

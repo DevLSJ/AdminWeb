@@ -41,6 +41,12 @@ public class KeyStatusHistory {
     @Column(name = "changed_by", nullable = false, length = 64)
     private String changedBy;
 
+    @Column(nullable = false, length = 32)
+    private String operation;
+
+    @Column(name = "key_version", nullable = false)
+    private int keyVersion;
+
     @Column(name = "changed_at", nullable = false, updatable = false)
     private Instant changedAt;
 
@@ -48,11 +54,24 @@ public class KeyStatusHistory {
     }
 
     public KeyStatusHistory(CryptoKey cryptoKey, KeyStatus fromStatus, KeyStatus toStatus, String reason, String changedBy) {
+        this(cryptoKey, fromStatus, toStatus, "STATUS_CHANGE", reason, changedBy);
+    }
+
+    public KeyStatusHistory(
+            CryptoKey cryptoKey,
+            KeyStatus fromStatus,
+            KeyStatus toStatus,
+            String operation,
+            String reason,
+            String changedBy
+    ) {
         this.cryptoKey = cryptoKey;
         this.fromStatus = fromStatus;
         this.toStatus = toStatus;
         this.reason = reason;
         this.changedBy = changedBy;
+        this.operation = operation;
+        this.keyVersion = cryptoKey.getCurrentVersion();
     }
 
     @PrePersist
@@ -63,5 +82,7 @@ public class KeyStatusHistory {
     public KeyStatus getToStatus() { return toStatus; }
     public String getReason() { return reason; }
     public String getChangedBy() { return changedBy; }
+    public String getOperation() { return operation; }
+    public int getKeyVersion() { return keyVersion; }
     public Instant getChangedAt() { return changedAt; }
 }

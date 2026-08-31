@@ -37,6 +37,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import { alpha } from '@mui/material/styles'
 import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { KeyLifecycleGuide } from '../../components/keys/KeyLifecycleGuide'
@@ -55,12 +56,12 @@ const defaultParams: KeyListParams = {
   status: 'ALL',
   purpose: 'ALL',
   page: 0,
-  size: 5,
+  size: 20,
   sort: 'createdAt,desc',
 }
 
 const algorithmOptions = ['ALL', 'AES', 'HMAC', 'RSA'] as const
-const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED', 'DESTROYED'] as const
+const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'REACTIVATED', 'DEACTIVATED', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 
 function KeyList() {
@@ -214,24 +215,26 @@ function KeyList() {
         </Stack>
       </FilterCard>
 
-      <Card>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 14 }}>관리 키 {totalElements.toLocaleString()}개</Typography><FormControl size="small" sx={{ minWidth: 132 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
-        <TableContainer sx={{ maxHeight: params.size === 20 ? 820 : params.size === 10 ? 620 : 440 }}>
-          <Table stickyHeader sx={{ minWidth: 1050 }}>
-            <TableHead><TableRow><TableCell>키 이름 / UID</TableCell><TableCell>알고리즘</TableCell><TableCell>용도</TableCell><TableCell>상태</TableCell><TableCell>버전</TableCell><TableCell>만료일</TableCell><TableCell>무결성</TableCell><TableCell align="right">관리</TableCell></TableRow></TableHead>
+      <Card sx={{ overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack><FormControl size="small" sx={{ minWidth: 128 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[20, 50, 100].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
+        <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)', minHeight: 360 }}>
+          <Table stickyHeader size="small" sx={{ minWidth: 1180, '& .MuiTableCell-root': { px: 1.25, py: 0.72 }, '& .MuiTableCell-head': { py: 0.9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '0.02em' } }}>
+            <TableHead><TableRow><TableCell>키 이름 / UID</TableCell><TableCell>알고리즘·모드</TableCell><TableCell>용도</TableCell><TableCell>상태</TableCell><TableCell>버전</TableCell><TableCell>자동 갱신</TableCell><TableCell>만료일</TableCell><TableCell>무결성</TableCell><TableCell align="right">관리</TableCell></TableRow></TableHead>
             <TableBody>
               {pageContent.map((key) => (
-                <TableRow key={key.keyUid} hover sx={{ cursor: 'pointer' }} onDoubleClick={() => navigate(`/keys/${key.keyUid}`)}>
-                  <TableCell><Typography sx={{ fontWeight: 700, fontSize: 14 }}>{key.keyName}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 12.5 }}>{key.keyUid}</Typography></TableCell>
-                  <TableCell><StatusBadge label={`${key.algorithm}-${key.keySize}`} tone="neutral" /></TableCell>
-                  <TableCell>{key.purpose}</TableCell>
+                <TableRow key={key.keyUid} hover sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? 'action.hover' : (theme) => alpha(theme.palette.error.main, 0.13) } }} onDoubleClick={() => navigate(`/keys/${key.keyUid}`)}>
+                  <TableCell><Typography noWrap sx={{ maxWidth: 220, fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography noWrap sx={{ maxWidth: 220, color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
+                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{key.algorithm}-{key.keySize}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{key.mode}</Typography></TableCell>
+                  <TableCell sx={{ fontSize: 12 }}>{key.purpose}</TableCell>
                   <TableCell><StatusBadge status={key.status} /></TableCell>
-                  <TableCell>v{key.version}</TableCell>
-                  <TableCell>{key.expireAt}</TableCell>
-                  <TableCell>{key.integrityValid ? <StatusBadge status="VALID" icon={<CheckCircleRounded />} /> : <StatusBadge status="INVALID" icon={<WarningAmberRounded />} />}</TableCell>
-                  <TableCell align="right"><Stack direction="row" spacing={0.5} sx={{ justifyContent: 'flex-end' }}><Button size="small" variant="text" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>{isAdmin && <Button size="small" variant="outlined" disabled={getManualKeyStatusTransitions(key.status).length === 0} onClick={() => openTransition(key)}>상태 변경</Button>}{isAdmin && <Button size="small" color="error" startIcon={<DeleteOutlineRounded />} onClick={() => openDelete(key)}>삭제</Button>}</Stack></TableCell>
+                  <TableCell sx={{ fontSize: 12, fontWeight: 800 }}>v{key.version}</TableCell>
+                  <TableCell sx={{ fontSize: 11.5 }}>{key.autoRotationDays ? `${key.autoRotationDays}일` : '—'}</TableCell>
+                  <TableCell sx={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{key.expireAt || '—'}</TableCell>
+                  <TableCell>{key.integrityValid ? <StatusBadge status="VALID" icon={<CheckCircleRounded />} /> : <StatusBadge status="INVALID" icon={<WarningAmberRounded />} sx={{ animation: 'integrity-pulse 1.8s ease-in-out infinite' }} />}</TableCell>
+                  <TableCell align="right"><Stack direction="row" spacing={0.35} sx={{ justifyContent: 'flex-end' }}><Button size="small" variant="text" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>{isAdmin && <Button size="small" variant="outlined" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => openTransition(key)}>상태</Button>}{isAdmin && <Button size="small" color="error" onClick={() => openDelete(key)}><DeleteOutlineRounded sx={{ fontSize: 17 }} /></Button>}</Stack></TableCell>
                 </TableRow>
               ))}
+              {!listLoading && pageContent.length === 0 && <TableRow><TableCell colSpan={9} align="center" sx={{ py: 8, color: 'text.secondary' }}>조건에 맞는 키가 없습니다.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </TableContainer>

@@ -132,6 +132,7 @@ function MainLayout() {
 
   if (!user) return null
 
+  // 메뉴 필터는 UX용이며 실제 접근 권한은 라우트 가드와 백엔드 인가가 최종 판단한다.
   const visibleMenuGroups = menuGroups
     .filter((group) => group.roles.includes(user.role))
     .map((group) => ({ ...group, children: group.children?.filter((child) => child.roles.includes(user.role)) }))
@@ -238,7 +239,9 @@ function MainLayout() {
             p: { xs: 2, sm: 2.5 },
           }}
         >
-          <Outlet />
+          <Box key={location.pathname} className="page-route-transition">
+            <Outlet />
+          </Box>
         </Box>
       </Box>
       <Snackbar open={Boolean(feedback)} autoHideDuration={3500} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>

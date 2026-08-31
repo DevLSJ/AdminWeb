@@ -7,6 +7,7 @@ import { AuthContext } from './AuthContext'
 import type { ApiResponse } from '../types/api'
 import { canChangeRole, type AuthContextValue, type AuthResult, type AuthUser, type LoginCredentials, type MockAccount, type UserRole } from '../types/auth'
 
+// TODO: 프로필·역할 편집 화면용 임시 데이터이며, 실제 로그인 인증은 항상 백엔드 API가 담당한다.
 const initialAccounts: MockAccount[] = [
   { userUid: 'usr-auth-admin', loginId: 'admin', password: 'admin', name: '최고 관리자', role: 'S.ADMIN' },
   { userUid: 'usr-auth-manager', loginId: 'manager', password: 'manager', name: '일반 관리자', role: 'ADMIN' },
@@ -16,6 +17,7 @@ const initialAccounts: MockAccount[] = [
 ]
 
 function readStoredSession(): AuthUser | null {
+  // 토큰과 사용자 정보가 모두 있을 때만 새로고침 후 세션 복원을 시도한다.
   if (!localStorage.getItem(TOKEN_STORAGE_KEY)) return null
   try {
     const value = localStorage.getItem(SESSION_STORAGE_KEY)
@@ -63,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    // 저장된 JWT의 유효성과 최신 계정 상태를 서버에서 다시 확인한다.
     let active = true
     void apiClient.get<ApiResponse<AuthUser>>(apiEndpoints.auth.me)
       .then(({ data }) => {
@@ -106,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshSession = async (): Promise<AuthResult> => {
     try {
+      // refresh 응답의 새 JWT를 먼저 저장해 이후 타이머와 API 요청 기준을 함께 갱신한다.
       const { data } = await apiClient.post<ApiResponse<AuthUser & { token: string }>>(apiEndpoints.auth.refresh)
       persistToken(data.data.token)
       persistSession({

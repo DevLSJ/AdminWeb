@@ -1,22 +1,27 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   AddRounded,
   EditRounded,
-  ManageAccountsRounded,
+  LockResetRounded,
   PersonSearchRounded,
-  TouchAppRounded,
+  RefreshRounded,
+  SearchRounded,
+  SecurityRounded,
   VisibilityRounded,
+  WarningAmberRounded,
 } from '@mui/icons-material'
 import {
   Alert,
   Box,
   Button,
   Card,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Select,
@@ -28,137 +33,245 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
-import { InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import {
+  changeUserStatus,
+  createUser,
+  fetchUserPage,
+  fetchUserPlain,
+  getApiErrorMessage,
+  resetUserPassword,
+  updateUser,
+} from '../../api/kms'
+import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
-import { useAuth } from '../../hooks/useAuth'
-import { mockUsers } from '../../mocks/adminData'
-import type { AppUser, UserStatus } from '../../types/api'
-import { canChangeRole, type AuthResult, type AuthUser, type UserRole } from '../../types/auth'
+import type { AppUser, AppUserPlain, PageResponse, UserListParams, UserStatus } from '../../types/api'
 
+const emptyPage: PageResponse<AppUser> = { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0 }
 const emptyForm = { name: '', phone: '', email: '', password: '' }
+const initialParams: UserListParams = { name: '', phone: '', status: 'ALL', page: 0, size: 10 }
+
+function formatKst(value: string) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(value))
+}
 
 function UserList() {
-  const { accounts, user: currentUser, updateAccountRole } = useAuth()
-  const [users, setUsers] = useState(mockUsers)
-  const [page, setPage] = useState(0)
-  const [pageSize, setPageSize] = useState(5)
+  const [draft, setDraft] = useState(initialParams)
+  const [params, setParams] = useState(initialParams)
+  const [pageData, setPageData] = useState(emptyPage)
+  const [loading, setLoading] = useState(true)
+  const [busyUserUid, setBusyUserUid] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [detailUser, setDetailUser] = useState<AppUser | null>(null)
-  const [plainUser, setPlainUser] = useState<AppUser | null>(null)
+  const [plainCandidate, setPlainCandidate] = useState<AppUser | null>(null)
+  const [plainReason, setPlainReason] = useState('')
+  const [plainUser, setPlainUser] = useState<AppUserPlain | null>(null)
   const [formUser, setFormUser] = useState<AppUser | null | undefined>(undefined)
   const [form, setForm] = useState(emptyForm)
-  const [message, setMessage] = useState('')
-  const [roleResult, setRoleResult] = useState<AuthResult | null>(null)
-  const [selectedUserUid, setSelectedUserUid] = useState<string | null>(null)
-  const [pendingRole, setPendingRole] = useState<UserRole | ''>('')
+  const [passwordUser, setPasswordUser] = useState<AppUser | null>(null)
+  const [newPassword, setNewPassword] = useState('')
 
-  const roleOptions: UserRole[] = currentUser?.role === 'S.ADMIN'
-    ? ['S.ADMIN', 'ADMIN', 'CLIENT']
-    : ['ADMIN', 'CLIENT']
-  const canEditAccount = (account: AuthUser) => roleOptions.some((role) => canChangeRole(currentUser, account, role))
-
-  const pageContent = users.slice(page * pageSize, (page + 1) * pageSize)
-  const selectedUser = users.find((user) => user.userUid === selectedUserUid) ?? null
-  const selectedAccount = selectedUser?.loginId ? accounts.find((account) => account.loginId === selectedUser.loginId) ?? null : null
-  const selectedAccountEditable = selectedAccount ? canEditAccount(selectedAccount) : false
-  const formatRole = (role?: UserRole) => role === 'S.ADMIN' ? 'S.Admin' : role ?? '미연동'
-
-  const selectUser = (user: AppUser) => {
-    const account = user.loginId ? accounts.find((item) => item.loginId === user.loginId) : undefined
-    setSelectedUserUid(user.userUid)
-    setPendingRole(account?.role ?? '')
-    setRoleResult(null)
-  }
-
-  const changeSelectedRole = () => {
-    if (!selectedAccount || !pendingRole) return
-    setRoleResult(updateAccountRole(selectedAccount.loginId, pendingRole))
-  }
-
-  const openForm = (user: AppUser | null) => {
-    setFormUser(user)
-    setForm(user ? { name: user.name, phone: user.phonePlain, email: user.emailPlain, password: '' } : emptyForm)
-  }
-
-  const saveUser = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (formUser) {
-      setUsers((current) => current.map((user) => user.userUid === formUser.userUid ? { ...user, name: form.name, phonePlain: form.phone, phoneMasked: `${form.phone.slice(0, 4)}****-${form.phone.slice(-4)}`, emailPlain: form.email, emailMasked: `${form.email.slice(0, 2)}***@${form.email.split('@')[1] ?? 'example.com'}`, updatedAt: '2026-08-19 17:10:00', integrityValid: true } : user))
-      setMessage('사용자 정보가 재암호화되고 검색 해시·무결성 해시가 재계산되었습니다.')
-    } else {
-      const created: AppUser = { userUid: `usr-${crypto.randomUUID().slice(0, 8)}`, name: form.name, phonePlain: form.phone, phoneMasked: `${form.phone.slice(0, 4)}****-${form.phone.slice(-4)}`, emailPlain: form.email, emailMasked: `${form.email.slice(0, 2)}***@${form.email.split('@')[1] ?? 'example.com'}`, status: 'ACTIVE', integrityValid: true, encVer: 1, createdAt: '2026-08-19 17:10:00', updatedAt: '2026-08-19 17:10:00' }
-      setUsers((current) => [created, ...current])
-      setPage(0)
-      setMessage('사용자가 등록되었습니다. 비밀번호는 PBKDF2+Salt, 개인정보는 AES-256-GCM으로 보호됩니다.')
+  const loadUsers = useCallback(async (nextParams: UserListParams) => {
+    setLoading(true)
+    setError('')
+    try {
+      setPageData(await fetchUserPage(nextParams))
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '사용자 목록을 불러오지 못했습니다.'))
+    } finally {
+      setLoading(false)
     }
-    setFormUser(undefined)
+  }, [])
+
+  useEffect(() => {
+    void loadUsers(params)
+  }, [loadUsers, params])
+
+  const search = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setParams({ ...draft, page: 0 })
   }
 
-  const toggleStatus = (user: AppUser) => {
-    const status: UserStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    setUsers((current) => current.map((item) => item.userUid === user.userUid ? { ...item, status } : item))
-    setMessage(`${user.name} 사용자가 ${status} 상태로 변경되었습니다.`)
+  const resetFilters = () => {
+    setDraft(initialParams)
+    setParams(initialParams)
+  }
+
+  const openCreate = () => {
+    setForm(emptyForm)
+    setFormUser(null)
+  }
+
+  const openEdit = async (user: AppUser) => {
+    setBusyUserUid(user.userUid)
+    setError('')
+    try {
+      const plain = await fetchUserPlain(user.userUid, '사용자 개인정보 수정')
+      setForm({ name: plain.name, phone: plain.phone, email: plain.email, password: '' })
+      setFormUser(user)
+      setMessage('수정 화면 구성을 위한 원문 조회가 감사 로그에 기록되었습니다.')
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '수정할 개인정보를 불러오지 못했습니다.'))
+    } finally {
+      setBusyUserUid(null)
+    }
+  }
+
+  const saveUser = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    try {
+      if (formUser) {
+        await updateUser(formUser.userUid, { name: form.name, phone: form.phone, email: form.email })
+        setMessage('개인정보를 새 IV로 재암호화하고 검색·무결성 HMAC을 갱신했습니다.')
+      } else {
+        await createUser(form)
+        setMessage('사용자를 등록했습니다. 개인정보는 마스터키로 암호화되어 DB에 저장됩니다.')
+      }
+      setFormUser(undefined)
+      await loadUsers(params)
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '사용자 정보를 저장하지 못했습니다.'))
+    }
+  }
+
+  const viewPlain = async () => {
+    if (!plainCandidate || plainReason.trim().length < 2) return
+    setBusyUserUid(plainCandidate.userUid)
+    setError('')
+    try {
+      setPlainUser(await fetchUserPlain(plainCandidate.userUid, plainReason.trim()))
+      setPlainCandidate(null)
+      setPlainReason('')
+      setMessage('원문 조회 사유와 행위자가 USER_VIEW_PLAIN 감사 로그에 기록되었습니다.')
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '개인정보 원문을 조회하지 못했습니다.'))
+    } finally {
+      setBusyUserUid(null)
+    }
+  }
+
+  const toggleStatus = async (user: AppUser) => {
+    const nextStatus: UserStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    setBusyUserUid(user.userUid)
+    setError('')
+    try {
+      await changeUserStatus(user.userUid, nextStatus)
+      setMessage(`${user.nameMasked} 사용자를 ${nextStatus} 상태로 변경했습니다.`)
+      await loadUsers(params)
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '사용자 상태를 변경하지 못했습니다.'))
+    } finally {
+      setBusyUserUid(null)
+    }
+  }
+
+  const resetPassword = async () => {
+    if (!passwordUser || newPassword.length < 8) return
+    setBusyUserUid(passwordUser.userUid)
+    setError('')
+    try {
+      await resetUserPassword(passwordUser.userUid, newPassword)
+      setPasswordUser(null)
+      setNewPassword('')
+      setMessage('새 Salt와 PBKDF2-HMAC-SHA256 해시로 비밀번호를 재설정했습니다.')
+      await loadUsers(params)
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '비밀번호를 재설정하지 못했습니다.'))
+    } finally {
+      setBusyUserUid(null)
+    }
   }
 
   return (
     <Box>
-      <PageHeader title="사용자 관리" description="개인정보를 마스킹해 표시하고 사용자 상태·무결성·시스템 계정 권한을 관리합니다." action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm(null)}>사용자 등록</Button>} />
+      <PageHeader
+        title="사용자 관리"
+        description="개인정보 원문을 DB에 남기지 않고 마스킹 조회·사유 기반 원문 조회·행 무결성 검증을 수행합니다."
+        action={<Button data-testid="user-create-button" variant="contained" startIcon={<AddRounded />} onClick={openCreate}>사용자 등록</Button>}
+      />
+      <Alert icon={<SecurityRounded />} severity="info" sx={{ mb: 2 }}>
+        이름·연락처·이메일은 AES-256-GCM으로 암호화되며, 목록 API는 마스킹 값만 반환합니다. 원문 조회는 캐시가 금지되고 감사 체인에 기록됩니다.
+      </Alert>
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
-      {roleResult && <Alert severity={roleResult.success ? 'success' : 'error'} onClose={() => setRoleResult(null)} sx={{ mb: 2 }}>{roleResult.message}</Alert>}
-      <Card sx={{ mb: 2.5 }}>
-        <Box sx={{ p: 2.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><ManageAccountsRounded color="primary" /><Typography variant="h6">시스템 계정 권한</Typography></Box>
-          <Typography sx={{ mt: 0.5, color: 'text.secondary', fontSize: 14, lineHeight: 1.65 }}>아래 사용자 행을 선택하면 로그인 계정과 현재 권한을 확인하고, 허용된 위계 내에서 권한을 변경할 수 있습니다.</Typography>
+      {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
+
+      <FilterCard>
+        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 180px auto' }, gap: 1.25 }}>
+          <TextField size="small" label="이름 정확히 검색" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
+          <TextField size="small" label="연락처 정확히 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
+          <FormControl size="small"><InputLabel>상태</InputLabel><Select label="상태" value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as UserListParams['status'] }))}><MenuItem value="ALL">전체</MenuItem><MenuItem value="ACTIVE">ACTIVE</MenuItem><MenuItem value="INACTIVE">INACTIVE</MenuItem></Select></FormControl>
+          <Stack direction="row" spacing={1}><Button type="submit" variant="contained">검색</Button><Button color="inherit" startIcon={<RefreshRounded />} onClick={resetFilters}>초기화</Button></Stack>
         </Box>
-        {!selectedUser ? (
-          <Box sx={{ display: 'grid', minHeight: 190, placeItems: 'center', borderTop: '1px solid', borderColor: 'divider', bgcolor: '#fbfcfe', textAlign: 'center' }}>
-            <Box><TouchAppRounded sx={{ color: 'text.disabled', fontSize: 42 }} /><Typography sx={{ mt: 1, fontSize: 15, fontWeight: 700 }}>선택된 사용자가 없습니다.</Typography><Typography sx={{ mt: 0.5, color: 'text.secondary', fontSize: 13.5 }}>하단 목록에서 권한을 확인할 사용자 행을 선택하세요.</Typography></Box>
-          </Box>
-        ) : (
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(150px, 1fr)) minmax(300px, 1.35fr)' }, gap: 2, alignItems: 'end', p: 2.5, borderTop: '1px solid', borderColor: 'divider', bgcolor: '#fbfcfe' }}>
-            <Box><Typography sx={{ color: 'text.secondary', fontSize: 13, fontWeight: 700 }}>로그인 ID</Typography><Typography sx={{ mt: 0.7, fontSize: 15, fontWeight: 800 }}>{selectedAccount?.loginId ?? selectedUser.loginId ?? '계정 미연동'}</Typography></Box>
-            <Box><Typography sx={{ color: 'text.secondary', fontSize: 13, fontWeight: 700 }}>이름</Typography><Typography sx={{ mt: 0.7, fontSize: 15, fontWeight: 800 }}>{selectedUser.name}</Typography></Box>
-            <Box><Typography sx={{ color: 'text.secondary', fontSize: 13, fontWeight: 700 }}>현재 권한</Typography><Typography sx={{ mt: 0.7, fontSize: 15, fontWeight: 800 }}>{formatRole(selectedAccount?.role)}</Typography></Box>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <FormControl size="small" fullWidth disabled={!selectedAccountEditable}>
-                <InputLabel>변경할 권한</InputLabel>
-                <Select label="변경할 권한" value={pendingRole} onChange={(event) => setPendingRole(event.target.value as UserRole)}>
-                  {roleOptions.map((role) => <MenuItem key={role} value={role}>{role === 'S.ADMIN' ? 'S.Admin' : role}</MenuItem>)}
-                </Select>
-              </FormControl>
-              <Button variant="contained" disabled={!selectedAccountEditable || !pendingRole || pendingRole === selectedAccount?.role} onClick={changeSelectedRole} sx={{ minWidth: 104, whiteSpace: 'nowrap' }}>권한 변경</Button>
-            </Stack>
-            {!selectedAccountEditable && <Typography sx={{ gridColumn: { md: '4' }, color: 'text.secondary', fontSize: 13 }}>{selectedAccount?.loginId === currentUser?.loginId ? '현재 로그인한 계정은 변경할 수 없습니다.' : currentUser?.role === 'ADMIN' && selectedAccount?.role !== 'CLIENT' ? '일반 관리자는 다른 Admin 또는 S.Admin 계정을 변경할 수 없습니다.' : '이 계정의 권한을 변경할 수 없습니다.'}</Typography>}
-          </Box>
-        )}
-      </Card>
+        <Typography sx={{ mt: 1, color: 'text.secondary', fontSize: 12.5 }}>검색어는 복호화하지 않고 정규화된 HMAC 검색값으로 정확히 일치시킵니다.</Typography>
+      </FilterCard>
+
       <Card>
-        <TableContainer>
-          <Table sx={{ minWidth: 1160, tableLayout: 'fixed', '& .MuiTableCell-root': { px: 2, py: 1.8, fontSize: 15 }, '& .MuiTableCell-head': { bgcolor: '#f8f9fc', color: 'text.secondary', fontSize: 14.5, fontWeight: 800, whiteSpace: 'nowrap' } }}>
-            <TableHead><TableRow><TableCell sx={{ width: '17%' }}>사용자</TableCell><TableCell sx={{ width: '12%' }}>연락처</TableCell><TableCell sx={{ width: '16%' }}>이메일</TableCell><TableCell sx={{ width: '10%' }}>상태</TableCell><TableCell sx={{ width: '12%' }}>시스템 권한</TableCell><TableCell sx={{ width: '11%' }}>등록일</TableCell><TableCell align="right" sx={{ width: '22%' }}>관리</TableCell></TableRow></TableHead>
-            <TableBody>{pageContent.map((user) => (
-              <TableRow key={user.userUid} hover selected={selectedUserUid === user.userUid} tabIndex={0} onClick={() => selectUser(user)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectUser(user) } }} aria-selected={selectedUserUid === user.userUid} sx={{ cursor: 'pointer', '&.Mui-selected': { bgcolor: 'action.selected' } }}>
-                <TableCell><Typography sx={{ fontSize: 15.5, fontWeight: 750 }}>{user.name}</Typography><Typography sx={{ mt: 0.25, color: 'text.secondary', fontSize: 13.5 }}>{user.loginId ? `${user.loginId} · ${user.userUid}` : user.userUid}</Typography></TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{user.phoneMasked}</TableCell>
-                <TableCell>{user.emailMasked}</TableCell>
-                <TableCell><StatusBadge status={user.status} /></TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatRole(user.loginId ? accounts.find((account) => account.loginId === user.loginId)?.role : undefined)}</TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{user.createdAt.split(' ')[0]}</TableCell>
-                <TableCell align="right"><Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}><Button size="small" startIcon={<PersonSearchRounded />} onClick={() => setDetailUser(user)} sx={{ px: 1.4 }}>상세</Button><Button size="small" startIcon={<EditRounded />} onClick={() => openForm(user)} sx={{ px: 1.4 }}>수정</Button><Button size="small" onClick={() => toggleStatus(user)} sx={{ px: 1.6 }}>{user.status === 'ACTIVE' ? '정지' : '활성'}</Button></Stack></TableCell>
-              </TableRow>
-            ))}</TableBody>
+        <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
+          <Table stickyHeader size="small" sx={{ minWidth: 1080, tableLayout: 'fixed' }}>
+            <TableHead><TableRow><TableCell sx={{ width: '16%' }}>사용자</TableCell><TableCell sx={{ width: '15%' }}>연락처</TableCell><TableCell sx={{ width: '21%' }}>이메일</TableCell><TableCell sx={{ width: '10%' }}>상태</TableCell><TableCell sx={{ width: '12%' }}>무결성</TableCell><TableCell sx={{ width: '12%' }}>등록일</TableCell><TableCell align="right" sx={{ width: '24%' }}>관리</TableCell></TableRow></TableHead>
+            <TableBody>
+              {loading && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
+              {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
+              {!loading && pageData.content.map((user) => {
+                const busy = busyUserUid === user.userUid
+                return (
+                  <TableRow key={user.userUid} hover sx={!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : undefined}>
+                    <TableCell><Stack direction="row" spacing={0.8} sx={{ alignItems: 'center' }}>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box><Typography sx={{ fontWeight: 750 }}>{user.nameMasked}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{user.userUid}</Typography></Box></Stack></TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{user.phoneMasked}</TableCell>
+                    <TableCell><Typography noWrap>{user.emailMasked}</Typography></TableCell>
+                    <TableCell><StatusBadge status={user.status} /></TableCell>
+                    <TableCell><StatusBadge status={user.integrityValid ? 'VALID' : 'INVALID'} /></TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatKst(user.createdAt).slice(0, 13)}</TableCell>
+                    <TableCell align="right"><Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end' }}>
+                      <Tooltip title="마스킹 상세"><Button size="small" startIcon={<PersonSearchRounded />} onClick={() => setDetailUser(user)}>상세</Button></Tooltip>
+                      <Tooltip title={user.integrityValid ? '원문 조회 감사기록 후 수정' : '무결성 위반으로 수정 차단'}><span><Button size="small" startIcon={<EditRounded />} disabled={!user.integrityValid || busy} onClick={() => void openEdit(user)}>수정</Button></span></Tooltip>
+                      <Tooltip title="비밀번호 재설정"><span><Button size="small" aria-label="비밀번호 재설정" disabled={!user.integrityValid || busy} onClick={() => { setPasswordUser(user); setNewPassword('') }}><LockResetRounded fontSize="small" /></Button></span></Tooltip>
+                      <Button size="small" disabled={!user.integrityValid || busy} onClick={() => void toggleStatus(user)}>{user.status === 'ACTIVE' ? '정지' : '활성'}</Button>
+                    </Stack></TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
           </Table>
         </TableContainer>
-        <PaginationBar page={page} size={pageSize} totalElements={users.length} onPageChange={setPage} onSizeChange={(size) => { setPageSize(size); setPage(0) }} />
+        <PaginationBar page={params.page} size={params.size} totalElements={pageData.totalElements} onPageChange={(page) => setParams((current) => ({ ...current, page }))} onSizeChange={(size) => setParams((current) => ({ ...current, page: 0, size }))} />
       </Card>
 
-      <Dialog open={Boolean(detailUser)} onClose={() => setDetailUser(null)} fullWidth maxWidth="sm"><DialogTitle>사용자 상세</DialogTitle><DialogContent>{detailUser && <><Alert severity={detailUser.integrityValid ? 'success' : 'error'} sx={{ mb: 2 }}>{detailUser.integrityValid ? '행 무결성 검증이 정상입니다.' : '행 무결성이 훼손되어 원문 조회를 차단해야 합니다.'}</Alert><InfoRow label="사용자 UID" value={detailUser.userUid} /><InfoRow label="이름" value={detailUser.name} /><InfoRow label="연락처" value={detailUser.phoneMasked} /><InfoRow label="이메일" value={detailUser.emailMasked} /><InfoRow label="상태" value={<StatusBadge status={detailUser.status} />} /><InfoRow label="암호화 버전" value={`enc_ver ${detailUser.encVer}`} /></>}</DialogContent><DialogActions><Button onClick={() => setDetailUser(null)}>닫기</Button><Button variant="contained" startIcon={<VisibilityRounded />} disabled={!detailUser?.integrityValid} onClick={() => { setPlainUser(detailUser); setDetailUser(null) }}>원문 보기</Button></DialogActions></Dialog>
+      <Dialog open={Boolean(detailUser)} onClose={() => setDetailUser(null)} fullWidth maxWidth="sm">
+        <DialogTitle>사용자 마스킹 상세</DialogTitle>
+        <DialogContent>{detailUser && <>
+          <Alert severity={detailUser.integrityValid ? 'success' : 'error'} sx={{ mb: 2 }}>{detailUser.integrityValid ? '암호문·IV·검색값·상태의 행 무결성이 정상입니다.' : '행 무결성이 훼손되어 원문 조회와 변경이 차단됩니다.'}</Alert>
+          <InfoRow label="사용자 UID" value={detailUser.userUid} /><InfoRow label="이름" value={detailUser.nameMasked} /><InfoRow label="연락처" value={detailUser.phoneMasked} /><InfoRow label="이메일" value={detailUser.emailMasked} /><InfoRow label="상태" value={<StatusBadge status={detailUser.status} />} /><InfoRow label="암호화 버전" value={`enc_ver ${detailUser.encVer}`} /><InfoRow label="등록자" value={detailUser.createdBy} /><InfoRow label="수정 시각" value={`${formatKst(detailUser.updatedAt)} KST`} />
+        </>}</DialogContent>
+        <DialogActions><Button onClick={() => setDetailUser(null)}>닫기</Button><Button data-testid="plain-view-start" variant="contained" startIcon={<VisibilityRounded />} disabled={!detailUser?.integrityValid} onClick={() => { setPlainCandidate(detailUser); setPlainReason(''); setDetailUser(null) }}>원문 보기</Button></DialogActions>
+      </Dialog>
 
-      <Dialog open={Boolean(plainUser)} onClose={() => setPlainUser(null)} fullWidth maxWidth="sm"><DialogTitle>개인정보 원문 조회</DialogTitle><DialogContent>{plainUser && <><Alert severity="warning" sx={{ mb: 2 }}>ADMIN 전용 기능입니다. 마스터키로 복호화하며 USER_VIEW_PLAIN 감사로그가 자동 기록됩니다.</Alert><InfoRow label="이름" value={plainUser.name} /><InfoRow label="연락처 원문" value={plainUser.phonePlain} /><InfoRow label="이메일 원문" value={plainUser.emailPlain} /></>}</DialogContent><DialogActions><Button onClick={() => setPlainUser(null)}>확인</Button></DialogActions></Dialog>
+      <Dialog open={Boolean(plainCandidate)} onClose={() => setPlainCandidate(null)} fullWidth maxWidth="sm">
+        <DialogTitle>개인정보 원문 조회 승인</DialogTitle>
+        <DialogContent><Alert severity="warning" sx={{ mb: 2 }}>원문 조회는 마스터키 복호화 후 수행되며 행위자·대상·사유가 USER_VIEW_PLAIN 감사 로그에 남습니다.</Alert><TextField autoFocus fullWidth required multiline minRows={3} label="조회 사유" value={plainReason} onChange={(event) => setPlainReason(event.target.value)} slotProps={{ htmlInput: { maxLength: 200 } }} helperText={`${plainReason.trim().length}/200 · 최소 2자`} /></DialogContent>
+        <DialogActions><Button onClick={() => setPlainCandidate(null)}>취소</Button><Button data-testid="plain-view-confirm" variant="contained" color="warning" disabled={plainReason.trim().length < 2 || busyUserUid === plainCandidate?.userUid} onClick={() => void viewPlain()}>감사 기록 후 조회</Button></DialogActions>
+      </Dialog>
 
-      <Dialog open={formUser !== undefined} onClose={() => setFormUser(undefined)} fullWidth maxWidth="sm"><Box component="form" onSubmit={saveUser}><DialogTitle>{formUser ? '사용자 수정' : '사용자 등록'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="이름" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /><TextField required label="연락처" placeholder="010-1234-5678" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} helperText="저장 시 AES-GCM 재암호화 및 HMAC 검색 해시를 생성합니다." /><TextField required type="email" label="이메일" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />{!formUser && <TextField required type="password" label="초기 비밀번호" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} helperText="새 Salt를 생성해 PBKDF2 단방향 해시로 저장합니다." />}</Stack></DialogContent><DialogActions><Button onClick={() => setFormUser(undefined)}>취소</Button><Button type="submit" variant="contained" disabled={!form.name || !form.phone || !form.email || (!formUser && !form.password)}>저장</Button></DialogActions></Box></Dialog>
+      <Dialog open={Boolean(plainUser)} onClose={() => setPlainUser(null)} fullWidth maxWidth="sm">
+        <DialogTitle>개인정보 원문</DialogTitle>
+        <DialogContent>{plainUser && <><Alert severity="error" sx={{ mb: 2 }}>민감정보입니다. 화면·브라우저 캐시·감사로그에는 원문을 저장하지 마세요.</Alert><InfoRow label="이름 원문" value={plainUser.name} /><InfoRow label="연락처 원문" value={plainUser.phone} /><InfoRow label="이메일 원문" value={plainUser.email} /><InfoRow label="암호화 버전" value={`enc_ver ${plainUser.encVer}`} /></>}</DialogContent>
+        <DialogActions><Button data-testid="plain-view-close" variant="contained" onClick={() => setPlainUser(null)}>확인</Button></DialogActions>
+      </Dialog>
 
+      <Dialog open={formUser !== undefined} onClose={() => setFormUser(undefined)} fullWidth maxWidth="sm">
+        <Box component="form" onSubmit={saveUser}><DialogTitle>{formUser ? '사용자 개인정보 수정' : '암호화 사용자 등록'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="이름" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} slotProps={{ htmlInput: { maxLength: 64 } }} /><TextField required label="연락처" placeholder="010-1234-5678" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} helperText="정규화된 연락처 HMAC으로 중복과 정확 검색을 처리합니다." /><TextField required type="email" label="이메일" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />{!formUser && <TextField required type="password" label="초기 비밀번호" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8자 이상 · 사용자별 Salt와 PBKDF2-HMAC-SHA256 적용" />}</Stack></DialogContent><DialogActions><Button onClick={() => setFormUser(undefined)}>취소</Button><Button data-testid="user-save-button" type="submit" variant="contained" disabled={!form.name.trim() || !form.phone.trim() || !form.email.trim() || (!formUser && form.password.length < 8)}>암호화 저장</Button></DialogActions></Box>
+      </Dialog>
+
+      <Dialog open={Boolean(passwordUser)} onClose={() => setPasswordUser(null)} fullWidth maxWidth="xs">
+        <DialogTitle>비밀번호 재설정</DialogTitle><DialogContent><TextField autoFocus fullWidth type="password" label="새 비밀번호" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="새 Salt로 PBKDF2 해시를 생성하고 감사 로그를 기록합니다." sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setPasswordUser(null)}>취소</Button><Button variant="contained" disabled={newPassword.length < 8 || busyUserUid === passwordUser?.userUid} onClick={() => void resetPassword()}>재설정</Button></DialogActions>
+      </Dialog>
     </Box>
   )
 }

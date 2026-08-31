@@ -15,8 +15,10 @@ export interface CreateKeyInput {
   keyName: string
   algorithm: CryptoKey['algorithm']
   keySize: number
+  mode: CryptoKey['mode']
   purpose: CryptoKey['purpose']
   expireAt: string
+  autoRotationDays: AutoRotationDays
   activateImmediately: boolean
 }
 
@@ -43,7 +45,7 @@ export interface KmsContextValue {
   rotateKey: (keyUid: string) => Promise<number>
   setAutoRotation: (keyUid: string, days: AutoRotationDays) => Promise<void>
   encrypt: (keyUid: string, plaintext: string) => Promise<KeyEncryptResult>
-  decrypt: (keyUid: string, ciphertext: string, iv: string, version?: number) => Promise<string>
+  decrypt: (keyUid: string, ciphertext: string, iv: string | null, version?: number) => Promise<string>
 }
 
 export const KmsContext = createContext<KmsContextValue | null>(null)

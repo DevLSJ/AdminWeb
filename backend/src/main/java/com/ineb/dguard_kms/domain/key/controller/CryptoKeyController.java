@@ -30,6 +30,7 @@ import com.ineb.dguard_kms.domain.key.dto.KeyDistributionResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyEncryptRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyEncryptResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyHistoryResponse;
+import com.ineb.dguard_kms.domain.key.dto.KeyIntegrityReportResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyResponse;
 import com.ineb.dguard_kms.domain.key.dto.KeyRotationPolicyRequest;
 import com.ineb.dguard_kms.domain.key.dto.KeyRotationResponse;
@@ -93,6 +94,20 @@ public class CryptoKeyController {
     @Operation(summary = "키 버전 목록 조회")
     public ApiResponse<List<KeyVersionResponse>> versions(@PathVariable UUID keyUid) {
         return ApiResponse.success(keyService.versions(keyUid), "키 버전 조회에 성공했습니다.");
+    }
+
+    @PostMapping("/integrity/verify")
+    @Operation(summary = "전체 키 무결성 검증", description = "메타데이터와 모든 키 버전의 HMAC 및 폐기 키 NULL 여부를 검사합니다.")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
+    public ApiResponse<KeyIntegrityReportResponse> verifyAllIntegrity() {
+        return ApiResponse.success(keyService.verifyAllIntegrity(), "전체 키 무결성 검증이 완료되었습니다.");
+    }
+
+    @GetMapping("/integrity")
+    @Operation(summary = "최근 시점 전체 키 무결성 리포트")
+    @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
+    public ApiResponse<KeyIntegrityReportResponse> integrityReport() {
+        return ApiResponse.success(keyService.verifyAllIntegrity(), "전체 키 무결성 리포트 조회에 성공했습니다.");
     }
 
     @PostMapping
