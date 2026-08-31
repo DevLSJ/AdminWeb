@@ -1,4 +1,14 @@
 -- 3주차 사용자 개인정보 암호화 저장과 감사 로그 append-only 보호.
+-- V8의 과제 기본 app_user가 비어 있을 때만 신규 암호화 모델로 교체한다.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM app_user LIMIT 1) THEN
+        RAISE EXCEPTION 'V10 requires an explicit app_user data migration; existing rows found';
+    END IF;
+END;
+$$;
+
+DROP TABLE app_user;
 CREATE TABLE app_user (
     id BIGSERIAL PRIMARY KEY,
     user_uid UUID NOT NULL UNIQUE,
@@ -38,6 +48,9 @@ COMMENT ON COLUMN app_user.name_ciphertext IS '마스터키 AES-256-GCM 이름 �
 COMMENT ON COLUMN app_user.phone_ciphertext IS '마스터키 AES-256-GCM 연락처 암호문';
 COMMENT ON COLUMN app_user.email_ciphertext IS '마스터키 AES-256-GCM 이메일 암호문';
 COMMENT ON COLUMN app_user.integrity_hash IS '개인정보 암호문·검색값·상태를 포함한 HMAC-SHA256';
+
+DROP TRIGGER IF EXISTS trg_audit_log_append_only ON audit_log;
+DROP FUNCTION IF EXISTS reject_audit_log_mutation();
 
 CREATE OR REPLACE FUNCTION prevent_audit_log_mutation()
 RETURNS TRIGGER
