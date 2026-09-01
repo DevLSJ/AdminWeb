@@ -1,34 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { AddRounded, AttachFileRounded, DeleteOutlineRounded, DownloadRounded, EditRounded, SearchRounded, VisibilityRounded } from '@mui/icons-material'
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormControlLabel,
-  InputAdornment,
-  InputLabel,
-  List,
-  ListItem,
-  ListItemText,
-  MenuItem,
-  Select,
-  Stack,
-  Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { AddRounded, ArrowBackRounded, AttachFileRounded, DeleteOutlineRounded, DownloadRounded, EditRounded, SearchRounded } from '@mui/icons-material'
+import { Alert, Box, Button, Card, CardContent, FormControl, FormControlLabel, InputAdornment, InputLabel, List, ListItem, ListItemText, MenuItem, Select, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
@@ -49,95 +22,108 @@ function downloadMockFile(file: NoticeFile) {
   URL.revokeObjectURL(url)
 }
 
-function NoticeList({ autoCreate = false }: { autoCreate?: boolean }) {
+function NoticeList() {
   const { user } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [params, setParams] = useState(defaultParams)
   const [notices, setNotices] = useState(mockNotices)
-  const [detail, setDetail] = useState<Notice | null>(null)
-  const [editor, setEditor] = useState<Notice | null | undefined>(autoCreate ? null : undefined)
   const [form, setForm] = useState(emptyForm)
   const [files, setFiles] = useState<File[]>([])
+  const [editing, setEditing] = useState(false)
   const [message, setMessage] = useState('')
 
+  const pathParts = location.pathname.split('/').filter(Boolean)
+  const isCreate = pathParts[1] === 'new'
+  const noticeUid = isCreate ? '' : pathParts[1] ?? ''
+  const selectedNotice = notices.find((notice) => notice.noticeUid === noticeUid)
+  const isDetail = Boolean(noticeUid)
   const filteredNotices = useMemo(() => notices.filter((notice) => (!params.title.trim() || notice.title.toLowerCase().includes(params.title.trim().toLowerCase())) && (params.exposeYn === 'ALL' || notice.exposeYn === params.exposeYn)), [notices, params])
   const pageContent = filteredNotices.slice(params.page * params.size, (params.page + 1) * params.size)
+  const canManage = (notice: Notice) => isAdminRole(user?.role) || notice.createdBy === user?.loginId
+
+  useEffect(() => {
+    if (isCreate) {
+      setForm(emptyForm)
+      setFiles([])
+      setEditing(true)
+    } else if (selectedNotice) {
+      setForm({ title: selectedNotice.title, content: selectedNotice.content, exposeYn: selectedNotice.exposeYn })
+      setFiles([])
+      setEditing(false)
+    }
+  }, [isCreate, noticeUid, selectedNotice])
 
   const updateParam = <K extends keyof NoticeListParams>(key: K, value: NoticeListParams[K]) => setParams((current) => ({ ...current, [key]: value, page: key === 'page' ? Number(value) : 0 }))
-  const canManage = (notice: Notice) => isAdminRole(user?.role) || notice.createdBy === user?.loginId
-  const toggleExpose = (notice: Notice) => {
-    if (!canManage(notice)) return
-    const exposeYn = notice.exposeYn === 'Y' ? 'N' : 'Y'
-    setNotices((current) => current.map((item) => item.noticeUid === notice.noticeUid ? { ...item, exposeYn } : item))
-    setDetail((current) => current?.noticeUid === notice.noticeUid ? { ...current, exposeYn } : current)
-    setMessage(`${notice.title} 공지가 ${exposeYn === 'Y' ? '노출' : '숨김'} 상태로 변경되었습니다.`)
-  }
-  const openEditor = (notice: Notice | null) => {
-    if (notice && !canManage(notice)) {
-      setMessage('CLIENT는 본인이 작성한 공지만 수정할 수 있습니다.')
-      return
-    }
-    setEditor(notice)
-    setForm(notice ? { title: notice.title, content: notice.content, exposeYn: notice.exposeYn } : emptyForm)
-    setFiles([])
-  }
-
   const openDetail = (notice: Notice) => {
-    const viewed = { ...notice, viewCount: notice.viewCount + 1 }
-    setNotices((current) => current.map((item) => item.noticeUid === notice.noticeUid ? viewed : item))
-    setDetail(viewed)
+    setNotices((current) => current.map((item) => item.noticeUid === notice.noticeUid ? { ...item, viewCount: item.viewCount + 1 } : item))
+    navigate(`/notices/${notice.noticeUid}`)
   }
 
   const saveNotice = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const uploadedFiles: NoticeFile[] = files.map((file) => ({ fileUid: `file-${crypto.randomUUID().slice(0, 8)}`, originalName: file.name, size: file.size, encVer: 1 }))
-    if (editor) {
-      if (!canManage(editor)) return
-      setNotices((current) => current.map((notice) => notice.noticeUid === editor.noticeUid ? { ...notice, ...form, files: [...notice.files, ...uploadedFiles], updatedAt: '2026-08-19 17:40:00' } : notice))
+    if (selectedNotice) {
+      if (!canManage(selectedNotice)) return
+      setNotices((current) => current.map((notice) => notice.noticeUid === selectedNotice.noticeUid ? { ...notice, ...form, files: [...notice.files, ...uploadedFiles], updatedAt: '2026-09-01 11:30:00' } : notice))
+      setEditing(false)
+      setFiles([])
       setMessage('공지가 수정되고 신규 첨부파일이 마스터키로 암호화되었습니다.')
-    } else {
-      const created: Notice = { noticeUid: `notice-${crypto.randomUUID().slice(0, 8)}`, ...form, viewCount: 0, createdBy: user?.loginId ?? 'unknown', createdAt: '2026-08-20 09:00:00', updatedAt: '2026-08-20 09:00:00', files: uploadedFiles }
-      setNotices((current) => [created, ...current])
-      setMessage('공지가 등록되었습니다. 첨부파일은 AES-256-GCM 암호문으로 저장됩니다.')
+      return
     }
-    setEditor(undefined)
+    const created: Notice = { noticeUid: `notice-${crypto.randomUUID().slice(0, 8)}`, ...form, viewCount: 0, createdBy: user?.loginId ?? 'unknown', createdAt: '2026-09-01 11:30:00', updatedAt: '2026-09-01 11:30:00', files: uploadedFiles }
+    setNotices((current) => [created, ...current])
+    setMessage('공지가 등록되었습니다. 첨부파일은 AES-256-GCM 암호문으로 저장됩니다.')
+    navigate(`/notices/${created.noticeUid}`)
   }
 
   const deleteNotice = (notice: Notice) => {
-    if (!canManage(notice)) {
-      setMessage('CLIENT는 본인이 작성한 공지만 삭제할 수 있습니다.')
-      return
-    }
+    if (!canManage(notice)) return
     setNotices((current) => current.filter((item) => item.noticeUid !== notice.noticeUid))
-    setDetail(null)
-    setMessage(`${notice.title} 공지와 암호화된 첨부파일 ${notice.files.length}개가 함께 정리되었습니다.`)
+    navigate('/notices')
   }
 
   const deleteFile = (fileUid: string) => {
-    if (!detail) return
-    if (!canManage(detail)) {
-      setMessage('CLIENT는 본인이 작성한 글의 첨부파일만 삭제할 수 있습니다.')
-      return
-    }
-    const updated = { ...detail, files: detail.files.filter((file) => file.fileUid !== fileUid) }
-    setDetail(updated)
-    setNotices((current) => current.map((notice) => notice.noticeUid === updated.noticeUid ? updated : notice))
+    if (!selectedNotice || !canManage(selectedNotice)) return
+    setNotices((current) => current.map((notice) => notice.noticeUid === selectedNotice.noticeUid ? { ...notice, files: notice.files.filter((file) => file.fileUid !== fileUid) } : notice))
     setMessage('첨부파일과 notice_file 레코드가 삭제되었습니다.')
+  }
+
+  if ((isDetail || isCreate) && !selectedNotice && !isCreate) {
+    return <Box><Button startIcon={<ArrowBackRounded />} onClick={() => navigate('/notices')}>공지 목록</Button><Alert severity="error" sx={{ mt: 2 }}>요청한 공지를 찾을 수 없습니다.</Alert></Box>
+  }
+
+  if (isDetail || isCreate) {
+    const notice = selectedNotice
+    const showEditor = isCreate || editing
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2.5 }}>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}><Button color="inherit" startIcon={<ArrowBackRounded />} onClick={() => navigate('/notices')}>공지 목록</Button><Box sx={{ minWidth: 0 }}><Typography variant="h5" noWrap>{isCreate ? '공지 등록' : notice?.title}</Typography>{notice && <Typography sx={{ mt: .2, color: 'text.secondary', fontSize: 11.5 }}>{notice.noticeUid}</Typography>}</Box></Stack>
+          {notice && canManage(notice) && !showEditor && <Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<EditRounded />} onClick={() => setEditing(true)}>수정</Button><Button color="error" startIcon={<DeleteOutlineRounded />} onClick={() => deleteNotice(notice)}>삭제</Button></Stack>}
+        </Box>
+        {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
+        {showEditor ? (
+          <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">{isCreate ? '새 공지 작성' : '공지 수정'}</Typography></Box><Box component="form" onSubmit={saveNotice}><CardContent sx={{ p: '20px !important' }}><Stack spacing={2}><TextField required label="제목" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /><TextField required multiline minRows={10} label="본문" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /><FormControlLabel control={<Switch checked={form.exposeYn === 'Y'} onChange={(event) => setForm((current) => ({ ...current, exposeYn: event.target.checked ? 'Y' : 'N' }))} />} label="공지 노출" /><Button component="label" variant="outlined" startIcon={<AttachFileRounded />} sx={{ alignSelf: 'flex-start' }}>첨부파일 선택<input hidden multiple type="file" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} /></Button>{files.length > 0 && <Alert severity="info">선택한 {files.length}개 파일은 업로드 시 마스터키 AES-256-GCM으로 암호화됩니다.</Alert>}</Stack></CardContent><Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, px: 2.5, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>{!isCreate && <Button onClick={() => setEditing(false)}>취소</Button>}<Button type="submit" variant="contained" disabled={!form.title.trim() || !form.content.trim()}>저장</Button></Box></Box></Card>
+        ) : notice ? (
+          <Stack spacing={2}>
+            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">공지 상세</Typography><Stack direction="row" spacing={.75}><StatusBadge status={notice.exposeYn} minWidth={0} /><StatusBadge label={`조회 ${notice.viewCount.toLocaleString()}`} tone="neutral" minWidth={0} /></Stack></Box><CardContent sx={{ p: '20px !important' }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: .5, sm: 2 }} sx={{ mb: 2, color: 'text.secondary' }}><Typography sx={{ fontSize: 12.5 }}>작성자 {notice.createdBy}</Typography><Typography sx={{ fontSize: 12.5 }}>등록 {notice.createdAt}</Typography><Typography sx={{ fontSize: 12.5 }}>수정 {notice.updatedAt}</Typography></Stack><Typography sx={{ minHeight: 180, whiteSpace: 'pre-wrap', lineHeight: 1.85 }}>{notice.content}</Typography></CardContent></Card>
+            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => <ListItem key={file.fileUid} divider secondaryAction={<Stack direction="row" spacing={.5}><Button size="small" startIcon={<DownloadRounded />} onClick={() => { downloadMockFile(file); setMessage('첨부파일을 복호화해 다운로드하고 감사로그를 기록했습니다.') }}>복호화 다운로드</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => deleteFile(file.fileUid)}>삭제</Button>}</Stack>}><ListItemText primary={file.originalName} secondary={`${(file.size / 1024).toFixed(1)} KB · enc_ver ${file.encVer}`} /></ListItem>)}</List>}</CardContent></Card>
+          </Stack>
+        ) : null}
+      </Box>
+    )
   }
 
   return (
     <Box>
-      <PageHeader title="공지사항" description={isAdminRole(user?.role) ? '전체 공지 노출 상태와 첨부파일을 관리합니다.' : '공지를 조회·작성하고 본인이 작성한 글을 수정·삭제할 수 있습니다.'} action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openEditor(null)}>공지 등록</Button>} />
-      {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
-      <FilterCard><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 1.5fr) minmax(160px, 0.5fr) auto' }, gap: 1.5 }}><TextField size="small" label="title" placeholder="공지 제목 검색" value={params.title} onChange={(event) => updateParam('title', event.target.value)} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} /><FormControl size="small"><InputLabel>exposeYn</InputLabel><Select label="exposeYn" value={params.exposeYn} onChange={(event) => updateParam('exposeYn', event.target.value as NoticeListParams['exposeYn'])}><MenuItem value="ALL">전체</MenuItem><MenuItem value="Y">노출</MenuItem><MenuItem value="N">숨김</MenuItem></Select></FormControl><Button color="inherit" onClick={() => setParams((current) => ({ ...defaultParams, size: current.size }))}>초기화</Button></Box></FilterCard>
-      <Card>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 14 }}>공지사항 {filteredNotices.length.toLocaleString()}건</Typography><FormControl size="small" sx={{ minWidth: 132 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '공지사항 페이지당 개수' }}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
-        <TableContainer sx={{ maxHeight: params.size === 20 ? 820 : params.size === 10 ? 620 : 440 }}><Table stickyHeader sx={{ minWidth: 980 }}><TableHead><TableRow><TableCell>제목</TableCell><TableCell sx={{ minWidth: 150 }}>노출 상태</TableCell><TableCell>첨부</TableCell><TableCell>조회수</TableCell><TableCell>작성자</TableCell><TableCell>등록일</TableCell><TableCell align="right">관리</TableCell></TableRow></TableHead><TableBody>{pageContent.map((notice) => <TableRow key={notice.noticeUid} hover><TableCell><Typography sx={{ fontWeight: 700 }}>{notice.title}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>{notice.noticeUid}</Typography></TableCell><TableCell><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><StatusBadge status={notice.exposeYn} /><Switch size="small" checked={notice.exposeYn === 'Y'} disabled={!canManage(notice)} onChange={() => toggleExpose(notice)} slotProps={{ input: { 'aria-label': `${notice.title} 노출 상태 변경` } }} /></Stack></TableCell><TableCell><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={50} /></TableCell><TableCell>{notice.viewCount.toLocaleString()}</TableCell><TableCell>{notice.createdBy}{notice.createdBy === user?.loginId && <StatusBadge label="내 글" tone="accent" minWidth={46} sx={{ ml: 1 }} />}</TableCell><TableCell>{notice.createdAt.split(' ')[0]}</TableCell><TableCell align="right"><Button size="small" startIcon={<VisibilityRounded />} onClick={() => openDetail(notice)}>상세</Button>{canManage(notice) && <Button size="small" startIcon={<EditRounded />} onClick={() => openEditor(notice)}>수정</Button>}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
+      <PageHeader title="공지사항" action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/notices/new')}>공지 등록</Button>} />
+      <FilterCard><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 1.5fr) minmax(160px, .5fr) auto' }, gap: 1.25 }}><TextField size="small" label="제목 검색" value={params.title} onChange={(event) => updateParam('title', event.target.value)} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} /><FormControl size="small"><InputLabel>노출 상태</InputLabel><Select label="노출 상태" value={params.exposeYn} onChange={(event) => updateParam('exposeYn', event.target.value as NoticeListParams['exposeYn'])}><MenuItem value="ALL">전체</MenuItem><MenuItem value="Y">노출</MenuItem><MenuItem value="N">숨김</MenuItem></Select></FormControl><Button color="inherit" onClick={() => setParams((current) => ({ ...defaultParams, size: current.size }))}>초기화</Button></Box></FilterCard>
+      <Card sx={{ overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: .8, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>공지사항 {filteredNotices.length.toLocaleString()}건</Typography><FormControl size="small" sx={{ minWidth: 128 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))}>{[5, 10, 20].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
+        <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)', minHeight: 360 }}><Table stickyHeader size="small" className="dense-data-table" sx={{ minWidth: 880, '& .MuiTableCell-root': { px: 1.25, py: .72 }, '& .MuiTableCell-head': { py: .9, bgcolor: 'background.paper', fontSize: 12 } }}><TableHead><TableRow><TableCell>제목</TableCell><TableCell>첨부</TableCell><TableCell>노출</TableCell><TableCell>작성자</TableCell><TableCell>등록일</TableCell><TableCell align="right">조회수</TableCell></TableRow></TableHead><TableBody>{pageContent.map((notice) => <TableRow key={notice.noticeUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer' }} onClick={() => openDetail(notice)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(notice) }}><TableCell><Typography sx={{ fontWeight: 750, fontSize: 12.75 }}>{notice.title}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.5 }}>{notice.noticeUid}</Typography></TableCell><TableCell><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></TableCell><TableCell><StatusBadge status={notice.exposeYn} minWidth={0} /></TableCell><TableCell>{notice.createdBy}{notice.createdBy === user?.loginId && <StatusBadge label="내 글" tone="accent" minWidth={0} sx={{ ml: .75 }} />}</TableCell><TableCell><Typography sx={{ color: 'text.secondary', fontSize: 11.25 }}>{notice.createdAt.split(' ')[0]}</Typography></TableCell><TableCell align="right" sx={{ fontWeight: 800 }}>{notice.viewCount.toLocaleString()}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
         <PaginationBar page={params.page} size={params.size} totalElements={filteredNotices.length} onPageChange={(page) => updateParam('page', page)} />
       </Card>
-
-      <Dialog open={Boolean(detail)} onClose={() => setDetail(null)} fullWidth maxWidth="md"><DialogTitle>{detail?.title}</DialogTitle><DialogContent>{detail && <><Stack direction="row" spacing={1} sx={{ mb: 2 }}><StatusBadge status={detail.exposeYn} /><StatusBadge label={`조회 ${detail.viewCount.toLocaleString()}`} tone="neutral" /><StatusBadge label={detail.createdAt} tone="neutral" minWidth={0} /></Stack><Typography sx={{ minHeight: 140, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{detail.content}</Typography><Typography variant="h6" sx={{ mt: 3, mb: 1 }}>암호화 첨부파일</Typography>{detail.files.length === 0 ? <Typography color="text.secondary">첨부파일이 없습니다.</Typography> : <List>{detail.files.map((file) => <ListItem key={file.fileUid} divider secondaryAction={<Stack direction="row" spacing={0.5}><Button size="small" startIcon={<DownloadRounded />} onClick={() => { downloadMockFile(file); setMessage('첨부파일을 마스터키로 복호화해 다운로드하고 FILE_DOWNLOAD 감사로그를 기록했습니다.') }}>복호화 다운로드</Button>{canManage(detail) && <Button color="error" size="small" startIcon={<DeleteOutlineRounded />} onClick={() => deleteFile(file.fileUid)}>삭제</Button>}</Stack>}><ListItemText primary={file.originalName} secondary={`${(file.size / 1024).toFixed(1)} KB · enc_ver ${file.encVer}`} /></ListItem>)}</List>}</>}</DialogContent><DialogActions>{detail && canManage(detail) && <Button color="error" onClick={() => deleteNotice(detail)}>공지 삭제</Button>}<Button onClick={() => setDetail(null)}>닫기</Button></DialogActions></Dialog>
-
-      <Dialog open={editor !== undefined} onClose={() => setEditor(undefined)} fullWidth maxWidth="md"><Box component="form" onSubmit={saveNotice}><DialogTitle>{editor ? '공지 수정' : '공지 등록'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="제목" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /><TextField required multiline minRows={8} label="본문" value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} /><FormControlLabel control={<Switch checked={form.exposeYn === 'Y'} onChange={(event) => setForm((current) => ({ ...current, exposeYn: event.target.checked ? 'Y' : 'N' }))} />} label="공지 노출" /><Button component="label" variant="outlined" startIcon={<AttachFileRounded />}>다중 첨부파일 선택<input hidden multiple type="file" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} /></Button>{files.length > 0 && <Alert severity="info">선택한 {files.length}개 파일은 업로드 시 마스터키 AES-256-GCM으로 암호화하고 IV·enc_ver를 저장합니다.</Alert>}</Stack></DialogContent><DialogActions><Button onClick={() => setEditor(undefined)}>취소</Button><Button type="submit" variant="contained" disabled={!form.title.trim() || !form.content.trim()}>저장</Button></DialogActions></Box></Dialog>
     </Box>
   )
 }

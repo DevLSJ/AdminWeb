@@ -241,13 +241,13 @@ export function RecentActivityPage({
         </Stack>
       </Box>
 
-      <Card sx={{ mt: 3 }}>
-        <CardContent sx={{ p: { xs: 2.25, sm: 3 } }}>
+      <Card sx={{ mt: 2.5 }}>
+        <CardContent sx={{ p: '20px !important' }}>
           <Box
             sx={{
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', sm: 'minmax(190px, 1fr) repeat(2, minmax(160px, 0.8fr))' },
-              gap: 1.5,
+              gap: 1.25,
               alignItems: 'center',
             }}
           >
@@ -291,8 +291,9 @@ export function RecentActivityPage({
       )}
 
       <Card sx={{ mt: 2, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table aria-label="내 최근 활동 목록" sx={{ minWidth: 920 }}>
+        <Box sx={{ px: 1.75, py: .8, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>최근 활동 {data.totalElements.toLocaleString()}건</Typography></Box>
+        <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)', minHeight: 360 }}>
+          <Table stickyHeader size="small" aria-label="내 최근 활동 목록" className="dense-data-table" sx={{ minWidth: 920, '& .MuiTableCell-root': { px: 1.25, py: .72 }, '& .MuiTableCell-head': { py: .9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '.02em' } }}>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f7f8fb' }}>
                 <TableCell>일시</TableCell>
@@ -320,13 +321,13 @@ export function RecentActivityPage({
               ) : data.content.map((activity) => {
                 const activityStyle = activityTypeStyle[activity.activityType]
                 return (
-                  <TableRow key={activity.id} hover>
-                    <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                  <TableRow key={activity.id} hover className="interactive-row">
+                    <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap', fontSize: 11.5 }}>
                       {formatTimestamp(activity.timestamp)}
                     </TableCell>
                     <TableCell>
-                      <Stack direction="row" spacing={1.1} sx={{ alignItems: 'center' }}>
-                        <Avatar sx={{ width: 34, height: 34, bgcolor: alpha(activityStyle.color, 0.12), color: activityStyle.color, '& svg': { fontSize: 18 } }}>
+                      <Stack direction="row" spacing={.75} sx={{ alignItems: 'center' }}>
+                        <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(activityStyle.color, 0.12), color: activityStyle.color, '& svg': { fontSize: 16 } }}>
                           {activityStyle.icon}
                         </Avatar>
                         <Chip label={activityStyle.label} size="small" sx={{ bgcolor: alpha(activityStyle.color, 0.1), color: activityStyle.color }} />
@@ -335,15 +336,15 @@ export function RecentActivityPage({
                     <TableCell>
                       {activity.targetKey ? (
                         <Box>
-                          <Typography sx={{ fontSize: 14, fontWeight: 750 }}>{activity.targetKey}</Typography>
-                          <Typography sx={{ mt: 0.2, color: 'text.secondary', fontSize: 12.5 }}>
+                          <Typography sx={{ fontSize: 12.75, fontWeight: 750 }}>{activity.targetKey}</Typography>
+                          <Typography sx={{ mt: 0.1, color: 'text.secondary', fontSize: 10.75 }}>
                             {[activity.targetKeyUid, activity.keyVersion].filter(Boolean).join(' · ')}
                           </Typography>
                         </Box>
                       ) : <Typography sx={{ color: 'text.disabled' }}>—</Typography>}
                     </TableCell>
                     <TableCell sx={{ maxWidth: 350 }}>
-                      <Typography sx={{ fontSize: 14, lineHeight: 1.55 }}>{activity.description}</Typography>
+                      <Typography sx={{ fontSize: 12.5, lineHeight: 1.45 }}>{activity.description}</Typography>
                     </TableCell>
                     <TableCell align="center">
                       <StatusBadge status={activity.status} />

@@ -144,13 +144,19 @@ function MainLayout() {
           {showText && <Typography sx={{ mb: 1.2, px: 1.5, color: 'rgba(255,255,255,.58)', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.1em' }}>MANAGEMENT</Typography>}
           <List disablePadding>
             {visibleMenuGroups.map((group) => {
-              const groupSelected = group.path ? location.pathname === group.path : group.children?.some((child) => location.pathname === child.path || (child.path === '/keys' && location.pathname.startsWith('/keys/'))) ?? false
+              const groupSelected = group.path
+                ? location.pathname === group.path
+                : group.id === 'keys'
+                  ? location.pathname.startsWith('/keys')
+                  : group.id === 'notices'
+                    ? location.pathname.startsWith('/notices')
+                    : group.children?.some((child) => location.pathname === child.path) ?? false
               const groupOpen = Boolean(openGroups[group.id])
               const button = (
                 <ListItemButton
-                  selected={groupSelected && (!group.children || collapsed)}
+                  selected={groupSelected}
                   onClick={() => group.children ? toggleGroup(group.id) : group.path && handleNavigate(group.path)}
-                  sx={{ minHeight: 50, justifyContent: showText ? 'initial' : 'center', borderRadius: showText && groupSelected && !group.children ? '10px 0 0 10px' : 2, mr: showText && groupSelected && !group.children ? -1.5 : 0, pr: showText && groupSelected && !group.children ? 3 : undefined, px: showText ? 1.5 : 0, color: groupSelected ? 'primary.main' : 'rgba(255,255,255,.78)', transition: 'all 220ms ease', '&.Mui-selected': { bgcolor: '#fff', boxShadow: '0 10px 26px rgba(6,37,103,.2)' }, '&:hover': { bgcolor: groupSelected ? '#fff' : 'rgba(255,255,255,.1)', color: groupSelected ? 'primary.main' : '#fff' } }}
+                  sx={{ minHeight: 50, justifyContent: showText ? 'initial' : 'center', borderRadius: showText && groupSelected && !group.children ? '10px 0 0 10px' : 2, mr: showText && groupSelected && !group.children ? -1.5 : 0, pr: showText && groupSelected && !group.children ? 3 : undefined, px: showText ? 1.5 : 0, color: groupSelected && !group.children ? 'primary.main' : '#fff', transition: 'background-color 240ms ease, color 240ms ease, transform 240ms cubic-bezier(.16,1,.3,1), box-shadow 240ms ease', '&.Mui-selected': { bgcolor: group.children ? '#084ab9' : '#fff', boxShadow: group.children ? 'inset 3px 0 0 #82b1ff, 0 8px 20px rgba(5,35,101,.2)' : '0 10px 26px rgba(6,37,103,.2)', transform: 'translateX(2px)' }, '&.Mui-selected:hover': { bgcolor: group.children ? '#0643a9' : '#fff' }, '&:hover': { bgcolor: groupSelected ? undefined : 'rgba(255,255,255,.12)', color: groupSelected && !group.children ? 'primary.main' : '#fff' } }}
                 >
                   <ListItemIcon sx={{ minWidth: showText ? 40 : 0, justifyContent: 'center', color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 22 } }}>{group.icon}</ListItemIcon>
                   {showText && <ListItemText primary={group.label} slotProps={{ primary: { sx: { fontSize: 15, fontWeight: groupSelected ? 700 : 600 } } }} />}
@@ -165,8 +171,9 @@ function MainLayout() {
                     const isKeyDetail = child.path === '/keys'
                       && /^\/keys\/[^/]+$/.test(location.pathname)
                       && location.pathname !== '/keys/test'
-                    const selected = location.pathname === child.path || isKeyDetail
-                    return <ListItem key={child.path} disablePadding><ListItemButton selected={selected} onClick={() => handleNavigate(child.path)} sx={{ minHeight: 44, ml: 1.3, mr: selected ? -1.5 : 0, pl: 2.4, pr: selected ? 3 : 1.5, borderRadius: selected ? '9px 0 0 9px' : 2, color: selected ? 'primary.main' : 'rgba(255,255,255,.7)', transition: 'all 220ms ease', '&.Mui-selected': { bgcolor: '#fff', boxShadow: '0 10px 24px rgba(6,37,103,.18)' }, '&:hover': { bgcolor: selected ? '#fff' : 'rgba(255,255,255,.1)', color: selected ? 'primary.main' : '#fff' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 19 } }}>{child.icon}</ListItemIcon><ListItemText primary={child.label} slotProps={{ primary: { sx: { fontSize: 14.5, lineHeight: 1.5, fontWeight: selected ? 700 : 500 } } }} /></ListItemButton></ListItem>
+                    const isNoticeDetail = child.path === '/notices' && /^\/notices\/[^/]+$/.test(location.pathname) && location.pathname !== '/notices/new'
+                    const selected = location.pathname === child.path || isKeyDetail || isNoticeDetail
+                    return <ListItem key={child.path} disablePadding><ListItemButton selected={selected} onClick={() => handleNavigate(child.path)} sx={{ minHeight: 44, ml: 1.3, mr: selected ? -1.5 : 0, pl: 2.4, pr: selected ? 3 : 1.5, borderRadius: selected ? '9px 0 0 9px' : 2, color: selected ? 'primary.main' : 'rgba(255,255,255,.76)', transition: 'background-color 240ms ease, color 240ms ease, transform 240ms cubic-bezier(.16,1,.3,1), box-shadow 240ms ease', '&.Mui-selected': { bgcolor: '#fff', boxShadow: '0 10px 24px rgba(6,37,103,.18)', transform: 'translateX(2px)' }, '&.Mui-selected:hover': { bgcolor: '#fff' }, '&:hover': { bgcolor: selected ? '#fff' : 'rgba(255,255,255,.12)', color: selected ? 'primary.main' : '#fff' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 19 } }}>{child.icon}</ListItemIcon><ListItemText primary={child.label} slotProps={{ primary: { sx: { fontSize: 14.5, lineHeight: 1.5, fontWeight: selected ? 700 : 500 } } }} /></ListItemButton></ListItem>
                   })}</List></Collapse>}
                 </Box>
               )

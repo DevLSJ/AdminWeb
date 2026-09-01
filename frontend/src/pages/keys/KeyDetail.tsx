@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowBackRounded, AutorenewRounded, EditRounded, HistoryRounded, ShieldRounded } from '@mui/icons-material'
+import { ArrowBackRounded, AutorenewRounded, EditRounded, ShieldRounded } from '@mui/icons-material'
 import {
   Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, FormControl, InputLabel, MenuItem, Select, Stack, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TextField, Typography,
 } from '@mui/material'
-import { alpha } from '@mui/material/styles'
 import { useNavigate, useParams } from 'react-router-dom'
 import { InfoRow } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
+import { KeyLifecycleTimeline } from '../../components/keys/KeyLifecycleTimeline'
 import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { canRotateWithStatus, getManualKeyStatusTransitions, keyStatusMetadata } from '../../utils/keyLifecycle'
@@ -127,11 +127,11 @@ function KeyDetail() {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'minmax(0,1.55fr) minmax(360px,.7fr)' }, alignItems: 'start', gap: 2 }}>
         <Stack spacing={2}>
-          <Card sx={{ borderRadius: 1, boxShadow: 'none' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h6">기본 정보</Typography><StatusBadge status={key.status} /></Box>
-            <CardContent sx={{ p: '18px 24px !important' }}>
+          <Card className="section-card">
+            <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">기본 정보</Typography></Box>
+            <CardContent sx={{ p: '16px 20px !important' }}>
               <InfoRow label="이름" value={<Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography>{key.keyName}</Typography>{isAdmin && <Button size="small" startIcon={<EditRounded />} onClick={openEdit}>Edit</Button>}</Stack>} />
-              <InfoRow label="상태" value={<Stack spacing={.5}><StatusBadge status={key.status} /><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>{keyStatusMetadata[key.status].description}</Typography></Stack>} />
+              <InfoRow label="상태" value={<Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}><StatusBadge status={key.status} minWidth={0} sx={{ height: 24, '& .MuiChip-label': { px: .8 } }} /><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>{keyStatusMetadata[key.status].description}</Typography></Stack>} />
               <InfoRow label="키 유형" value={`${getKeyCategoryLabel(key.algorithm)} · ${getKeyAlgorithmLabel(key)}`} />
               <InfoRow label="키 용도" value={key.purpose} />
               <InfoRow label="현재 버전" value={`v${key.version}`} />
@@ -140,25 +140,20 @@ function KeyDetail() {
             </CardContent>
           </Card>
 
-          <Card sx={{ borderRadius: 1, boxShadow: 'none' }}>
-            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h6">회전 설정</Typography></Box>
-            <CardContent sx={{ p: '18px 24px !important' }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '150px minmax(180px,1fr) auto auto' }, alignItems: 'center', gap: 1.25 }}><Typography sx={{ fontWeight: 750, fontSize: 13.5 }}>자동 회전 주기</Typography><TextField size="small" type="number" value={rotationDraft} placeholder="미사용" disabled={!isAdmin} onChange={(event) => setRotationDraft(event.target.value)} slotProps={{ htmlInput: { min: 1, max: 3650 } }} /><Button size="small" variant="outlined" disabled={!isAdmin || (rotationDraft !== '' && (Number(rotationDraft) < 1 || Number(rotationDraft) > 3650))} onClick={() => void updateAutoRotation()}>적용</Button>{isAdmin && <Button size="small" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !canRotateWithStatus(key.status)} onClick={() => setRotateOpen(true)}>키 갱신</Button>}</Box><Typography sx={{ mt: 1, ml: { sm: '150px' }, color: 'text.secondary', fontSize: 12 }}>현재 {autoRotation ? `${autoRotation}일` : '미사용'} · 비활성 상태에서도 설정된 회전 주기는 유지됩니다.</Typography></CardContent>
+          <Card className="section-card">
+            <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">회전 설정</Typography></Box>
+            <CardContent sx={{ p: '16px 20px !important' }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '150px minmax(180px,1fr) auto auto' }, alignItems: 'center', gap: 1.25 }}><Typography sx={{ fontWeight: 750, fontSize: 13.5 }}>자동 회전 주기</Typography><TextField size="small" type="number" value={rotationDraft} placeholder="미사용" disabled={!isAdmin} onChange={(event) => setRotationDraft(event.target.value)} slotProps={{ htmlInput: { min: 1, max: 3650 } }} /><Button size="small" variant="outlined" disabled={!isAdmin || (rotationDraft !== '' && (Number(rotationDraft) < 1 || Number(rotationDraft) > 3650))} onClick={() => void updateAutoRotation()}>적용</Button>{isAdmin && <Button size="small" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !canRotateWithStatus(key.status)} onClick={() => setRotateOpen(true)}>키 갱신</Button>}</Box><Typography sx={{ mt: 1, ml: { sm: '150px' }, color: 'text.secondary', fontSize: 12 }}>현재 {autoRotation ? `${autoRotation}일` : '미사용'} · 비활성 상태에서도 설정된 회전 주기는 유지됩니다.</Typography></CardContent>
           </Card>
 
-          <Card sx={{ borderRadius: 1, boxShadow: 'none', overflow: 'hidden' }}>
-            <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography variant="h6">버전 이력</Typography></Box>
-            <TableContainer><Table size="small"><TableHead><TableRow><TableCell>버전</TableCell><TableCell>상태</TableCell><TableCell>사용 범위</TableCell><TableCell>생성자</TableCell><TableCell>생성 시각</TableCell></TableRow></TableHead><TableBody>{versions.map((version) => <TableRow key={version.version} hover className="interactive-row"><TableCell sx={{ fontWeight: 850 }}>v{version.version}</TableCell><TableCell><StatusBadge status={version.status} /></TableCell><TableCell>{version.decryptOnly ? <StatusBadge status="DECRYPT_ONLY" /> : <StatusBadge status="ACTIVE" label="암호화·복호화" />}</TableCell><TableCell>{version.createdBy}</TableCell><TableCell>{version.createdAt}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
+          <Card className="section-card" sx={{ overflow: 'hidden' }}>
+            <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">버전 이력</Typography></Box>
+            <TableContainer><Table size="small" className="dense-data-table"><TableHead><TableRow><TableCell>버전</TableCell><TableCell>상태</TableCell><TableCell>사용 범위</TableCell><TableCell>생성자</TableCell><TableCell>생성 시각</TableCell></TableRow></TableHead><TableBody>{versions.map((version) => <TableRow key={version.version} hover className="interactive-row"><TableCell sx={{ fontWeight: 850 }}>v{version.version}</TableCell><TableCell><StatusBadge status={version.status} minWidth={0} /></TableCell><TableCell>{version.decryptOnly ? <StatusBadge status="DECRYPT_ONLY" minWidth={0} /> : <StatusBadge status="ACTIVE" label="암호화·복호화" minWidth={0} />}</TableCell><TableCell>{version.createdBy}</TableCell><TableCell>{version.createdAt}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
           </Card>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', md: 'repeat(5,1fr)' }, gap: 1 }}>{usage && Object.entries(usage).map(([label, value]) => <Box key={label} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{usageLabels[label] ?? label}</Typography><Typography sx={{ mt: .25, fontSize: 20, fontWeight: 850 }}>{value.toLocaleString()}</Typography></Box>)}</Box>
         </Stack>
 
-        <Card sx={{ position: { xl: 'sticky' }, top: { xl: 92 }, borderRadius: 1, boxShadow: 'none', overflow: 'hidden' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.25, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><HistoryRounded color="primary" /><Typography variant="h6">생명주기 타임라인</Typography></Stack><StatusBadge label={`${histories.length}건`} tone="neutral" /></Box>
-          <Box className="timeline-scroll" sx={{ maxHeight: 'calc(100vh - 190px)', minHeight: 430, overflowY: 'auto', p: 1.5 }}>
-            {histories.map((history, index) => <Box key={history.id} className="timeline-entry" sx={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 1.1, p: 1.25, mb: 1, border: '1px solid', borderColor: 'divider' }}><Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center' }}><Box sx={{ zIndex: 1, width: 10, height: 10, mt: .65, bgcolor: index === 0 ? 'primary.main' : 'background.paper', border: '2px solid', borderColor: 'primary.main' }} />{index < histories.length - 1 && <Box sx={{ position: 'absolute', top: 18, bottom: -22, width: 2, bgcolor: (theme) => alpha(theme.palette.primary.main, .18) }} />}</Box><Box><Stack direction="row" spacing={.7} sx={{ alignItems: 'center', justifyContent: 'space-between' }}><Typography sx={{ fontWeight: 800, fontSize: 13 }}>{history.fromStatus ? `${getStatusLabel(history.fromStatus)} → ` : ''}{getStatusLabel(history.toStatus)}</Typography><StatusBadge label={`v${history.keyVersion}`} tone="info" /></Stack><Typography sx={{ mt: .55, color: 'text.secondary', fontSize: 12.25, lineHeight: 1.55 }}>{history.reason}</Typography><Typography sx={{ mt: .6, color: 'text.disabled', fontSize: 11 }}>{history.changedAt} · {history.changedBy}</Typography></Box></Box>)}
-          </Box>
-        </Card>
+        <KeyLifecycleTimeline histories={histories} sticky />
       </Box>
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm" slotProps={{ paper: { sx: { borderRadius: 1 } } }}><DialogTitle>기본 정보 수정</DialogTitle><DialogContent><TextField fullWidth label="키 이름" value={editForm.keyName} onChange={(event) => setEditForm((current) => ({ ...current, keyName: event.target.value }))} sx={{ mt: 1, mb: 2 }} /><FormControl fullWidth sx={{ mb: 2 }}><InputLabel>용도</InputLabel><Select label="용도" value={editForm.purpose} onChange={(event) => setEditForm((current) => ({ ...current, purpose: event.target.value as KeyPurpose }))}><MenuItem value="ENCRYPT">데이터 암복호화</MenuItem><MenuItem value="WRAP">키 래핑</MenuItem><MenuItem value="SIGN">전자서명</MenuItem><MenuItem value="AUTH">메시지 인증</MenuItem></Select></FormControl><TextField fullWidth type="date" label="만료일" value={editForm.expireAt} onChange={(event) => setEditForm((current) => ({ ...current, expireAt: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} /></DialogContent><DialogActions><Button onClick={() => setEditOpen(false)}>취소</Button><Button variant="contained" disabled={!editForm.keyName.trim() || !editForm.expireAt} onClick={() => void saveMetadata()}>저장</Button></DialogActions></Dialog>

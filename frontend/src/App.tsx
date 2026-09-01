@@ -36,8 +36,7 @@ function App() {
             <Route path="/keys" element={<KeyList />} />
             <Route path="/keys/test" element={<CryptoTest />} />
             <Route path="/keys/:id" element={<KeyDetail />} />
-            <Route path="/notices" element={<NoticeList key="notice-list" />} />
-            <Route path="/notices/new" element={<NoticeList key="notice-new" autoCreate />} />
+            <Route path="/notices/*" element={<NoticeList />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/forbidden" element={<Forbidden />} />
 

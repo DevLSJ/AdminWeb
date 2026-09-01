@@ -18,13 +18,14 @@ import {
 } from '@mui/material'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/admin/AdminPage'
+import { KeyLifecycleTimeline } from '../../components/keys/KeyLifecycleTimeline'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { getStatusLabel } from '../../utils/status'
 import { canDecryptWithStatus, canEncryptWithStatus } from '../../utils/keyLifecycle'
 import { getKeyAlgorithmLabel } from '../../utils/keyPresentation'
 
 function CryptoTest() {
-  const { keys, encrypt: encryptWithKey, decrypt: decryptWithKey } = useKmsMock()
+  const { keys, keyHistories, loadKeyHistory, encrypt: encryptWithKey, decrypt: decryptWithKey } = useKmsMock()
   const [searchParams] = useSearchParams()
   const initialKey = searchParams.get('key') ?? keys.find((key) => key.integrityValid && (canEncryptWithStatus(key.status) || canDecryptWithStatus(key.status)))?.keyUid ?? ''
   const [mode, setMode] = useState<'encrypt' | 'decrypt'>('encrypt')
@@ -38,6 +39,7 @@ function CryptoTest() {
   const [running, setRunning] = useState(false)
 
   const selectedKey = useMemo(() => keys.find((key) => key.keyUid === keyUid), [keyUid, keys])
+  const histories = selectedKey ? keyHistories[selectedKey.keyUid] ?? [] : []
   const canEncrypt = Boolean(selectedKey?.integrityValid && selectedKey && canEncryptWithStatus(selectedKey.status))
   const canDecrypt = Boolean(selectedKey?.integrityValid && selectedKey && canDecryptWithStatus(selectedKey.status))
   const executable = mode === 'encrypt' ? canEncrypt : canDecrypt
@@ -45,6 +47,10 @@ function CryptoTest() {
   useEffect(() => {
     if (!keyUid) setKeyUid(searchParams.get('key') ?? keys.find((key) => key.integrityValid && (canEncryptWithStatus(key.status) || canDecryptWithStatus(key.status)))?.keyUid ?? '')
   }, [keyUid, keys, searchParams])
+
+  useEffect(() => {
+    if (selectedKey) void loadKeyHistory(selectedKey.keyUid).catch(() => undefined)
+  }, [loadKeyHistory, selectedKey])
 
   const encrypt = async () => {
     if (!executable || !plaintext.trim()) return
@@ -87,8 +93,8 @@ function CryptoTest() {
   return (
     <Box>
       <PageHeader title="암복호화 테스트" />
-      <Box sx={{ maxWidth: 980 }}>
-        <Card>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'minmax(0,1.55fr) minmax(360px,.7fr)' }, alignItems: 'start', gap: 2 }}>
+        <Card className="section-card">
           <Tabs value={mode} onChange={(_event, value: 'encrypt' | 'decrypt') => { setMode(value); setResult(''); setError('') }} sx={{ px: 2.5, borderBottom: 1, borderColor: 'divider' }}><Tab icon={<LockRounded />} iconPosition="start" label="암호화" value="encrypt" /><Tab icon={<LockOpenRounded />} iconPosition="start" label="복호화" value="decrypt" /></Tabs>
           <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
             <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>관리 키 선택</InputLabel><Select label="관리 키 선택" value={keyUid} onChange={(event) => { const nextKeyUid = event.target.value; setKeyUid(nextKeyUid); setKeyVersion(keys.find((key) => key.keyUid === nextKeyUid)?.version ?? ''); setResult(''); setError('') }}>{keys.map((key) => <MenuItem key={key.keyUid} value={key.keyUid} disabled={!key.integrityValid || (!canEncryptWithStatus(key.status) && !canDecryptWithStatus(key.status))}>{key.keyName} · {getKeyAlgorithmLabel(key)} · {getStatusLabel(key.status)}{!key.integrityValid ? ' · 무결성 위반' : ''}</MenuItem>)}</Select></FormControl>
@@ -101,6 +107,7 @@ function CryptoTest() {
             {result && <Box sx={{ mt: 2.5, p: 2.5, borderRadius: 1, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}><Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}><Typography sx={{ fontWeight: 700 }}>{mode === 'encrypt' ? '암호문 결과' : '평문 결과'}</Typography><Button size="small" startIcon={<ContentCopyRounded />} onClick={() => void navigator.clipboard?.writeText(result)}>복사</Button></Box><Typography sx={{ fontFamily: 'monospace', fontSize: 12.5, wordBreak: 'break-all' }}>{result}</Typography>{mode === 'encrypt' && <><Typography sx={{ mt: 1.5, fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>IV: {iv || 'RSA는 IV를 사용하지 않음'}</Typography><Typography sx={{ mt: 0.75, fontFamily: 'monospace', fontSize: 12 }}>Key Version: v{keyVersion}</Typography></>}<Alert severity="success" sx={{ mt: 2 }}>성공 사용 로그가 기록되었습니다.</Alert></Box>}
           </CardContent>
         </Card>
+        <KeyLifecycleTimeline histories={histories} sticky maxHeight="calc(100vh - 190px)" />
       </Box>
     </Box>
   )
