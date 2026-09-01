@@ -11,6 +11,7 @@ import {
   ExpandLessRounded,
   ExpandMoreRounded,
   HistoryRounded,
+  InsightsRounded,
   KeyRounded,
   ListAltRounded,
   LogoutRounded,
@@ -70,6 +71,7 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   { id: 'dashboard', label: '대시보드', path: '/', icon: <DashboardRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
+  { id: 'analytics', label: '키 통계', path: '/analytics', icon: <InsightsRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
   { id: 'recent', label: '최근 활동', path: '/my/recent-activity', icon: <HistoryRounded />, roles: ['S.ADMIN', 'ADMIN'] },
   {
     id: 'keys', label: '키 관리', icon: <KeyRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'], children: [

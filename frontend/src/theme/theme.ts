@@ -66,6 +66,9 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
     MuiCard: {
       styleOverrides: {
         root: ({ theme }) => ({
+          boxSizing: 'border-box',
+          width: '100%',
+          maxWidth: '100%',
           border: `1px solid ${theme.palette.divider}`,
           boxShadow: mode === 'light'
             ? '0 10px 32px rgba(39, 76, 142, 0.07)'

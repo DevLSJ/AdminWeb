@@ -41,7 +41,7 @@ interface FilterCardProps {
 
 export function FilterCard({ children }: FilterCardProps) {
   return (
-    <Card sx={{ mb: 2.5 }}>
+    <Card className="section-card" sx={{ mb: 2.5, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
       <CardContent sx={{ p: '20px !important' }}>{children}</CardContent>
     </Card>
   )

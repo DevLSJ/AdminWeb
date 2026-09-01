@@ -7,6 +7,7 @@ import MainLayout from './layouts/MainLayout'
 import Login from './pages/Login'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Analytics = lazy(() => import('./pages/Analytics'))
 const AuditLog = lazy(() => import('./pages/audit/AuditLog'))
 const Forbidden = lazy(() => import('./pages/errors/Forbidden'))
 const CryptoTest = lazy(() => import('./pages/keys/CryptoTest'))
@@ -33,6 +34,7 @@ function App() {
         <Route element={<RequireAuth />}>
           <Route element={<MainLayout />}>
             <Route index element={<Dashboard />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/keys" element={<KeyList />} />
             <Route path="/keys/test" element={<CryptoTest />} />
             <Route path="/keys/:id" element={<KeyDetail />} />
