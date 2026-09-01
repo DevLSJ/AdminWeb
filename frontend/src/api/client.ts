@@ -13,6 +13,11 @@ apiClient.interceptors.request.use((config) => {
   // 모든 API 요청에 현재 JWT를 자동 주입해 화면별 중복 인증 코드를 없앤다.
   const token = localStorage.getItem(TOKEN_STORAGE_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // 브라우저가 multipart boundary를 직접 붙이도록 전역 JSON 헤더를 제거한다.
+  // 이를 유지하면 공지 첨부 FormData가 JSON으로 오인되어 서버 등록이 실패한다.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete?.('Content-Type')
+  }
   return config
 })
 

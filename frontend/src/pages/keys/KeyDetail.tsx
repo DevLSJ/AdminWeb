@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowBackRounded, AutorenewRounded, EditRounded, ShieldRounded } from '@mui/icons-material'
+import { ArrowBackRounded, AutorenewRounded, EditRounded } from '@mui/icons-material'
 import {
   Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  Divider, FormControl, InputLabel, MenuItem, Select, Stack, TextField, Typography,
+  FormControl, InputLabel, MenuItem, Select, Stack, TextField, Typography,
 } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { InfoRow } from '../../components/admin/AdminPage'
@@ -113,7 +113,7 @@ function KeyDetail() {
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2.5 }}>
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <Button color="inherit" startIcon={<ArrowBackRounded />} onClick={() => navigate('/keys')}>키 목록</Button>
-          <Divider orientation="vertical" flexItem />
+          <Box sx={{ height: 40, borderLeft: '2px solid', borderColor: 'text.disabled' }} />
           <Box><Typography variant="h5">{key.keyName}</Typography><Typography sx={{ mt: .25, color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{key.keyUid}</Typography></Box>
         </Stack>
         {isAdmin && <Button variant="contained" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => { setToStatus(''); setReason(''); setStatusOpen(true) }}>상태 변경</Button>}
@@ -129,12 +129,12 @@ function KeyDetail() {
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">기본 정보</Typography></Box>
             <CardContent sx={{ p: '16px 20px !important' }}>
               <InfoRow label="이름" value={<Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography>{key.keyName}</Typography>{isAdmin && <Button size="small" startIcon={<EditRounded />} onClick={openEdit}>Edit</Button>}</Stack>} />
-              <InfoRow label="상태" value={<StatusBadge status={key.status} minWidth={0} sx={{ height: 24, '& .MuiChip-label': { px: .8 } }} />} />
+              <InfoRow label="상태" value={<StatusBadge dot status={key.status} minWidth={0} />} />
               <InfoRow label="키 유형" value={`${getKeyCategoryLabel(key.algorithm)} · ${getKeyAlgorithmLabel(key)}`} />
               <InfoRow label="키 용도" value={key.purpose} />
               <InfoRow label="현재 버전" value={`v${key.version}`} />
               <InfoRow label="만료일" value={key.expireAt} />
-              <InfoRow label="무결성" value={<StatusBadge status={key.integrityValid ? 'VALID' : 'INVALID'} label={key.integrityValid ? 'HMAC 검증 정상' : '무결성 위반'} icon={<ShieldRounded />} />} />
+              <InfoRow label="무결성" value={<StatusBadge dot status={key.integrityValid ? 'VALID' : 'INVALID'} label={key.integrityValid ? '정상' : '비정상'} />} />
             </CardContent>
           </Card>
 

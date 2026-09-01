@@ -2,12 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   AddRounded,
   AccountTreeRounded,
-  CheckCircleRounded,
   CloudUploadRounded,
   DeleteOutlineRounded,
   FilterAltOffRounded,
   SearchRounded,
-  WarningAmberRounded,
 } from '@mui/icons-material'
 import {
   Alert,
@@ -227,11 +225,11 @@ function KeyList() {
                   <TableCell><Typography noWrap sx={{ maxWidth: 220, fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography noWrap sx={{ maxWidth: 220, color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
                   <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
                   <TableCell sx={{ fontSize: 12 }}>{purposeLabels[key.purpose]}</TableCell>
-                  <TableCell><StatusBadge status={key.status} /></TableCell>
+                  <TableCell><StatusBadge dot status={key.status} /></TableCell>
                   <TableCell sx={{ fontSize: 12, fontWeight: 800 }}>v{key.version}</TableCell>
                   <TableCell sx={{ fontSize: 11.5 }}>{key.autoRotationDays ? `${key.autoRotationDays}일` : '—'}</TableCell>
                   <TableCell sx={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{key.expireAt || '—'}</TableCell>
-                  <TableCell>{key.integrityValid ? <StatusBadge status="VALID" icon={<CheckCircleRounded />} /> : <StatusBadge status="INVALID" icon={<WarningAmberRounded />} sx={{ animation: 'integrity-pulse 1.8s ease-in-out infinite' }} />}</TableCell>
+                  <TableCell>{key.integrityValid ? <StatusBadge dot status="VALID" /> : <StatusBadge dot status="INVALID" sx={{ animation: 'integrity-pulse 1.8s ease-in-out infinite' }} />}</TableCell>
                   <TableCell align="right"><Stack direction="row" spacing={0.35} sx={{ justifyContent: 'flex-end' }}>{isAdmin && <Button size="small" variant="outlined" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={(event) => { event.stopPropagation(); openTransition(key) }}>상태</Button>}{isAdmin && <Button size="small" color="error" disabled={key.status === 'DESTROYED'} onClick={(event) => { event.stopPropagation(); openDelete(key) }}><DeleteOutlineRounded sx={{ fontSize: 17 }} /></Button>}</Stack></TableCell>
                 </TableRow>
               ))}

@@ -237,3 +237,17 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 자동 검증은 `NoticeDatabaseIntegrationTests`에서 multipart 공지 등록, 암호문·IV DB 저장, 상세 조회수 0→1→2 증가, 첨부파일 복호화 일치, 감사 체인 정상, ADMIN/CLIENT 및 S.ADMIN/ADMIN 권한 분기와 관리 계정 재서명을 실제 HTTP·JPA 흐름으로 확인한다. 프론트는 oxlint, TypeScript 프로젝트 검사, Vite production build를 통과했다.
 
 운영 PostgreSQL의 기존 `notice.expose_yn CHAR(1)`과 Hibernate 7의 String `VARCHAR(1)` 검증 차이는 `V12__normalize_notice_exposure_type.sql`에서 데이터 의미와 Y/N 체크 제약을 유지한 채 `VARCHAR(1)`로 정규화했다. 이 마이그레이션은 기존 V11 체크섬을 변경하지 않으며 운영 `ddl-auto=validate` 기동을 보장한다.
+
+## 14. 인증·공지 등록 및 슬라이드 상세 UI 보강 (2026-09-01)
+
+- 로그인 화면을 좌측 내비게이션과 같은 청색 그라데이션, 청색 포커스 조명과 그림자 체계로 통일했다.
+- Axios의 전역 JSON `Content-Type`이 공지 `FormData`까지 덮어써 multipart boundary가 누락되던 문제를 수정했다. FormData 요청은 브라우저가 boundary를 생성하며 JWT만 그대로 전달한다.
+- 프론트 Nginx의 요청 본문 제한을 100MB로 맞췄다. 화면과 백엔드는 파일당 10MB, 최대 10개를 함께 검증해 초과 요청을 명확한 오류로 차단한다.
+- 저장 세션을 프론트 임시 계정 목록으로 재해석하던 로직을 제거했다. 기존 DB 계정의 UID·이름·역할을 보존하고 `/api/auth/me`에서 최신 상태를 다시 검증한다.
+- 키 상태, 키·사용자 무결성은 배지 대신 색상 점과 짧은 상태 텍스트로 표시한다. 사용자 목록의 현재 로그인 표시는 제거하고 최근 접속일만 유지한다.
+- 키·공지·암복호화 화면의 상단 경로는 `목록 | 대상` 형태의 2px 구분선을 공유한다.
+- 사용자 목록 행은 식별이 쉬운 아바타형 아이콘을 사용하고, 행을 클릭하면 목록 위로 우측 슬라이드 상세 패널이 열린다. 배경은 블러 처리되며 관리 권한에 따른 수정·정지·활성화·비밀번호 재설정은 기존 서버 API를 그대로 사용한다.
+- 감사 이벤트도 동일한 우측 슬라이드 패널로 전환했다. 패널이 열린 동안 3초마다 행 HMAC, 이전 연결, 다음 연결과 체인 헤드를 서버에서 실시간 재검증한다.
+- 좌측 메뉴는 선택 상태가 투명해지지 않는 청색/흰색 강조, 하위 메뉴 세로 가이드, 짧은 이동 애니메이션을 사용한다.
+
+검증: 프론트 oxlint, TypeScript 프로젝트 검사, Vite production build가 성공했다. 백엔드 `NoticeDatabaseIntegrationTests`에서 multipart 등록, AES-256-GCM 첨부 암호화 DB 저장, 복호화 다운로드, 상세 접속별 조회수 증가와 감사 체인 검증이 통과했다.

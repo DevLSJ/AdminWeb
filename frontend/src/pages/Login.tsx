@@ -51,7 +51,7 @@ function Login() {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        bgcolor: '#fdf4f9',
+        background: 'linear-gradient(135deg, #edf4ff 0%, #f7faff 52%, #e7f0ff 100%)',
         p: 2,
         '&::before': {
           position: 'absolute',
@@ -60,7 +60,7 @@ function Login() {
           width: 520,
           height: 520,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(232, 47, 126, 0.19), transparent 68%)',
+          background: 'radial-gradient(circle, rgba(13, 95, 231, 0.22), transparent 68%)',
           content: '""',
         },
         '&::after': {
@@ -70,7 +70,7 @@ function Login() {
           width: 600,
           height: 600,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(118, 82, 184, 0.18), transparent 68%)',
+          background: 'radial-gradient(circle, rgba(22, 71, 200, 0.18), transparent 68%)',
           content: '""',
         },
       }}
@@ -80,14 +80,16 @@ function Login() {
           zIndex: 1,
           width: '100%',
           maxWidth: 430,
-          borderRadius: 3,
-          boxShadow: '0 28px 70px rgba(96, 37, 77, 0.15)',
+          overflow: 'hidden',
+          border: '1px solid rgba(87, 132, 214, .18)',
+          borderRadius: 2.5,
+          boxShadow: '0 28px 72px rgba(26, 74, 157, 0.17)',
         }}
       >
         <Box
           sx={{
             height: 6,
-            background: 'linear-gradient(90deg, #e72f7e 0%, #a34bc1 100%)',
+            background: 'linear-gradient(90deg, #0d5fe7 0%, #2f7df4 100%)',
           }}
         />
         <CardContent sx={{ px: { xs: 3, sm: 5 }, py: { xs: 4, sm: 5 } }}>
@@ -101,8 +103,8 @@ function Login() {
                 mb: 2,
                 placeItems: 'center',
                 borderRadius: 3,
-                background: 'linear-gradient(135deg, #e72f7e 0%, #8d4fc4 100%)',
-                boxShadow: '0 12px 24px rgba(217, 47, 129, 0.24)',
+                background: 'linear-gradient(135deg, #0d5fe7 0%, #1647c8 100%)',
+                boxShadow: '0 12px 26px rgba(13, 95, 231, 0.26)',
                 color: 'common.white',
               }}
             >
@@ -174,10 +176,10 @@ function Login() {
               sx={{
                 mt: 3,
                 py: 1.35,
-                background: 'linear-gradient(90deg, #e72f7e 0%, #b23fa6 100%)',
-                boxShadow: '0 10px 22px rgba(217, 47, 129, 0.22)',
+                background: 'linear-gradient(90deg, #0d5fe7 0%, #286fdc 100%)',
+                boxShadow: '0 10px 22px rgba(13, 95, 231, 0.24)',
                 '&:hover': {
-                  boxShadow: '0 12px 26px rgba(217, 47, 129, 0.3)',
+                  boxShadow: '0 12px 28px rgba(13, 95, 231, 0.34)',
                 },
               }}
             >

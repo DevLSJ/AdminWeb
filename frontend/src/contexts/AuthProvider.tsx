@@ -23,10 +23,8 @@ function readStoredSession(): AuthUser | null {
     const value = localStorage.getItem(SESSION_STORAGE_KEY)
     if (!value) return null
     const stored = JSON.parse(value) as AuthUser
-    const account = initialAccounts.find((item) => item.loginId === stored.loginId)
-    return account
-      ? { userUid: account.userUid, loginId: account.loginId, name: stored.name || account.name, role: account.role }
-      : null
+    if (!stored.userUid || !stored.loginId || !stored.name || !stored.role) return null
+    return stored
   } catch {
     localStorage.removeItem(TOKEN_STORAGE_KEY)
     localStorage.removeItem(SESSION_STORAGE_KEY)

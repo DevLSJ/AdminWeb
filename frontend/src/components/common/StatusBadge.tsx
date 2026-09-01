@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { Chip } from '@mui/material'
+import { Box, Chip, Typography } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import { getStatusLabel } from '../../utils/status'
 
@@ -55,11 +55,22 @@ interface StatusBadgeProps {
   tone?: SemanticTone
   icon?: ReactElement
   minWidth?: number | string
+  dot?: boolean
   sx?: SxProps<Theme>
 }
 
-export function StatusBadge({ status = '', label, tone, icon, minWidth = 62, sx }: StatusBadgeProps) {
+export function StatusBadge({ status = '', label, tone, icon, minWidth = 62, dot = false, sx }: StatusBadgeProps) {
   const colors = semanticColors[tone ?? getSemanticTone(status)]
+  if (dot) {
+    return (
+      <Box
+        sx={[{ display: 'inline-flex', minWidth, alignItems: 'center', gap: .7, color: colors.text }, ...(Array.isArray(sx) ? sx : [sx])]}
+      >
+        <Box component="span" sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: colors.text, boxShadow: `0 0 0 3px ${colors.background}` }} />
+        <Typography component="span" sx={{ color: 'text.secondary', fontSize: 12.5, fontWeight: 650 }}>{label ?? getStatusLabel(status)}</Typography>
+      </Box>
+    )
+  }
   return (
     <Chip
       icon={icon}

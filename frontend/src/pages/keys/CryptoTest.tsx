@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ContentCopyRounded, LockOpenRounded, LockRounded, PlayArrowRounded } from '@mui/icons-material'
+import { ArrowBackRounded, ContentCopyRounded, LockOpenRounded, LockRounded, PlayArrowRounded } from '@mui/icons-material'
 import {
   Alert,
   Box,
@@ -16,8 +16,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useSearchParams } from 'react-router-dom'
-import { PageHeader } from '../../components/admin/AdminPage'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KeyLifecycleTimeline } from '../../components/keys/KeyLifecycleTimeline'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { getStatusLabel } from '../../utils/status'
@@ -27,6 +26,7 @@ import { getKeyAlgorithmLabel } from '../../utils/keyPresentation'
 function CryptoTest() {
   const { keys, keyHistories, loadKeyHistory, encrypt: encryptWithKey, decrypt: decryptWithKey } = useKmsMock()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const initialKey = searchParams.get('key') ?? keys.find((key) => key.integrityValid && (canEncryptWithStatus(key.status) || canDecryptWithStatus(key.status)))?.keyUid ?? ''
   const [mode, setMode] = useState<'encrypt' | 'decrypt'>('encrypt')
   const [keyUid, setKeyUid] = useState(initialKey)
@@ -92,7 +92,11 @@ function CryptoTest() {
 
   return (
     <Box>
-      <PageHeader title="암복호화 테스트" />
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 2.5 }}>
+        <Button color="inherit" startIcon={<ArrowBackRounded />} onClick={() => navigate('/keys')}>키 목록</Button>
+        <Box sx={{ height: 40, borderLeft: '2px solid', borderColor: 'text.disabled' }} />
+        <Box sx={{ minWidth: 0 }}><Typography variant="h5">암복호화 테스트</Typography><Typography noWrap sx={{ mt: .25, color: 'text.secondary', fontSize: 11.5 }}>{selectedKey?.keyName ?? '키를 선택하세요'}</Typography></Box>
+      </Stack>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'minmax(0,1.55fr) minmax(360px,.7fr)' }, alignItems: 'start', gap: 2 }}>
         <Card className="section-card">
           <Tabs value={mode} onChange={(_event, value: 'encrypt' | 'decrypt') => { setMode(value); setResult(''); setError('') }} sx={{ px: 2.5, borderBottom: 1, borderColor: 'divider' }}><Tab icon={<LockRounded />} iconPosition="start" label="암호화" value="encrypt" /><Tab icon={<LockOpenRounded />} iconPosition="start" label="복호화" value="decrypt" /></Tabs>
