@@ -43,9 +43,13 @@ export const apiEndpoints = {
     password: (id: string) => `/api/users/${id}/password`,
     status: (id: string) => `/api/users/${id}/status`,
   },
+  adminAccounts: {
+    list: '/api/admin-accounts',
+  },
   auditLogs: {
     list: '/api/audit-logs',
     verify: '/api/audit-logs/verify',
+    verifyEntry: (id: string) => `/api/audit-logs/${id}/verify`,
     export: '/api/audit-logs/export',
   },
   notices: {

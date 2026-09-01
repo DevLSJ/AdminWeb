@@ -47,6 +47,12 @@ class WeekThreeUserAuditIntegrationTests {
         HttpClient client = HttpClient.newHttpClient();
         String adminToken = login(client, "admin", "admin");
         String clientToken = login(client, "client", "client");
+        JsonNode adminAccounts = sendJson(client, "GET", "/api/admin-accounts", adminToken, "", 200);
+        assertThat(adminAccounts.path("data")).anySatisfy(account -> {
+            assertThat(account.path("loginId").asText()).isEqualTo("admin");
+            assertThat(account.has("passwordHash")).isFalse();
+            assertThat(account.has("passwordSalt")).isFalse();
+        }).anySatisfy(account -> assertThat(account.path("loginId").asText()).isEqualTo("client"));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         String email = "week3-" + suffix + "@example.com";
         String phone = "010-" + suffix.substring(0, 4).replaceAll("[^0-9]", "1")
@@ -126,6 +132,12 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(verification.path("data").path("valid").asBoolean()).isTrue();
         assertThat(verification.path("data").path("headValid").asBoolean()).isTrue();
         assertThat(verification.path("data").path("checkedCount").asLong()).isPositive();
+        String selectedLogUid = logs.path("data").path("content").get(0).path("logUid").asText();
+        JsonNode entryVerification = sendJson(client, "GET", "/api/audit-logs/" + selectedLogUid + "/verify", adminToken, "", 200);
+        assertThat(entryVerification.path("data").path("valid").asBoolean()).isTrue();
+        assertThat(entryVerification.path("data").path("rowHashValid").asBoolean()).isTrue();
+        assertThat(entryVerification.path("data").path("previousLinkValid").asBoolean()).isTrue();
+        assertThat(entryVerification.path("data").path("nextLinkValid").asBoolean()).isTrue();
 
         HttpResponse<String> csv = send(client, "GET",
                 "/api/audit-logs/export?action=USER_VIEW_PLAIN", adminToken, "");

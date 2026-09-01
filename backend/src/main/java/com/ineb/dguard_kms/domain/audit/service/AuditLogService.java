@@ -21,6 +21,7 @@ import jakarta.persistence.criteria.Predicate;
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.crypto.IntegrityService;
 import com.ineb.dguard_kms.domain.audit.dto.AuditLogResponse;
+import com.ineb.dguard_kms.domain.audit.dto.AuditEntryVerificationResponse;
 import com.ineb.dguard_kms.domain.audit.dto.AuditVerificationResponse;
 import com.ineb.dguard_kms.domain.audit.entity.AuditChainHead;
 import com.ineb.dguard_kms.domain.audit.entity.AuditLog;
@@ -131,6 +132,35 @@ public class AuditLogService {
                 logs.size(),
                 List.copyOf(invalid),
                 headValid,
+                Instant.now().truncatedTo(ChronoUnit.MILLIS)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public AuditEntryVerificationResponse verifyEntry(UUID logUid) {
+        AuditLog log = repository.findByLogUid(logUid)
+                .orElseThrow(() -> new IllegalArgumentException("감사 로그를 찾을 수 없습니다."));
+        AuditLog previous = repository.findTopByIdLessThanOrderByIdDesc(log.getId()).orElse(null);
+        AuditLog next = repository.findTopByIdGreaterThanOrderByIdAsc(log.getId()).orElse(null);
+
+        boolean rowHashValid = verifyRow(log);
+        boolean previousLinkValid = java.util.Objects.equals(
+                previous == null ? null : previous.getRowHash(), log.getPreviousHash()
+        );
+        boolean nextLinkValid = next == null || java.util.Objects.equals(log.getRowHash(), next.getPreviousHash());
+        String storedHead = chainHeadRepository.findById((short) 1)
+                .map(AuditChainHead::getCurrentHash).orElse(null);
+        boolean chainHeadValid = next != null || java.util.Objects.equals(log.getRowHash(), storedHead);
+
+        return new AuditEntryVerificationResponse(
+                logUid,
+                rowHashValid && previousLinkValid && nextLinkValid && chainHeadValid,
+                rowHashValid,
+                previousLinkValid,
+                nextLinkValid,
+                chainHeadValid,
+                previous == null ? null : previous.getLogUid(),
+                next == null ? null : next.getLogUid(),
                 Instant.now().truncatedTo(ChronoUnit.MILLIS)
         );
     }

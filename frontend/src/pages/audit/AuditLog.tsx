@@ -25,10 +25,10 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogs } from '../../api/kms'
+import { exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogEntry, verifyAuditLogs } from '../../api/kms'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
-import type { AuditAction, AuditListParams, AuditLog as AuditLogType, AuditVerification, PageResponse } from '../../types/api'
+import type { AuditAction, AuditEntryVerification, AuditListParams, AuditLog as AuditLogType, AuditVerification, PageResponse } from '../../types/api'
 
 const auditActions: Array<AuditAction | 'ALL'> = [
   'ALL', 'LOGIN', 'LOGOUT', 'SESSION_REFRESH', 'KEY_CREATE', 'KEY_UPDATE', 'KEY_DELETE',
@@ -73,6 +73,8 @@ function AuditLog() {
   const [loading, setLoading] = useState(true)
   const [verification, setVerification] = useState<AuditVerification | null>(null)
   const [detail, setDetail] = useState<AuditLogType | null>(null)
+  const [entryVerification, setEntryVerification] = useState<AuditEntryVerification | null>(null)
+  const [verifyingUid, setVerifyingUid] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const loadLogs = useCallback(async (nextParams: AuditListParams) => {
@@ -121,6 +123,18 @@ function AuditLog() {
     }
   }
 
+  const verifyEntry = async (log: AuditLogType) => {
+    setVerifyingUid(log.logUid)
+    setError('')
+    try {
+      setEntryVerification(await verifyAuditLogEntry(log.logUid))
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, '선택한 감사 로그 체인을 검증하지 못했습니다.'))
+    } finally {
+      setVerifyingUid(null)
+    }
+  }
+
   const invalidLogUids = new Set(verification?.invalidLogUids ?? [])
 
   return (
@@ -130,7 +144,6 @@ function AuditLog() {
         description="서버의 append-only 감사 이벤트를 검색하고 행 HMAC·prev_hash 연결·체인 헤드를 한 번에 검증합니다."
         action={<Stack direction="row" spacing={1}><Button data-testid="audit-verify-button" variant="outlined" startIcon={<FactCheckRounded />} onClick={() => void verifyChain()}>해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={() => void exportCsv()}>서명 CSV 내려받기</Button></Stack>}
       />
-      <Alert severity="info" sx={{ mb: 2 }}>감사 로그는 서버에서만 append할 수 있으며 API에는 UPDATE·DELETE가 없습니다. 운영 DB는 트리거로 직접 변경도 차단합니다.</Alert>
       {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity="success" onClose={() => setVerification(null)} sx={{ mb: 2 }}>총 {verification.checkedCount.toLocaleString()}건의 행 HMAC, prev_hash 연결, 최종 체인 헤드가 정상입니다. · {formatKst(verification.verifiedAt)} KST</Alert>}
       {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '체인 헤드'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
@@ -148,13 +161,13 @@ function AuditLog() {
       <Card>
         <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
           <Table stickyHeader size="small" sx={{ minWidth: 1120, tableLayout: 'fixed' }}>
-            <TableHead><TableRow><TableCell sx={{ width: '16%' }}>시각 (KST)</TableCell><TableCell sx={{ width: '10%' }}>행위자</TableCell><TableCell sx={{ width: '16%' }}>행위</TableCell><TableCell sx={{ width: '21%' }}>대상</TableCell><TableCell sx={{ width: '25%' }}>설명</TableCell><TableCell sx={{ width: '12%' }}>행 HMAC</TableCell><TableCell align="right" sx={{ width: 80 }}>상세</TableCell></TableRow></TableHead>
+            <TableHead><TableRow><TableCell sx={{ width: '15%' }}>시각 (KST)</TableCell><TableCell sx={{ width: '9%' }}>행위자</TableCell><TableCell sx={{ width: '15%' }}>행위</TableCell><TableCell sx={{ width: '19%' }}>대상</TableCell><TableCell sx={{ width: '22%' }}>설명</TableCell><TableCell sx={{ width: '10%' }}>행 HMAC</TableCell><TableCell align="right" sx={{ width: 150 }}>검증 / 상세</TableCell></TableRow></TableHead>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
               {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 감사 로그가 없습니다.</TableCell></TableRow>}
               {!loading && pageData.content.map((log) => {
                 const invalid = !log.chainValid || invalidLogUids.has(log.logUid)
-                return <TableRow key={log.logUid} hover sx={invalid ? { bgcolor: 'rgba(228, 81, 111, 0.09)' } : undefined}><TableCell sx={{ whiteSpace: 'nowrap' }}>{formatKst(log.createdAt)}</TableCell><TableCell><StatusBadge label={log.actor} tone="neutral" /></TableCell><TableCell><Typography sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 13.5 }}>{auditActionLabels[log.action] ?? log.action}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.targetType}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{log.targetId}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.detail}</Typography></TableCell><TableCell><StatusBadge status={invalid ? 'INVALID' : 'VALID'} /></TableCell><TableCell align="right"><Button size="small" onClick={() => setDetail(log)}>보기</Button></TableCell></TableRow>
+                return <TableRow key={log.logUid} hover sx={invalid ? { bgcolor: 'rgba(228, 81, 111, 0.09)' } : undefined}><TableCell sx={{ whiteSpace: 'nowrap' }}>{formatKst(log.createdAt)}</TableCell><TableCell><StatusBadge label={log.actor} tone="neutral" /></TableCell><TableCell><Typography sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 13.5 }}>{auditActionLabels[log.action] ?? log.action}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.targetType}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{log.targetId}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.detail}</Typography></TableCell><TableCell><StatusBadge status={invalid ? 'INVALID' : 'VALID'} /></TableCell><TableCell align="right"><Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end' }}><Button size="small" startIcon={<FactCheckRounded />} disabled={verifyingUid === log.logUid} onClick={() => void verifyEntry(log)}>개별 검증</Button><Button size="small" onClick={() => setDetail(log)}>보기</Button></Stack></TableCell></TableRow>
               })}
             </TableBody>
           </Table>
@@ -164,6 +177,12 @@ function AuditLog() {
 
       <Dialog open={Boolean(detail)} onClose={() => setDetail(null)} fullWidth maxWidth="sm">
         <DialogTitle>감사 로그 상세</DialogTitle><DialogContent>{detail && <><InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={auditActionLabels[detail.action] ?? detail.action} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="대상 ID" value={detail.targetId} /><InfoRow label="상세" value={<Box component="pre" sx={{ m: 0, p: 1.5, borderRadius: 2, bgcolor: 'action.hover', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 13, lineHeight: 1.6 }}>{JSON.stringify({ message: detail.detail, rowHashValid: detail.chainValid }, null, 2)}</Box>} /><InfoRow label="기록 시각" value={`${formatKst(detail.createdAt)} KST`} /></>}</DialogContent><DialogActions><Button onClick={() => setDetail(null)}>닫기</Button></DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(entryVerification)} onClose={() => setEntryVerification(null)} fullWidth maxWidth="sm">
+        <DialogTitle>개별 해시 체인 검증 결과</DialogTitle>
+        <DialogContent>{entryVerification && <><Alert severity={entryVerification.valid ? 'success' : 'error'} sx={{ mb: 2 }}>{entryVerification.valid ? '선택한 로그와 인접 체인의 무결성이 정상입니다.' : '선택한 로그 구간에서 무결성 위반이 발견되었습니다.'}</Alert><InfoRow label="로그 UID" value={entryVerification.logUid} /><InfoRow label="행 HMAC" value={<StatusBadge status={entryVerification.rowHashValid ? 'VALID' : 'INVALID'} />} /><InfoRow label="이전 연결" value={<StatusBadge status={entryVerification.previousLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.previousLinkValid ? 'prev_hash 일치' : 'prev_hash 불일치'} />} /><InfoRow label="다음 연결" value={<StatusBadge status={entryVerification.nextLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLinkValid ? 'next.prev_hash 일치' : 'next.prev_hash 불일치'} />} /><InfoRow label="체인 헤드" value={<StatusBadge status={entryVerification.chainHeadValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLogUid ? '중간 행 · 해당 없음' : entryVerification.chainHeadValid ? '최종 헤드 일치' : '최종 헤드 불일치'} />} /><InfoRow label="이전 로그" value={entryVerification.previousLogUid ?? 'Genesis'} /><InfoRow label="다음 로그" value={entryVerification.nextLogUid ?? 'Chain head'} /><InfoRow label="검증 시각" value={`${formatKst(entryVerification.verifiedAt)} KST`} /></>}</DialogContent>
+        <DialogActions><Button variant="contained" onClick={() => setEntryVerification(null)}>확인</Button></DialogActions>
       </Dialog>
     </Box>
   )

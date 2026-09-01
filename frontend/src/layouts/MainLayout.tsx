@@ -10,6 +10,7 @@ import {
   DescriptionRounded,
   ExpandLessRounded,
   ExpandMoreRounded,
+  HistoryRounded,
   KeyRounded,
   ListAltRounded,
   LogoutRounded,
@@ -69,6 +70,7 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   { id: 'dashboard', label: '대시보드', path: '/', icon: <DashboardRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
+  { id: 'recent', label: '최근 활동', path: '/my/recent-activity', icon: <HistoryRounded />, roles: ['S.ADMIN', 'ADMIN'] },
   {
     id: 'keys', label: '키 관리', icon: <KeyRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'], children: [
       { label: '키 목록', path: '/keys', icon: <ListAltRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
@@ -85,14 +87,6 @@ const menuGroups: MenuGroup[] = [
   },
 ]
 
-const pageTitles: Array<[string, string]> = [
-  ['/keys/test', '암복호화 테스트'], ['/keys/', '키 상세'],
-  ['/keys', '키 목록'], ['/users', '사용자 관리'], ['/audit-logs', '감사 로그'],
-  ['/my/recent-activity', '내 최근 활동'],
-  ['/notices/new', '공지사항 등록'], ['/notices', '공지사항'], ['/', '대시보드'],
-  ['/profile', '프로필 관리'], ['/forbidden', '접근 제한'],
-]
-
 function MainLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -105,7 +99,6 @@ function MainLayout() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [feedback, setFeedback] = useState<{ severity: 'success' | 'error'; message: string } | null>(null)
   const drawerWidth = collapsed ? collapsedWidth : expandedWidth
-  const currentTitle = pageTitles.find(([path]) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path))?.[1] ?? 'D\'Guard KMS'
 
   const handleNavigate = (path: string) => {
     navigate(path)
@@ -200,7 +193,7 @@ function MainLayout() {
         <Toolbar sx={{ minHeight: '72px !important', px: { xs: 2, sm: 3.5 } }}>
           <Tooltip title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}><IconButton aria-label="사이드바 토글" onClick={() => setCollapsed((value) => !value)} sx={{ display: { xs: 'none', md: 'inline-flex' }, mr: 1.5 }}>{collapsed ? <ChevronRightRounded /> : <ChevronLeftRounded />}</IconButton></Tooltip>
           <IconButton aria-label="메뉴 열기" onClick={() => setMobileOpen(true)} sx={{ display: { md: 'none' }, mr: 1 }}><MenuRounded /></IconButton>
-          <Typography sx={{ flexGrow: 1, fontSize: 18, fontWeight: 700 }}>{currentTitle}</Typography>
+          <Box sx={{ flexGrow: 1 }} />
           <Stack direction="row" spacing={{ xs: 0.25, sm: 0.75 }} sx={{ alignItems: 'center' }}>
             <Button color="inherit" onClick={() => navigate('/profile')} sx={{ display: { xs: 'none', lg: 'block' }, minWidth: 0, mr: 0.5, p: 0.5, textAlign: 'right' }}><Typography sx={{ fontSize: 14.5, fontWeight: 700 }}>{user.loginId}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>{user.role}</Typography></Button>
             <Tooltip title={mode === 'dark' ? '라이트 모드' : '다크 모드'}>

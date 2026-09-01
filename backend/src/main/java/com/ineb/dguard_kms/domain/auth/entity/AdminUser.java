@@ -137,5 +137,7 @@ public class AdminUser {
     }
 
     public Long getId() { return id; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
     public Instant getLastLoginAt() { return lastLoginAt; }
 }

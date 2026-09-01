@@ -6,7 +6,6 @@ import {
   PersonSearchRounded,
   RefreshRounded,
   SearchRounded,
-  SecurityRounded,
   VisibilityRounded,
   WarningAmberRounded,
 } from '@mui/icons-material'
@@ -39,6 +38,7 @@ import {
 import {
   changeUserStatus,
   createUser,
+  fetchAdminAccounts,
   fetchUserPage,
   fetchUserPlain,
   getApiErrorMessage,
@@ -47,7 +47,7 @@ import {
 } from '../../api/kms'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
-import type { AppUser, AppUserPlain, PageResponse, UserListParams, UserStatus } from '../../types/api'
+import type { AdminAccount, AppUser, AppUserPlain, PageResponse, UserListParams, UserStatus } from '../../types/api'
 
 const emptyPage: PageResponse<AppUser> = { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0 }
 const emptyForm = { name: '', phone: '', email: '', password: '' }
@@ -76,6 +76,7 @@ function UserList() {
   const [form, setForm] = useState(emptyForm)
   const [passwordUser, setPasswordUser] = useState<AppUser | null>(null)
   const [newPassword, setNewPassword] = useState('')
+  const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([])
 
   const loadUsers = useCallback(async (nextParams: UserListParams) => {
     setLoading(true)
@@ -92,6 +93,12 @@ function UserList() {
   useEffect(() => {
     void loadUsers(params)
   }, [loadUsers, params])
+
+  useEffect(() => {
+    void fetchAdminAccounts()
+      .then(setAdminAccounts)
+      .catch((requestError) => setError(getApiErrorMessage(requestError, '관리 계정을 불러오지 못했습니다.')))
+  }, [])
 
   const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -196,11 +203,26 @@ function UserList() {
         description="개인정보 원문을 DB에 남기지 않고 마스킹 조회·사유 기반 원문 조회·행 무결성 검증을 수행합니다."
         action={<Button data-testid="user-create-button" variant="contained" startIcon={<AddRounded />} onClick={openCreate}>사용자 등록</Button>}
       />
-      <Alert icon={<SecurityRounded />} severity="info" sx={{ mb: 2 }}>
-        이름·연락처·이메일은 AES-256-GCM으로 암호화되며, 목록 API는 마스킹 값만 반환합니다. 원문 조회는 캐시가 금지되고 감사 체인에 기록됩니다.
-      </Alert>
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
+
+      <Card sx={{ mb: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Typography sx={{ fontWeight: 800 }}>로그인 관리 계정</Typography>
+          <StatusBadge label={`DB ${adminAccounts.length}건`} tone="accent" />
+        </Box>
+        <TableContainer>
+          <Table size="small" aria-label="admin_user 관리 계정 목록">
+            <TableHead><TableRow><TableCell>로그인 ID</TableCell><TableCell>이름</TableCell><TableCell>권한</TableCell><TableCell>상태</TableCell><TableCell>최근 로그인</TableCell><TableCell>등록일</TableCell></TableRow></TableHead>
+            <TableBody>
+              {adminAccounts.length === 0 && <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>DB에 등록된 관리 계정이 없습니다.</TableCell></TableRow>}
+              {adminAccounts.map((account) => <TableRow key={account.userUid} hover><TableCell><Typography sx={{ fontWeight: 800 }}>{account.loginId}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11 }}>{account.userUid}</Typography></TableCell><TableCell>{account.name}</TableCell><TableCell><StatusBadge label={account.role} tone={account.role === 'CLIENT' ? 'neutral' : 'accent'} /></TableCell><TableCell><StatusBadge status={account.status} /></TableCell><TableCell>{account.lastLoginAt ? formatKst(account.lastLoginAt) : '로그인 이력 없음'}</TableCell><TableCell>{formatKst(account.createdAt)}</TableCell></TableRow>)}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
+
+      <Typography variant="h6" sx={{ mb: 1.5 }}>개인정보 암호화 사용자</Typography>
 
       <FilterCard>
         <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 180px auto' }, gap: 1.25 }}>

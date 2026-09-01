@@ -63,6 +63,8 @@ const defaultParams: KeyListParams = {
 const algorithmOptions = ['ALL', 'AES', 'HMAC', 'RSA'] as const
 const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'REACTIVATED', 'DEACTIVATED', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
+const algorithmLabels = { AES: '대칭 암호화 · AES', HMAC: '메시지 인증 · HMAC-SHA256', RSA: '비대칭 암호화 · RSA-OAEP' } as const
+const purposeLabels = { ENCRYPT: '암복호화', SIGN: '서명', AUTH: '인증', WRAP: '키 래핑' } as const
 
 function KeyList() {
   const { user } = useAuth()
@@ -204,9 +206,9 @@ function KeyList() {
             onChange={(event) => updateParam('keyword', event.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }}
           />
-          <FormControl size="small"><InputLabel>알고리즘</InputLabel><Select label="알고리즘" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 알고리즘' : option}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>키 카테고리</InputLabel><Select label="키 카테고리" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 키 카테고리' : algorithmLabels[option]}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel>상태</InputLabel><Select label="상태" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{statusOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : getStatusLabel(option)}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel>용도</InputLabel><Select label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : option}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>용도</InputLabel><Select label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : purposeLabels[option]}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel>정렬</InputLabel><Select label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
         </Box>
         <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
@@ -224,8 +226,8 @@ function KeyList() {
               {pageContent.map((key) => (
                 <TableRow key={key.keyUid} hover sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? 'action.hover' : (theme) => alpha(theme.palette.error.main, 0.13) } }} onDoubleClick={() => navigate(`/keys/${key.keyUid}`)}>
                   <TableCell><Typography noWrap sx={{ maxWidth: 220, fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography noWrap sx={{ maxWidth: 220, color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
-                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{key.algorithm}-{key.keySize}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{key.mode}</Typography></TableCell>
-                  <TableCell sx={{ fontSize: 12 }}>{key.purpose}</TableCell>
+                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{algorithmLabels[key.algorithm]}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{key.algorithm}-{key.keySize} / {key.mode}</Typography></TableCell>
+                  <TableCell sx={{ fontSize: 12 }}>{purposeLabels[key.purpose]}</TableCell>
                   <TableCell><StatusBadge status={key.status} /></TableCell>
                   <TableCell sx={{ fontSize: 12, fontWeight: 800 }}>v{key.version}</TableCell>
                   <TableCell sx={{ fontSize: 11.5 }}>{key.autoRotationDays ? `${key.autoRotationDays}일` : '—'}</TableCell>

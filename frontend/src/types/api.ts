@@ -177,6 +177,17 @@ export interface AppUserPlain {
   encVer: number
 }
 
+export interface AdminAccount {
+  userUid: string
+  loginId: string
+  name: string
+  role: 'S.ADMIN' | 'ADMIN' | 'CLIENT'
+  status: UserStatus
+  createdAt: string
+  updatedAt: string
+  lastLoginAt: string | null
+}
+
 export type AuditAction =
   | 'LOGIN'
   | 'LOGOUT'
@@ -226,6 +237,18 @@ export interface AuditVerification {
   checkedCount: number
   invalidLogUids: string[]
   headValid: boolean
+  verifiedAt: string
+}
+
+export interface AuditEntryVerification {
+  logUid: string
+  valid: boolean
+  rowHashValid: boolean
+  previousLinkValid: boolean
+  nextLinkValid: boolean
+  chainHeadValid: boolean
+  previousLogUid: string | null
+  nextLogUid: string | null
   verifiedAt: string
 }
 

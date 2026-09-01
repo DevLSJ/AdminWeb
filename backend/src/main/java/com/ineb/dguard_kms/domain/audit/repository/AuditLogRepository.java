@@ -12,6 +12,12 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSp
 
     Optional<AuditLog> findTopByOrderByIdDesc();
 
+    Optional<AuditLog> findByLogUid(java.util.UUID logUid);
+
+    Optional<AuditLog> findTopByIdLessThanOrderByIdDesc(Long id);
+
+    Optional<AuditLog> findTopByIdGreaterThanOrderByIdAsc(Long id);
+
     List<AuditLog> findAllByOrderByIdAsc();
 
 }

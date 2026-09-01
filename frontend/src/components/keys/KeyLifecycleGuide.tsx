@@ -78,7 +78,7 @@ export function KeyLifecycleGuide({ currentStatus, compact = false }: KeyLifecyc
   return (
     <Box>
       <Typography sx={{ mb: 2, color: 'text.secondary', fontSize: 13.5, lineHeight: 1.6 }}>
-        KMIP 상태 모델을 참고한 이 프로젝트의 허용 전이입니다. 목록에 없는 전이는 서버에서 차단됩니다.
+        KMIP 2.1의 Pre-Active·Active·Deactivated·Compromised·Destroyed를 표준 축으로 사용합니다. 재활성·만료·운영 중지·배포됨은 D’Guard 업무 정책 확장이며, 목록에 없는 전이는 서버에서 차단됩니다.
       </Typography>
       {content}
     </Box>

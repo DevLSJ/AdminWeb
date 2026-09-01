@@ -7,6 +7,7 @@ export type RecentActivityType =
   | 'LOGIN'
   | 'LOGOUT'
   | 'NOTICE_UPDATE'
+  | 'AUDIT_EVENT'
 
 export type RecentActivityStatus = 'SUCCESS' | 'FAILURE' | 'IN_PROGRESS'
 

@@ -39,10 +39,10 @@ function App() {
             <Route path="/notices" element={<NoticeList key="notice-list" />} />
             <Route path="/notices/new" element={<NoticeList key="notice-new" autoCreate />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/my/recent-activity" element={<MyRecentActivityRoute />} />
             <Route path="/forbidden" element={<Forbidden />} />
 
             <Route element={<RequireRole allowedRoles={['S.ADMIN', 'ADMIN']} />}>
+              <Route path="/my/recent-activity" element={<MyRecentActivityRoute />} />
               <Route path="/keys/register" element={<Navigate to="/keys" replace />} />
               <Route path="/users" element={<UserList />} />
               <Route path="/audit-logs" element={<AuditLog />} />

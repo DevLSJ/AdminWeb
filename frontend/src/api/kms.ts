@@ -3,9 +3,11 @@ import type {
   ApiResponse,
   AppUser,
   AppUserPlain,
+  AdminAccount,
   AuditLog,
   AuditListParams,
   AuditVerification,
+  AuditEntryVerification,
   DashboardSummary,
   DashboardTrend,
   CryptoKey,
@@ -67,10 +69,16 @@ export function getApiErrorMessage(error: unknown, fallback: string) {
 }
 
 export async function fetchKeys() {
-  const page = await fetchKeyPage({
-    keyword: '', algorithm: 'ALL', status: 'ALL', purpose: 'ALL', page: 0, size: 100, sort: 'createdAt,desc',
-  })
-  return page.content
+  const keys: CryptoKey[] = []
+  let pageNumber = 0
+  let totalPages = 1
+  while (pageNumber < totalPages) {
+    const page = await fetchKeyPage({ keyword: '', algorithm: 'ALL', status: 'ALL', purpose: 'ALL', page: pageNumber, size: 100, sort: 'createdAt,desc' })
+    keys.push(...page.content)
+    totalPages = page.totalPages
+    pageNumber += 1
+  }
+  return keys
 }
 
 export async function fetchKeyPage(params: KeyListParams) {
@@ -161,6 +169,14 @@ export async function fetchAuditLogs() {
 
 export async function verifyAuditLogs() {
   return unwrap(await apiClient.get<ApiResponse<AuditVerification>>(apiEndpoints.auditLogs.verify))
+}
+
+export async function verifyAuditLogEntry(logUid: string) {
+  return unwrap(await apiClient.get<ApiResponse<AuditEntryVerification>>(apiEndpoints.auditLogs.verifyEntry(logUid)))
+}
+
+export async function fetchAdminAccounts() {
+  return unwrap(await apiClient.get<ApiResponse<AdminAccount[]>>(apiEndpoints.adminAccounts.list))
 }
 
 export async function fetchAuditLogPage(params: AuditListParams) {

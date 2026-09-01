@@ -19,15 +19,15 @@ export const keyStatusOrder: KeyStatus[] = [
 ]
 
 export const keyStatusMetadata: Record<KeyStatus, KeyStatusMetadata> = {
-  CREATED: { label: '생성됨', description: '키가 생성됐으나 아직 암복호화에 사용할 수 없습니다.' },
-  ACTIVE: { label: '활성화', description: '최신 버전으로 암호화하고 모든 보존 버전으로 복호화할 수 있습니다.' },
-  REACTIVATED: { label: '재활성화', description: '새 데이터 암호화만 허용되며 복호화는 차단됩니다.' },
-  DEACTIVATED: { label: '비활성화', description: '기존 데이터 복호화만 허용되며 신규 암호화는 차단됩니다.' },
-  EXPIRED: { label: '만료됨', description: '유효기간이 만료됐으며 사유를 입력해 재활성화할 수 있습니다.' },
-  INACTIVE: { label: '비활성화', description: '사용이 중지됐으며 폐기만 가능합니다.' },
-  DISTRIBUTED: { label: '배포됨', description: '외부 시스템에 배포된 사실이 기록된 상태입니다.' },
-  COMPROMISED: { label: '침해됨', description: '키 노출 또는 유출이 의심되어 폐기만 가능합니다.' },
-  DESTROYED: { label: '폐기됨', description: '복구할 수 없는 최종 상태이며 다른 상태로 전이할 수 없습니다.', terminal: true },
+  CREATED: { label: '준비 · Pre-Active', description: 'KMIP Pre-Active 대응 상태입니다. 키가 생성됐으나 암복호화에는 사용할 수 없습니다.' },
+  ACTIVE: { label: '활성 · Active', description: 'KMIP Active 대응 상태입니다. 최신 버전 암호화와 보존 버전 복호화를 허용합니다.' },
+  REACTIVATED: { label: '재활성 · D’Guard', description: 'D’Guard 확장 정책입니다. 재활성화 이후 신규 암호화만 허용하고 복호화는 차단합니다.' },
+  DEACTIVATED: { label: '비활성 · Deactivated', description: 'KMIP Deactivated 대응 상태입니다. 기존 데이터 복호화만 허용하고 신규 암호화는 차단합니다.' },
+  EXPIRED: { label: '만료 · D’Guard', description: '유효기간에 따른 D’Guard 정책 상태입니다. 사유를 기록한 재활성화만 허용합니다.' },
+  INACTIVE: { label: '운영 중지 · D’Guard', description: '관리자가 완전히 사용 중지한 D’Guard 확장 상태이며 폐기만 가능합니다.' },
+  DISTRIBUTED: { label: '배포됨 · D’Guard', description: '수명주기가 아닌 외부 시스템 배포 사실을 보존하는 D’Guard 확장 상태입니다.' },
+  COMPROMISED: { label: '침해 · Compromised', description: 'KMIP Compromised 대응 상태입니다. 키 노출 또는 유출이 의심되어 폐기만 가능합니다.' },
+  DESTROYED: { label: '폐기 · Destroyed', description: 'KMIP Destroyed 대응 최종 상태입니다. 키 재료는 NULL이며 추가 전이가 불가능합니다.', terminal: true },
 }
 
 export const keyStatusTransitions: Record<KeyStatus, KeyStatus[]> = {

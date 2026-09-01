@@ -13,11 +13,11 @@ import {
 
 interface PageHeaderProps {
   title: string
-  description: string
+  description?: string
   action?: ReactNode
 }
 
-export function PageHeader({ title, description, action }: PageHeaderProps) {
+export function PageHeader({ title, action }: PageHeaderProps) {
   return (
     <Box
       sx={{
@@ -29,12 +29,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
         mb: 3,
       }}
     >
-      <Box>
-        <Typography variant="h5">{title}</Typography>
-        <Typography sx={{ mt: 0.65, color: 'text.secondary', fontSize: 14 }}>
-          {description}
-        </Typography>
-      </Box>
+      <Typography variant="h5">{title}</Typography>
       {action}
     </Box>
   )

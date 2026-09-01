@@ -17,6 +17,7 @@ import {
   LogoutRounded,
   RefreshRounded,
   ScienceRounded,
+  SecurityRounded,
   SwapHorizRounded,
 } from '@mui/icons-material'
 import {
@@ -46,7 +47,7 @@ import {
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { StatusBadge } from '../../src/components/common/StatusBadge'
-import { mockRecentActivitySource } from './mockData'
+import { apiRecentActivitySource } from './apiData'
 import type {
   RecentActivityPageResult,
   RecentActivityQuery,
@@ -92,6 +93,7 @@ const activityTypeStyle: Record<RecentActivityType, {
   LOGIN: { label: '로그인', color: '#25a875', icon: <LoginRounded /> },
   LOGOUT: { label: '로그아웃', color: '#7a8090', icon: <LogoutRounded /> },
   NOTICE_UPDATE: { label: '게시판 활동', color: '#e09a16', icon: <DescriptionRounded /> },
+  AUDIT_EVENT: { label: '감사 이벤트', color: '#596273', icon: <SecurityRounded /> },
 }
 
 function formatTimestamp(timestamp: string) {
@@ -185,12 +187,12 @@ export interface RecentActivityPageProps {
 
 export function RecentActivityPage({
   userId = 'admin',
-  source = mockRecentActivitySource,
+  source = apiRecentActivitySource,
   pollingIntervalMs = 10_000,
 }: RecentActivityPageProps) {
   const [activityType, setActivityType] = useState<RecentActivityTypeFilter>('ALL')
-  const [fromDate, setFromDate] = useState('2026-08-01')
-  const [toDate, setToDate] = useState('2026-08-20')
+  const [fromDate, setFromDate] = useState(() => { const date = new Date(); date.setDate(date.getDate() - 30); return date.toISOString().slice(0, 10) })
+  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
@@ -216,12 +218,7 @@ export function RecentActivityPage({
   return (
     <Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
-        <Box>
-          <Typography variant="h5">내 최근 활동</Typography>
-          <Typography sx={{ mt: 0.65, color: 'text.secondary', fontSize: 14 }}>
-            내 계정에서 발생한 키 관리 및 로그인 이력을 최신순으로 확인합니다.
-          </Typography>
-        </Box>
+        <Typography variant="h5">최근 활동</Typography>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <StatusBadge
             icon={<CheckCircleRounded />}

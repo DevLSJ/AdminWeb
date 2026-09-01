@@ -3,6 +3,7 @@ package com.ineb.dguard_kms.domain.audit.controller;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
@@ -14,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +24,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.ineb.dguard_kms.common.ApiResponse;
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.audit.dto.AuditLogResponse;
+import com.ineb.dguard_kms.domain.audit.dto.AuditEntryVerificationResponse;
 import com.ineb.dguard_kms.domain.audit.dto.AuditVerificationResponse;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
 import com.ineb.dguard_kms.security.AdminUserDetails;
@@ -59,6 +62,12 @@ public class AuditLogController {
     @Operation(summary = "감사 로그 체인 검증", description = "감사 로그 해시 체인의 무결성을 검증합니다.")
     public ApiResponse<AuditVerificationResponse> verify() {
         return ApiResponse.success(service.verifyChain(), "감사 로그 체인 검증을 완료했습니다.");
+    }
+
+    @GetMapping("/{logUid}/verify")
+    @Operation(summary = "개별 감사 로그 체인 검증", description = "선택한 행의 HMAC과 앞뒤 prev_hash 연결 및 마지막 행의 체인 헤드를 검증합니다.")
+    public ApiResponse<AuditEntryVerificationResponse> verifyEntry(@PathVariable UUID logUid) {
+        return ApiResponse.success(service.verifyEntry(logUid), "선택한 감사 로그 구간 검증을 완료했습니다.");
     }
 
     @GetMapping("/export")
