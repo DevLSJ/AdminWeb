@@ -251,3 +251,5 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 - 좌측 메뉴는 선택 상태가 투명해지지 않는 청색/흰색 강조, 하위 메뉴 세로 가이드, 짧은 이동 애니메이션을 사용한다.
 
 검증: 프론트 oxlint, TypeScript 프로젝트 검사, Vite production build가 성공했다. 백엔드 `NoticeDatabaseIntegrationTests`에서 multipart 등록, AES-256-GCM 첨부 암호화 DB 저장, 복호화 다운로드, 상세 접속별 조회수 증가와 감사 체인 검증이 통과했다.
+
+운영 검증: GitHub Actions `Build & Deploy` 실행 33473801243에서 백엔드·프론트 이미지 빌드와 `Deploy to Server`가 모두 성공했다. 배포 후 운영 도메인에서 `admin` DB 계정으로 로그인하고 개인정보가 없는 임시 텍스트 첨부 공지를 multipart로 등록했다. 생성 UUID를 사용한 상세 조회에서 조회수 1, 첨부파일 1개를 확인했으며 검증 공지는 HTTP 200으로 즉시 삭제했다. 로그인 화면으로 이탈하지 않은 채 동일 JWT로 생성·조회·삭제가 완료되어 인증 유지와 운영 DB 왕복을 확인했다.
