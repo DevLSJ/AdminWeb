@@ -235,3 +235,5 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 - 신규 키 등록 모달은 정책 입력과 대형 만료일 달력을 같은 높이의 2열로 맞추고, 입력 컨트롤 높이와 좌측 영역 폭을 확장했다.
 
 자동 검증은 `NoticeDatabaseIntegrationTests`에서 multipart 공지 등록, 암호문·IV DB 저장, 상세 조회수 0→1→2 증가, 첨부파일 복호화 일치, 감사 체인 정상, ADMIN/CLIENT 및 S.ADMIN/ADMIN 권한 분기와 관리 계정 재서명을 실제 HTTP·JPA 흐름으로 확인한다. 프론트는 oxlint, TypeScript 프로젝트 검사, Vite production build를 통과했다.
+
+운영 PostgreSQL의 기존 `notice.expose_yn CHAR(1)`과 Hibernate 7의 String `VARCHAR(1)` 검증 차이는 `V12__normalize_notice_exposure_type.sql`에서 데이터 의미와 Y/N 체크 제약을 유지한 채 `VARCHAR(1)`로 정규화했다. 이 마이그레이션은 기존 V11 체크섬을 변경하지 않으며 운영 `ddl-auto=validate` 기동을 보장한다.

@@ -23,7 +23,7 @@ public class Notice {
     private String title;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
-    @Column(name = "expose_yn", nullable = false, length = 1, columnDefinition = "CHAR(1)")
+    @Column(name = "expose_yn", nullable = false, length = 1)
     private String exposeYn;
     @Column(name = "view_count", nullable = false)
     private long viewCount;
