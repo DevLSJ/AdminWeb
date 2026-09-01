@@ -15,12 +15,10 @@ public enum KeyStatus {
 
     public Set<KeyStatus> allowedTransitions() {
         return switch (this) {
-            case CREATED -> Set.of(ACTIVE);
-            case ACTIVE -> Set.of(DEACTIVATED, EXPIRED, INACTIVE, DISTRIBUTED, COMPROMISED);
-            case REACTIVATED -> Set.of(DEACTIVATED, EXPIRED, INACTIVE, DISTRIBUTED, COMPROMISED);
-            case DEACTIVATED -> Set.of(REACTIVATED, DESTROYED);
-            case EXPIRED -> Set.of(INACTIVE, REACTIVATED);
-            case INACTIVE, DISTRIBUTED, COMPROMISED -> Set.of(DESTROYED);
+            case CREATED -> Set.of(ACTIVE, DESTROYED);
+            case ACTIVE, REACTIVATED, DISTRIBUTED -> Set.of(DEACTIVATED, COMPROMISED, DESTROYED);
+            case DEACTIVATED, EXPIRED, INACTIVE -> Set.of(ACTIVE, COMPROMISED, DESTROYED);
+            case COMPROMISED -> Set.of(DESTROYED);
             case DESTROYED -> Set.of();
         };
     }
@@ -30,10 +28,14 @@ public enum KeyStatus {
     }
 
     public boolean canEncrypt() {
-        return this == ACTIVE || this == REACTIVATED;
+        return this == ACTIVE || this == REACTIVATED || this == DISTRIBUTED;
     }
 
     public boolean canDecrypt() {
-        return this == ACTIVE || this == DEACTIVATED;
+        return canEncrypt();
+    }
+
+    public boolean canRotate() {
+        return canEncrypt() || this == DEACTIVATED || this == EXPIRED || this == INACTIVE;
     }
 }

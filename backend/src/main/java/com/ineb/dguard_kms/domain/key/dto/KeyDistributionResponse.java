@@ -15,7 +15,7 @@ public record KeyDistributionResponse(
         int version,
         @Schema(description = "배포 대상", example = "payment-api")
         String target,
-        @Schema(description = "배포 후 키 상태", example = "DISTRIBUTED")
+        @Schema(description = "배포 후 유지되는 생명주기 상태", example = "ACTIVE")
         KeyStatus status,
         @Schema(description = "배포 완료 시각(UTC)")
         Instant distributedAt

@@ -286,17 +286,20 @@ public class CryptoKeyService {
     public void delete(UUID keyUid, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
         String keyName = key.getKeyName();
-        // Deliberately do not verify the row HMAC here: an administrator must
-        // be able to remove a failed demo/tampered key that all other actions
-        // correctly block. Delete children explicitly as well as retaining the
-        // database cascades, so the operation is portable to test databases.
-        usageLogRepository.deleteByCryptoKey(key);
-        historyRepository.deleteByCryptoKey(key);
-        materialRepository.deleteByCryptoKey(key);
-        keyRepository.delete(key);
-        keyRepository.flush();
+        KeyStatus from = key.getStatus();
+        if (from == KeyStatus.DESTROYED) return;
+        for (KeyMaterial version : materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key)) {
+            version.destroy();
+            signMaterial(key, version);
+        }
+        key.destroyPublicKey();
+        key.changeStatus(KeyStatus.DESTROYED);
+        signIntegrity(key);
+        historyRepository.save(new KeyStatusHistory(
+                key, from, KeyStatus.DESTROYED, "DESTROY", "관리자 즉시 폐기 및 원시 키 제로화", actor
+        ));
         auditLogService.append(actor, "KEY_DELETE", "CRYPTO_KEY", keyUid.toString(),
-                keyName + " 키 영구 삭제");
+                keyName + " 키 재료 제로화 및 폐기");
     }
 
     @Transactional
@@ -324,11 +327,11 @@ public class CryptoKeyService {
         KeyMaterial material = verifiedCurrentMaterial(key);
         KeyStatus from = key.getStatus();
         KeyStatus to = request.toStatus();
-        if (to == KeyStatus.DISTRIBUTED) {
+        if (to == KeyStatus.DISTRIBUTED || to == KeyStatus.REACTIVATED || to == KeyStatus.EXPIRED || to == KeyStatus.INACTIVE) {
             throw new KeyOperationException(
                     HttpStatus.BAD_REQUEST,
-                    "DISTRIBUTED 전이는 키 배포 API를 사용해야 합니다.",
-                    "USE_DISTRIBUTION_ENDPOINT"
+                    "화면에서 지원하지 않는 레거시 상태입니다.",
+                    "LEGACY_KEY_STATUS_NOT_ALLOWED"
             );
         }
         if (!from.canTransitionTo(to)) {
@@ -343,7 +346,7 @@ public class CryptoKeyService {
             key.destroyPublicKey();
         }
         signIntegrity(key);
-        historyRepository.save(new KeyStatusHistory(key, from, to, "STATUS_CHANGE", request.reason().trim(), actor));
+        historyRepository.save(new KeyStatusHistory(key, from, to, "LIFECYCLE", request.reason().trim(), actor));
         auditLogService.append(actor, "KEY_STATUS_CHANGE", "CRYPTO_KEY", key.getKeyUid().toString(),
                 from + " → " + to + ": " + request.reason().trim());
         return KeyResponse.from(key, true);
@@ -359,7 +362,7 @@ public class CryptoKeyService {
     public List<UUID> autoRotationCandidates() {
         Instant now = Instant.now();
         return keyRepository.findAll().stream()
-                .filter(key -> key.getAutoRotationDays() != null && key.getStatus().canEncrypt())
+                .filter(key -> key.getAutoRotationDays() != null && key.getStatus().canRotate())
                 .filter(key -> materialRepository.findByCryptoKeyAndKeyVersion(key, key.getCurrentVersion())
                         .map(material -> !material.getCreatedAt()
                                 .plusSeconds(key.getAutoRotationDays() * 86_400L).isAfter(now))
@@ -372,7 +375,7 @@ public class CryptoKeyService {
     public boolean rotateIfDue(UUID keyUid, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
         Integer days = key.getAutoRotationDays();
-        if (days == null || !key.getStatus().canEncrypt()) return false;
+        if (days == null || !key.getStatus().canRotate()) return false;
         KeyMaterial material = verifiedCurrentMaterial(key);
         if (material.getCreatedAt().plusSeconds(days * 86_400L).isAfter(Instant.now())) return false;
         rotateLocked(key, actor);
@@ -380,8 +383,8 @@ public class CryptoKeyService {
     }
 
     private KeyRotationResponse rotateLocked(CryptoKey key, String actor) {
-        if (!key.getStatus().canEncrypt()) {
-            throw conflict("암호화 가능한 키만 갱신할 수 있습니다.", "KEY_ROTATION_NOT_ALLOWED");
+        if (!key.getStatus().canRotate()) {
+            throw conflict("활성 또는 비활성 키만 갱신할 수 있습니다.", "KEY_ROTATION_NOT_ALLOWED");
         }
 
         int previousVersion = key.getCurrentVersion();
@@ -427,20 +430,17 @@ public class CryptoKeyService {
     @Transactional
     public KeyDistributionResponse distribute(UUID keyUid, KeyDistributionRequest request, String actor) {
         CryptoKey key = findKeyForUpdate(keyUid);
-        if (key.getStatus() != KeyStatus.ACTIVE) {
+        if (!key.getStatus().canEncrypt()) {
             throw conflict("ACTIVE 키만 배포할 수 있습니다.", "KEY_DISTRIBUTION_NOT_ALLOWED");
         }
 
         KeyMaterial material = verifiedCurrentMaterial(key);
-        KeyStatus from = key.getStatus();
         material.markDistributed();
         signMaterial(key, material);
-        key.changeStatus(KeyStatus.DISTRIBUTED);
-        signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key,
-                from,
-                KeyStatus.DISTRIBUTED,
+                key.getStatus(),
+                key.getStatus(),
                 "DISTRIBUTE",
                 request.reason().trim() + " (대상: " + request.target().trim() + ")",
                 actor
@@ -670,20 +670,18 @@ public class CryptoKeyService {
                 ? ("RSA".equals(algorithm) ? "OAEP_SHA256" : "GCM")
                 : requestedMode.trim().toUpperCase(Locale.ROOT).replace('-', '_');
         boolean valid = switch (algorithm) {
-            case "AES" -> (keySize == 128 || keySize == 192 || keySize == 256)
-                    && ("GCM".equals(mode) || "CBC".equals(mode));
-            case "RSA" -> (keySize == 2048 || keySize == 3072 || keySize == 4096)
-                    && ("OAEP_SHA256".equals(mode) || "OAEP".equals(mode));
+            case "AES" -> keySize == 256 && "GCM".equals(mode);
+            case "RSA" -> keySize == 2048 && "OAEP_SHA256".equals(mode);
             default -> false;
         };
         if (!valid) {
             throw new KeyOperationException(
                     HttpStatus.BAD_REQUEST,
-                    "지원 정책은 AES(128/192/256, GCM/CBC) 또는 RSA(2048/3072/4096, OAEP_SHA256)입니다.",
+                    "지원 정책은 AES-256-GCM 또는 RSA-2048-SHA256입니다.",
                     "UNSUPPORTED_KEY_ALGORITHM"
             );
         }
-        return new ManagedKeyPolicy(algorithm, "OAEP".equals(mode) ? "OAEP_SHA256" : mode, keySize);
+        return new ManagedKeyPolicy(algorithm, mode, keySize);
     }
 
     private void validateRotationDays(Integer days) {
@@ -718,7 +716,13 @@ public class CryptoKeyService {
             if (algorithm != null && !algorithm.isBlank()) {
                 predicates.add(builder.equal(builder.upper(root.get("algorithm")), algorithm.trim().toUpperCase(java.util.Locale.ROOT)));
             }
-            if (status != null) predicates.add(builder.equal(root.get("status"), status));
+            if (status == KeyStatus.ACTIVE) {
+                predicates.add(root.get("status").in(KeyStatus.ACTIVE, KeyStatus.REACTIVATED, KeyStatus.DISTRIBUTED));
+            } else if (status == KeyStatus.DEACTIVATED) {
+                predicates.add(root.get("status").in(KeyStatus.DEACTIVATED, KeyStatus.EXPIRED, KeyStatus.INACTIVE));
+            } else if (status != null) {
+                predicates.add(builder.equal(root.get("status"), status));
+            }
             if (purpose != null && !purpose.isBlank()) {
                 predicates.add(builder.equal(builder.upper(root.get("purpose")), purpose.trim().toUpperCase(java.util.Locale.ROOT)));
             }

@@ -142,7 +142,7 @@ export interface KeyDistributionResult {
   keyUid: string
   version: number
   target: string
-  status: 'DISTRIBUTED'
+  status: KeyStatus
   distributedAt: string
 }
 

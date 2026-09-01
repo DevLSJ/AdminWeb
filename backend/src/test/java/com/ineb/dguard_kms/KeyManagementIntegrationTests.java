@@ -29,6 +29,7 @@ import com.ineb.dguard_kms.crypto.CryptoUtil;
 import com.ineb.dguard_kms.crypto.MasterKeyService;
 import com.ineb.dguard_kms.domain.config.repository.CryptoConfigRepository;
 import com.ineb.dguard_kms.domain.key.entity.KeyMaterial;
+import com.ineb.dguard_kms.domain.key.entity.KeyStatus;
 import com.ineb.dguard_kms.domain.key.repository.CryptoKeyRepository;
 import com.ineb.dguard_kms.domain.key.repository.KeyMaterialRepository;
 import com.ineb.dguard_kms.domain.key.service.CryptoKeyService;
@@ -130,7 +131,7 @@ class KeyManagementIntegrationTests {
         assertBinaryMaterial(v1);
 
         JsonNode forbidden = sendJson(client, "PATCH", "/api/keys/" + keyUid + "/status", token, """
-                {"toStatus":"DESTROYED","reason":"금지 전이 검증"}
+                {"toStatus":"COMPROMISED","reason":"금지 전이 검증"}
                 """, 409);
         assertThat(forbidden.path("errorCode").asText()).isEqualTo("INVALID_KEY_STATUS_TRANSITION");
 
@@ -209,11 +210,11 @@ class KeyManagementIntegrationTests {
         JsonNode distributed = sendJson(client, "POST", "/api/keys/" + keyUid + "/distribute", token, """
                 {"target":"integration-agent","reason":"통합 테스트 배포"}
                 """, 200);
-        assertThat(distributed.path("data").path("status").asText()).isEqualTo("DISTRIBUTED");
+        assertThat(distributed.path("data").path("status").asText()).isEqualTo("ACTIVE");
         assertThat(distributed.path("data").path("wrappedKey").isMissingNode()).isTrue();
         assertThat(distributed.path("data").path("iv").isMissingNode()).isTrue();
-        JsonNode distributedRotation = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 409);
-        assertThat(distributedRotation.path("errorCode").asText()).isEqualTo("KEY_ROTATION_NOT_ALLOWED");
+        JsonNode distributedRotation = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 200);
+        assertThat(distributedRotation.path("data").path("newVersion").asInt()).isEqualTo(3);
 
         JsonNode auditLogs = sendJson(client, "GET", "/api/audit-logs?page=0&size=100", token, "", 200);
         assertThat(auditLogs.path("data").path("content")).anySatisfy(log ->
@@ -227,7 +228,7 @@ class KeyManagementIntegrationTests {
         JsonNode tampered = sendJson(client, "GET", "/api/keys/" + keyUid, token, "", 409);
         assertThat(tampered.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
         JsonNode blocked = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 409);
-        assertThat(blocked.path("errorCode").asText()).isEqualTo("KEY_ROTATION_NOT_ALLOWED");
+        assertThat(blocked.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
     }
 
     @Test
@@ -244,7 +245,7 @@ class KeyManagementIntegrationTests {
     }
 
     @Test
-    void administratorCanDeleteAnIntegrityFailedDemoKey() throws Exception {
+    void administratorCanZeroizeAnIntegrityFailedKeyAndPreserveMetadata() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
         String token = login(client, "admin", "admin");
         JsonNode created = sendJson(client, "POST", "/api/keys", token, """
@@ -257,8 +258,14 @@ class KeyManagementIntegrationTests {
         keyRepository.saveAndFlush(key);
 
         keyService.delete(keyUid, "admin");
-        assertThat(keyRepository.findByKeyUid(keyUid)).isEmpty();
-        assertThat(materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(key)).isEmpty();
+        var destroyed = keyRepository.findByKeyUid(keyUid).orElseThrow();
+        assertThat(destroyed.getStatus()).isEqualTo(KeyStatus.DESTROYED);
+        assertThat(materialRepository.findAllByCryptoKeyOrderByKeyVersionDesc(destroyed))
+                .allSatisfy(material -> {
+                    assertThat(material.getWrappedKey()).isNull();
+                    assertThat(material.getWrappingIv()).isNull();
+                    assertThat(material.isDestroyed()).isTrue();
+                });
     }
 
     @Test

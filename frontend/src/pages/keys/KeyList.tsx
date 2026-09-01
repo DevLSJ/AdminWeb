@@ -43,7 +43,8 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 import { KeyLifecycleGuide } from '../../components/keys/KeyLifecycleGuide'
 import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
-import { getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
+import { canEncryptWithStatus, getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
+import { getKeyAlgorithmLabel, getKeyCategoryLabel } from '../../utils/keyPresentation'
 import type { CryptoKey, DeploymentTargetType, KeyListParams, KeyStatus } from '../../types/api'
 import { isAdminRole } from '../../types/auth'
 import { getStatusLabel } from '../../utils/status'
@@ -60,10 +61,10 @@ const defaultParams: KeyListParams = {
   sort: 'createdAt,desc',
 }
 
-const algorithmOptions = ['ALL', 'AES', 'HMAC', 'RSA'] as const
-const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'REACTIVATED', 'DEACTIVATED', 'EXPIRED', 'INACTIVE', 'DISTRIBUTED', 'COMPROMISED', 'DESTROYED'] as const
+const algorithmOptions = ['ALL', 'AES', 'RSA'] as const
+const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'DEACTIVATED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
-const algorithmLabels = { AES: '대칭 암호화 · AES', HMAC: '메시지 인증 · HMAC-SHA256', RSA: '비대칭 암호화 · RSA-OAEP' } as const
+const algorithmLabels = { AES: '대칭키 · AES-256-GCM', RSA: '공개키 · RSA-2048-SHA256' } as const
 const purposeLabels = { ENCRYPT: '암복호화', SIGN: '서명', AUTH: '인증', WRAP: '키 래핑' } as const
 
 function KeyList() {
@@ -150,7 +151,7 @@ function KeyList() {
       await distributeKeys(deployKeyUids, target.trim(), deploymentReason.trim())
       await loadPage()
       setDeploymentComplete(true)
-      setMessage(`${deployKeyUids.length}개 키가 배포되어 DISTRIBUTED 상태로 전환되었습니다.`)
+      setMessage(`${deployKeyUids.length}개 키 배포 이력이 기록되었습니다. 키 생명주기 상태는 유지됩니다.`)
     } catch (requestError) {
       setMessage(requestError instanceof Error ? requestError.message : '키 배포에 실패했습니다.')
     } finally {
@@ -169,7 +170,7 @@ function KeyList() {
     try {
       await deleteKey(deleteKeyTarget.keyUid)
       await loadPage()
-      setMessage(`${deleteKeyTarget.keyName} 키가 영구 삭제되었습니다.`)
+      setMessage(`${deleteKeyTarget.keyName} 키 재료가 제로화되어 폐기 상태로 전환되었습니다.`)
       setDeleteKeyTarget(null)
     } catch (requestError) {
       setMessage(requestError instanceof Error ? requestError.message : '키를 삭제하지 못했습니다.')
@@ -226,7 +227,7 @@ function KeyList() {
               {pageContent.map((key) => (
                 <TableRow key={key.keyUid} hover sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? 'action.hover' : (theme) => alpha(theme.palette.error.main, 0.13) } }} onDoubleClick={() => navigate(`/keys/${key.keyUid}`)}>
                   <TableCell><Typography noWrap sx={{ maxWidth: 220, fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography noWrap sx={{ maxWidth: 220, color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
-                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{algorithmLabels[key.algorithm]}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{key.algorithm}-{key.keySize} / {key.mode}</Typography></TableCell>
+                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
                   <TableCell sx={{ fontSize: 12 }}>{purposeLabels[key.purpose]}</TableCell>
                   <TableCell><StatusBadge status={key.status} /></TableCell>
                   <TableCell sx={{ fontSize: 12, fontWeight: 800 }}>v{key.version}</TableCell>
@@ -265,21 +266,21 @@ function KeyList() {
       <KeyRegisterDialog open={registerOpen} onClose={() => setRegisterOpen(false)} onCreated={(key) => { setMessage(`${key.keyName} 키가 등록되었습니다.`); void loadPage() }} />
 
       <Dialog open={Boolean(deleteKeyTarget)} onClose={() => !deleting && setDeleteKeyTarget(null)} fullWidth maxWidth="sm">
-        <DialogTitle>키 영구 삭제</DialogTitle>
+        <DialogTitle>키 즉시 폐기</DialogTitle>
         <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>키 재료, 상태 이력, 사용 로그가 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</Alert>
-          <Typography sx={{ mb: 2 }}><strong>{deleteKeyTarget?.keyName}</strong>을 삭제하려면 아래에 키 이름을 정확히 입력하세요.</Typography>
+          <Alert severity="warning" sx={{ mb: 2 }}>모든 버전의 원시 키를 제로화합니다. 복구할 수 없으며 운영 메타데이터와 감사 이력은 무결성 검증을 위해 보존됩니다.</Alert>
+          <Typography sx={{ mb: 2 }}><strong>{deleteKeyTarget?.keyName}</strong>을 즉시 폐기하려면 아래에 키 이름을 정확히 입력하세요.</Typography>
           <TextField fullWidth label="삭제할 키 이름" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} disabled={deleting} />
         </DialogContent>
-        <DialogActions><Button onClick={() => setDeleteKeyTarget(null)} disabled={deleting}>취소</Button><Button color="error" variant="contained" disabled={!deleteKeyTarget || deleteConfirmation !== deleteKeyTarget.keyName || deleting} onClick={() => void executeDelete()}>{deleting ? '삭제 중…' : '영구 삭제'}</Button></DialogActions>
+        <DialogActions><Button onClick={() => setDeleteKeyTarget(null)} disabled={deleting}>취소</Button><Button color="error" variant="contained" disabled={!deleteKeyTarget || deleteKeyTarget.status === 'DESTROYED' || deleteConfirmation !== deleteKeyTarget.keyName || deleting} onClick={() => void executeDelete()}>{deleting ? '폐기 중…' : '즉시 폐기'}</Button></DialogActions>
       </Dialog>
 
       <Dialog open={deployOpen} onClose={() => !deploying && setDeployOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>키 배포</DialogTitle>
         <DialogContent>
-          {deploymentComplete && <Alert severity="success" sx={{ mb: 2 }}>배포가 완료되었습니다. 키 상태는 DISTRIBUTED로 변경되었습니다.</Alert>}
+          {deploymentComplete && <Alert severity="success" sx={{ mb: 2 }}>배포가 완료되었습니다. 배포 이력이 기록되고 키 생명주기 상태는 유지됩니다.</Alert>}
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <FormControl fullWidth disabled={deploying || deploymentComplete}><InputLabel>배포할 키</InputLabel><Select multiple label="배포할 키" value={deployKeyUids} renderValue={(selected) => selected.map((uid) => keys.find((key) => key.keyUid === uid)?.keyName).filter(Boolean).join(', ')} onChange={(event) => setDeployKeyUids(typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value)}>{keys.filter((key) => key.status === 'ACTIVE').map((key) => <MenuItem key={key.keyUid} value={key.keyUid}><Checkbox checked={deployKeyUids.includes(key.keyUid)} /><ListItemText primary={key.keyName} secondary={`v${key.version} · ${getStatusLabel(key.status)}`} /></MenuItem>)}</Select></FormControl>
+            <FormControl fullWidth disabled={deploying || deploymentComplete}><InputLabel>배포할 키</InputLabel><Select multiple label="배포할 키" value={deployKeyUids} renderValue={(selected) => selected.map((uid) => keys.find((key) => key.keyUid === uid)?.keyName).filter(Boolean).join(', ')} onChange={(event) => setDeployKeyUids(typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value)}>{keys.filter((key) => canEncryptWithStatus(key.status)).map((key) => <MenuItem key={key.keyUid} value={key.keyUid}><Checkbox checked={deployKeyUids.includes(key.keyUid)} /><ListItemText primary={key.keyName} secondary={`v${key.version} · ${getStatusLabel(key.status)}`} /></MenuItem>)}</Select></FormControl>
             <FormControl fullWidth disabled={deploying || deploymentComplete}><InputLabel>배포 대상 유형</InputLabel><Select label="배포 대상 유형" value={targetType} onChange={(event) => setTargetType(event.target.value as DeploymentTargetType)}><MenuItem value="SERVER_IP">서버 IP</MenuItem><MenuItem value="K8S_SECRET">K8s Secret</MenuItem><MenuItem value="APP_ID">App ID</MenuItem></Select></FormControl>
             <TextField fullWidth required disabled={deploying || deploymentComplete} label={targetType === 'SERVER_IP' ? '서버 IP' : targetType === 'K8S_SECRET' ? 'K8s Secret 이름' : 'App ID'} placeholder={targetType === 'SERVER_IP' ? '10.20.30.40' : targetType === 'K8S_SECRET' ? 'kms/payment-key' : 'payment-service'} value={target} onChange={(event) => setTarget(event.target.value)} />
             <TextField fullWidth required multiline minRows={2} disabled={deploying || deploymentComplete} label="배포 사유" value={deploymentReason} onChange={(event) => setDeploymentReason(event.target.value)} />

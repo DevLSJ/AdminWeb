@@ -129,9 +129,9 @@ export function KmsProvider({ children }: { children: ReactNode }) {
 
   const deleteKey = useCallback(async (keyUid: string) => {
     await run(() => deleteKeyRequest(keyUid), '키를 삭제하지 못했습니다.')
-    setKeys((current) => current.filter((key) => key.keyUid !== keyUid))
+    await Promise.all([refreshKeys(), loadKeyHistory(keyUid).catch(() => undefined)])
     await refreshAuditAfterMutation()
-  }, [refreshAuditAfterMutation, run])
+  }, [loadKeyHistory, refreshAuditAfterMutation, refreshKeys, run])
 
   const updateKeyMetadata = useCallback(async (keyUid: string, values: Pick<CryptoKey, 'keyName' | 'purpose' | 'expireAt'>) => {
     const result = await run(() => updateKey(keyUid, values), '키 메타정보를 수정하지 못했습니다.')

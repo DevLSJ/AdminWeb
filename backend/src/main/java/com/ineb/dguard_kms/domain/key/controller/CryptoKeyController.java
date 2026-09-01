@@ -134,14 +134,14 @@ public class CryptoKeyController {
     }
 
     @DeleteMapping("/{keyUid}")
-    @Operation(summary = "키 영구 삭제", description = "시연 또는 폐기 키의 키 재료·상태 이력·사용 로그를 함께 삭제합니다.")
+    @Operation(summary = "키 즉시 폐기", description = "모든 버전의 원시 키를 제로화하고 DESTROYED로 전환합니다. 메타데이터와 감사 이력은 보존합니다.")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<Void> delete(
             @PathVariable UUID keyUid,
             Authentication authentication
     ) {
         keyService.delete(keyUid, authentication.getName());
-        return ApiResponse.success(null, "키가 영구 삭제되었습니다.");
+        return ApiResponse.success(null, "키 재료가 제로화되어 폐기되었습니다.");
     }
 
     @PatchMapping("/{keyUid}/rotation-policy")

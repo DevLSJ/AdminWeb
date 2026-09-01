@@ -13,9 +13,9 @@ public record KeyCreateRequest(
         @NotBlank(message = "키 이름은 필수입니다.") String keyName,
         @Schema(description = "암호 알고리즘", example = "AES")
         @NotBlank(message = "알고리즘은 필수입니다.") String algorithm,
-        @Schema(description = "암호 모드. AES는 GCM/CBC, RSA는 OAEP_SHA256", example = "GCM")
+        @Schema(description = "내부 암호 모드. 웹 등록 정책은 AES-256-GCM 또는 RSA-2048-SHA256", example = "GCM")
         String mode,
-        @Schema(description = "키 길이(비트). AES 128/192/256, RSA 2048/3072/4096", example = "256")
+        @Schema(description = "키 길이(비트). AES는 256, RSA는 2048", example = "256")
         @Positive(message = "키 길이는 양수여야 합니다.") int keySize,
         @Schema(description = "키 사용 목적", example = "PAYMENT_ENCRYPTION")
         @NotBlank(message = "키 용도는 필수입니다.") String purpose,

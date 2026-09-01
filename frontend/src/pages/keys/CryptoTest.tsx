@@ -22,6 +22,7 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { getStatusLabel } from '../../utils/status'
 import { canDecryptWithStatus, canEncryptWithStatus } from '../../utils/keyLifecycle'
+import { getKeyAlgorithmLabel } from '../../utils/keyPresentation'
 
 function CryptoTest() {
   const { keys, encrypt: encryptWithKey, decrypt: decryptWithKey } = useKmsMock()
@@ -91,7 +92,7 @@ function CryptoTest() {
         <Card>
           <Tabs value={mode} onChange={(_event, value: 'encrypt' | 'decrypt') => { setMode(value); setResult(''); setError('') }} sx={{ px: 2.5, borderBottom: 1, borderColor: 'divider' }}><Tab icon={<LockRounded />} iconPosition="start" label="암호화" value="encrypt" /><Tab icon={<LockOpenRounded />} iconPosition="start" label="복호화" value="decrypt" /></Tabs>
           <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-            <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>관리 키 선택</InputLabel><Select label="관리 키 선택" value={keyUid} onChange={(event) => { const nextKeyUid = event.target.value; setKeyUid(nextKeyUid); setKeyVersion(keys.find((key) => key.keyUid === nextKeyUid)?.version ?? ''); setResult(''); setError('') }}>{keys.map((key) => <MenuItem key={key.keyUid} value={key.keyUid} disabled={!key.integrityValid || (!canEncryptWithStatus(key.status) && !canDecryptWithStatus(key.status))}>{key.keyName} · {key.algorithm}-{key.keySize}/{key.mode} · {getStatusLabel(key.status)}{!key.integrityValid ? ' · 무결성 위반' : ''}</MenuItem>)}</Select></FormControl>
+            <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>관리 키 선택</InputLabel><Select label="관리 키 선택" value={keyUid} onChange={(event) => { const nextKeyUid = event.target.value; setKeyUid(nextKeyUid); setKeyVersion(keys.find((key) => key.keyUid === nextKeyUid)?.version ?? ''); setResult(''); setError('') }}>{keys.map((key) => <MenuItem key={key.keyUid} value={key.keyUid} disabled={!key.integrityValid || (!canEncryptWithStatus(key.status) && !canDecryptWithStatus(key.status))}>{key.keyName} · {getKeyAlgorithmLabel(key)} · {getStatusLabel(key.status)}{!key.integrityValid ? ' · 무결성 위반' : ''}</MenuItem>)}</Select></FormControl>
             {selectedKey && <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, mb: 2 }}><Alert severity={canEncrypt ? 'success' : 'error'} icon={<LockRounded />} sx={{ py: 0.15, '& .MuiAlert-message': { fontSize: 12.5, fontWeight: 700 } }}>암호화 {canEncrypt ? '허용' : '차단'}</Alert><Alert severity={canDecrypt ? 'success' : 'error'} icon={<LockOpenRounded />} sx={{ py: 0.15, '& .MuiAlert-message': { fontSize: 12.5, fontWeight: 700 } }}>복호화 {canDecrypt ? '허용' : '차단'}</Alert></Box>}
             {selectedKey && !selectedKey.integrityValid && <Alert severity="error" sx={{ mb: 2 }}>무결성 위반 키는 모든 암호 연산이 즉시 차단됩니다.</Alert>}
             {selectedKey && selectedKey.integrityValid && !executable && <Alert severity="warning" sx={{ mb: 2 }}>{getStatusLabel(selectedKey.status)} 상태에서는 {mode === 'encrypt' ? '암호화' : '복호화'}를 실행할 수 없습니다.</Alert>}

@@ -39,31 +39,32 @@ class EnterpriseKmsIntegrationTests {
     private DashboardService dashboardService;
 
     @Test
-    void aesCbcLifecycleEnforcesOperationSpecificStateAndNullsMaterialOnDestroy() {
-        UUID keyUid = create("AES", "CBC", 128);
+    void aesGcmLifecycleBlocksInactiveUseRotatesAndNullsMaterialOnDestroy() {
+        UUID keyUid = create("AES", "GCM", 256);
         activate(keyUid);
 
         var encrypted = keyService.encrypt(keyUid, new KeyEncryptRequest("enterprise-secret"), "admin");
         assertThat(encrypted.iv()).isNotBlank();
 
         keyService.changeStatus(
-                keyUid, new KeyStatusChangeRequest(KeyStatus.DEACTIVATED, "복호화 전용 전환"), "admin"
+                keyUid, new KeyStatusChangeRequest(KeyStatus.DEACTIVATED, "사용 중지"), "admin"
         );
-        assertThat(keyService.decrypt(
-                keyUid, new KeyDecryptRequest(encrypted.ciphertext(), encrypted.iv(), encrypted.version()), "admin"
-        ).plaintext()).isEqualTo("enterprise-secret");
-        assertThatThrownBy(() -> keyService.encrypt(keyUid, new KeyEncryptRequest("blocked"), "admin"))
-                .isInstanceOfSatisfying(KeyOperationException.class,
-                        exception -> assertThat(exception.getErrorCode()).isEqualTo("KEY_ENCRYPT_NOT_ALLOWED"));
-
-        keyService.changeStatus(
-                keyUid, new KeyStatusChangeRequest(KeyStatus.REACTIVATED, "암호화 전용 재활성화"), "admin"
-        );
-        assertThat(keyService.encrypt(keyUid, new KeyEncryptRequest("new-data"), "admin").ciphertext()).isNotBlank();
         assertThatThrownBy(() -> keyService.decrypt(
                 keyUid, new KeyDecryptRequest(encrypted.ciphertext(), encrypted.iv(), encrypted.version()), "admin"
         )).isInstanceOfSatisfying(KeyOperationException.class,
                 exception -> assertThat(exception.getErrorCode()).isEqualTo("KEY_DECRYPT_NOT_ALLOWED"));
+        assertThatThrownBy(() -> keyService.encrypt(keyUid, new KeyEncryptRequest("blocked"), "admin"))
+                .isInstanceOfSatisfying(KeyOperationException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo("KEY_ENCRYPT_NOT_ALLOWED"));
+
+        assertThat(keyService.rotate(keyUid, "admin").newVersion()).isEqualTo(2);
+        keyService.changeStatus(
+                keyUid, new KeyStatusChangeRequest(KeyStatus.ACTIVE, "다시 활성화"), "admin"
+        );
+        assertThat(keyService.encrypt(keyUid, new KeyEncryptRequest("new-data"), "admin").ciphertext()).isNotBlank();
+        assertThat(keyService.decrypt(
+                keyUid, new KeyDecryptRequest(encrypted.ciphertext(), encrypted.iv(), encrypted.version()), "admin"
+        ).plaintext()).isEqualTo("enterprise-secret");
 
         keyService.changeStatus(
                 keyUid, new KeyStatusChangeRequest(KeyStatus.DEACTIVATED, "폐기 준비"), "admin"
