@@ -300,20 +300,19 @@ export function RecentActivityPage({
                 <TableCell>대상 키</TableCell>
                 <TableCell>상세 내용</TableCell>
                 <TableCell align="center">결과</TableCell>
-                <TableCell>IP 주소</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ height: 250 }}>
+                  <TableCell colSpan={5} align="center" sx={{ height: 250 }}>
                     <CircularProgress size={30} />
                     <Typography sx={{ mt: 1.2, color: 'text.secondary', fontSize: 14 }}>활동 이력을 불러오는 중입니다.</Typography>
                   </TableCell>
                 </TableRow>
               ) : data.content.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ height: 250 }}>
+                  <TableCell colSpan={5} align="center" sx={{ height: 250 }}>
                     <ErrorOutlineRounded sx={{ color: 'text.disabled', fontSize: 38 }} />
                     <Typography sx={{ mt: 1, color: 'text.secondary', fontSize: 14 }}>선택한 조건의 활동 이력이 없습니다.</Typography>
                   </TableCell>
@@ -349,7 +348,6 @@ export function RecentActivityPage({
                     <TableCell align="center">
                       <StatusBadge status={activity.status} />
                     </TableCell>
-                    <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>{activity.ipAddress}</TableCell>
                   </TableRow>
                 )
               })}

@@ -135,13 +135,13 @@ function MainLayout() {
 
     return (
       <Box sx={{ display: 'flex', height: '100%', flexDirection: 'column', overflowX: 'hidden' }}>
-        <Box sx={{ display: 'flex', minHeight: 72, alignItems: 'center', justifyContent: showText ? 'flex-start' : 'center', px: showText ? 2.5 : 0, background: 'linear-gradient(125deg, #e72f7e 0%, #9d4cc5 100%)', color: 'common.white' }}>
+        <Box sx={{ display: 'flex', minHeight: 72, alignItems: 'center', justifyContent: showText ? 'flex-start' : 'center', px: showText ? 2.5 : 0, color: 'common.white' }}>
           <Box sx={{ display: 'grid', width: 36, height: 36, flexShrink: 0, placeItems: 'center', borderRadius: '10px', bgcolor: alpha('#ffffff', 0.2) }}><KeyRounded sx={{ fontSize: 21 }} /></Box>
           {showText && <Box sx={{ ml: 1.3, whiteSpace: 'nowrap' }}><Typography sx={{ fontSize: 19, fontWeight: 800, lineHeight: 1.2 }}>D&apos;Guard KMS</Typography><Typography sx={{ mt: 0.4, fontSize: 12.5, lineHeight: 1.4, opacity: 0.85 }}>Key Management System</Typography></Box>}
         </Box>
 
         <Box sx={{ px: showText ? 1.5 : 1, py: 2.5 }}>
-          {showText && <Typography sx={{ mb: 1.2, px: 1.5, color: 'text.secondary', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.1em' }}>MANAGEMENT</Typography>}
+          {showText && <Typography sx={{ mb: 1.2, px: 1.5, color: 'rgba(255,255,255,.58)', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.1em' }}>MANAGEMENT</Typography>}
           <List disablePadding>
             {visibleMenuGroups.map((group) => {
               const groupSelected = group.path ? location.pathname === group.path : group.children?.some((child) => location.pathname === child.path || (child.path === '/keys' && location.pathname.startsWith('/keys/'))) ?? false
@@ -150,7 +150,7 @@ function MainLayout() {
                 <ListItemButton
                   selected={groupSelected && (!group.children || collapsed)}
                   onClick={() => group.children ? toggleGroup(group.id) : group.path && handleNavigate(group.path)}
-                  sx={{ minHeight: 50, justifyContent: showText ? 'initial' : 'center', borderRadius: 2.5, px: showText ? 1.5 : 0, color: groupSelected ? 'primary.main' : 'text.secondary', '&.Mui-selected': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.09) } }}
+                  sx={{ minHeight: 50, justifyContent: showText ? 'initial' : 'center', borderRadius: showText && groupSelected && !group.children ? '10px 0 0 10px' : 2, mr: showText && groupSelected && !group.children ? -1.5 : 0, pr: showText && groupSelected && !group.children ? 3 : undefined, px: showText ? 1.5 : 0, color: groupSelected ? 'primary.main' : 'rgba(255,255,255,.78)', transition: 'all 220ms ease', '&.Mui-selected': { bgcolor: '#fff', boxShadow: '0 10px 26px rgba(6,37,103,.2)' }, '&:hover': { bgcolor: groupSelected ? '#fff' : 'rgba(255,255,255,.1)', color: groupSelected ? 'primary.main' : '#fff' } }}
                 >
                   <ListItemIcon sx={{ minWidth: showText ? 40 : 0, justifyContent: 'center', color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 22 } }}>{group.icon}</ListItemIcon>
                   {showText && <ListItemText primary={group.label} slotProps={{ primary: { sx: { fontSize: 15, fontWeight: groupSelected ? 700 : 600 } } }} />}
@@ -166,7 +166,7 @@ function MainLayout() {
                       && /^\/keys\/[^/]+$/.test(location.pathname)
                       && location.pathname !== '/keys/test'
                     const selected = location.pathname === child.path || isKeyDetail
-                    return <ListItem key={child.path} disablePadding><ListItemButton selected={selected} onClick={() => handleNavigate(child.path)} sx={{ minHeight: 44, ml: 1.3, pl: 2.4, borderRadius: 2, color: selected ? 'primary.main' : 'text.secondary', '&.Mui-selected': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08) } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 19 } }}>{child.icon}</ListItemIcon><ListItemText primary={child.label} slotProps={{ primary: { sx: { fontSize: 14.5, lineHeight: 1.5, fontWeight: selected ? 700 : 500 } } }} /></ListItemButton></ListItem>
+                    return <ListItem key={child.path} disablePadding><ListItemButton selected={selected} onClick={() => handleNavigate(child.path)} sx={{ minHeight: 44, ml: 1.3, mr: selected ? -1.5 : 0, pl: 2.4, pr: selected ? 3 : 1.5, borderRadius: selected ? '9px 0 0 9px' : 2, color: selected ? 'primary.main' : 'rgba(255,255,255,.7)', transition: 'all 220ms ease', '&.Mui-selected': { bgcolor: '#fff', boxShadow: '0 10px 24px rgba(6,37,103,.18)' }, '&:hover': { bgcolor: selected ? '#fff' : 'rgba(255,255,255,.1)', color: selected ? 'primary.main' : '#fff' } }}><ListItemIcon sx={{ minWidth: 34, color: 'inherit', '& .MuiSvgIcon-root': { fontSize: 19 } }}>{child.icon}</ListItemIcon><ListItemText primary={child.label} slotProps={{ primary: { sx: { fontSize: 14.5, lineHeight: 1.5, fontWeight: selected ? 700 : 500 } } }} /></ListItemButton></ListItem>
                   })}</List></Collapse>}
                 </Box>
               )
@@ -175,11 +175,11 @@ function MainLayout() {
         </Box>
 
         <Box sx={{ mt: 'auto', p: showText ? 2 : 1 }}>
-          <Divider sx={{ mb: 2 }} />
+          <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,.18)' }} />
           <Tooltip title={!showText ? `${user.loginId} · 프로필 관리` : ''} placement="right">
-            <Box role="button" tabIndex={0} onClick={() => handleNavigate('/profile')} onKeyDown={(event) => { if (event.key === 'Enter') handleNavigate('/profile') }} sx={{ display: 'flex', alignItems: 'center', justifyContent: showText ? 'flex-start' : 'center', px: showText ? 1 : 0, py: 0.75, borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}>
-              <Avatar sx={{ width: 40, height: 40, flexShrink: 0, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12), color: 'primary.main' }}><AccountCircleRounded /></Avatar>
-              {showText && <Box sx={{ ml: 1.25 }}><Typography sx={{ fontSize: 14.5, fontWeight: 700 }}>{user.loginId}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 12.5, lineHeight: 1.5 }}>{user.name} · {user.role}</Typography></Box>}
+            <Box role="button" tabIndex={0} onClick={() => handleNavigate('/profile')} onKeyDown={(event) => { if (event.key === 'Enter') handleNavigate('/profile') }} sx={{ display: 'flex', alignItems: 'center', justifyContent: showText ? 'flex-start' : 'center', px: showText ? 1 : 0, py: 0.75, borderRadius: 2, color: '#fff', cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,.1)' } }}>
+              <Avatar sx={{ width: 40, height: 40, flexShrink: 0, bgcolor: 'rgba(255,255,255,.18)', color: '#fff' }}><AccountCircleRounded /></Avatar>
+              {showText && <Box sx={{ ml: 1.25 }}><Typography sx={{ fontSize: 14.5, fontWeight: 700 }}>{user.loginId}</Typography><Typography sx={{ color: 'rgba(255,255,255,.66)', fontSize: 12.5, lineHeight: 1.5 }}>{user.name} · {user.role}</Typography></Box>}
             </Box>
           </Tooltip>
         </Box>
@@ -218,8 +218,8 @@ function MainLayout() {
       </AppBar>
 
       <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 }, transition: (theme) => theme.transitions.create('width') }}>
-        <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: expandedWidth, border: 0 } }}>{renderDrawer(true)}</Drawer>
-        <Drawer variant="permanent" open sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: drawerWidth, overflowX: 'hidden', transition: (theme) => theme.transitions.create('width'), borderRight: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' } }}>{renderDrawer()}</Drawer>
+        <Drawer variant="temporary" open={mobileOpen} onClose={() => setMobileOpen(false)} ModalProps={{ keepMounted: true }} sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': { width: expandedWidth, border: 0, background: 'linear-gradient(160deg, #0d5fe7 0%, #1647c8 100%)' } }}>{renderDrawer(true)}</Drawer>
+        <Drawer variant="permanent" open sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: drawerWidth, overflowX: 'hidden', transition: (theme) => theme.transitions.create('width'), border: 0, background: 'linear-gradient(160deg, #0d5fe7 0%, #1647c8 100%)', boxShadow: '10px 0 32px rgba(24,72,160,.12)' } }}>{renderDrawer()}</Drawer>
       </Box>
 
       <Box component="main" sx={{ width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', pt: '72px', transition: (theme) => theme.transitions.create('width') }}>

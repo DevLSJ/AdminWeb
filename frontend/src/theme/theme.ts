@@ -4,13 +4,13 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
   palette: {
     mode,
     primary: {
-      main: '#d92f81',
-      light: '#f3d4e5',
-      dark: '#a91d61',
+      main: '#1769e8',
+      light: '#dce9ff',
+      dark: '#0d47b8',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#7652b8',
+      main: '#315bd8',
     },
     background: mode === 'light'
       ? { default: '#f6f7fb', paper: '#ffffff' }
@@ -30,7 +30,7 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
     },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 8,
   },
   typography: {
     fontFamily:
@@ -68,7 +68,7 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
         root: ({ theme }) => ({
           border: `1px solid ${theme.palette.divider}`,
           boxShadow: mode === 'light'
-            ? '0 8px 30px rgba(31, 38, 54, 0.06)'
+            ? '0 10px 32px rgba(39, 76, 142, 0.07)'
             : '0 8px 30px rgba(0, 0, 0, 0.22)',
         }),
       },
@@ -79,7 +79,7 @@ export const createAppTheme = (mode: PaletteMode) => createTheme({
       },
       styleOverrides: {
         root: {
-          borderRadius: 9,
+          borderRadius: 6,
           fontSize: '0.9rem',
           lineHeight: 1.5,
         },

@@ -117,6 +117,27 @@ input {
   transform: translateY(-5px);
 }
 
+.interactive-row {
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.interactive-row:hover {
+  position: relative;
+  z-index: 2;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(23, 105, 232, 0.14);
+}
+
+.timeline-entry {
+  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.timeline-entry:hover {
+  transform: translateX(-5px);
+  border-color: rgba(23, 105, 232, 0.38);
+  background: rgba(23, 105, 232, 0.055);
+}
+
 .dashboard-card .dashboard-card-icon {
   transition: transform 240ms ease;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   AddRounded,
   EditRounded,
@@ -99,6 +99,16 @@ function UserList() {
       .then(setAdminAccounts)
       .catch((requestError) => setError(getApiErrorMessage(requestError, '관리 계정을 불러오지 못했습니다.')))
   }, [])
+
+  const visibleAdminAccounts = useMemo(() => {
+    if (params.page !== 0 || params.phone.trim()) return []
+    const name = params.name.trim().toLowerCase()
+    return adminAccounts.filter((account) => {
+      const matchesName = !name || account.loginId.toLowerCase().includes(name) || account.name.toLowerCase().includes(name)
+      const matchesStatus = params.status === 'ALL' || account.status === params.status
+      return matchesName && matchesStatus
+    })
+  }, [adminAccounts, params])
 
   const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -206,24 +216,6 @@ function UserList() {
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Card sx={{ mb: 2.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography sx={{ fontWeight: 800 }}>로그인 관리 계정</Typography>
-          <StatusBadge label={`DB ${adminAccounts.length}건`} tone="accent" />
-        </Box>
-        <TableContainer>
-          <Table size="small" aria-label="admin_user 관리 계정 목록">
-            <TableHead><TableRow><TableCell>로그인 ID</TableCell><TableCell>이름</TableCell><TableCell>권한</TableCell><TableCell>상태</TableCell><TableCell>최근 로그인</TableCell><TableCell>등록일</TableCell></TableRow></TableHead>
-            <TableBody>
-              {adminAccounts.length === 0 && <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>DB에 등록된 관리 계정이 없습니다.</TableCell></TableRow>}
-              {adminAccounts.map((account) => <TableRow key={account.userUid} hover><TableCell><Typography sx={{ fontWeight: 800 }}>{account.loginId}</Typography><Typography sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11 }}>{account.userUid}</Typography></TableCell><TableCell>{account.name}</TableCell><TableCell><StatusBadge label={account.role} tone={account.role === 'CLIENT' ? 'neutral' : 'accent'} /></TableCell><TableCell><StatusBadge status={account.status} /></TableCell><TableCell>{account.lastLoginAt ? formatKst(account.lastLoginAt) : '로그인 이력 없음'}</TableCell><TableCell>{formatKst(account.createdAt)}</TableCell></TableRow>)}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
-
-      <Typography variant="h6" sx={{ mb: 1.5 }}>개인정보 암호화 사용자</Typography>
-
       <FilterCard>
         <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 180px auto' }, gap: 1.25 }}>
           <TextField size="small" label="이름 정확히 검색" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
@@ -235,16 +227,28 @@ function UserList() {
       </FilterCard>
 
       <Card>
+        <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {(pageData.totalElements + adminAccounts.length).toLocaleString()}명</Typography></Box>
         <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
           <Table stickyHeader size="small" sx={{ minWidth: 1080, tableLayout: 'fixed' }}>
             <TableHead><TableRow><TableCell sx={{ width: '16%' }}>사용자</TableCell><TableCell sx={{ width: '15%' }}>연락처</TableCell><TableCell sx={{ width: '21%' }}>이메일</TableCell><TableCell sx={{ width: '10%' }}>상태</TableCell><TableCell sx={{ width: '12%' }}>무결성</TableCell><TableCell sx={{ width: '12%' }}>등록일</TableCell><TableCell align="right" sx={{ width: '24%' }}>관리</TableCell></TableRow></TableHead>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
-              {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
+              {!loading && pageData.content.length === 0 && visibleAdminAccounts.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
+              {!loading && visibleAdminAccounts.map((account) => (
+                <TableRow key={`admin-${account.userUid}`} hover className="interactive-row">
+                  <TableCell><Typography sx={{ fontWeight: 800 }}>{account.name}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontSize: 11.5 }}>{account.loginId} · {account.role}</Typography></TableCell>
+                  <TableCell sx={{ color: 'text.disabled' }}>—</TableCell>
+                  <TableCell sx={{ color: 'text.disabled' }}>—</TableCell>
+                  <TableCell><StatusBadge status={account.status} /></TableCell>
+                  <TableCell><StatusBadge label="LOGIN" tone="info" /></TableCell>
+                  <TableCell>{formatKst(account.createdAt)}</TableCell>
+                  <TableCell align="right"><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{account.lastLoginAt ? `최근 로그인 ${formatKst(account.lastLoginAt)}` : '로그인 이력 없음'}</Typography></TableCell>
+                </TableRow>
+              ))}
               {!loading && pageData.content.map((user) => {
                 const busy = busyUserUid === user.userUid
                 return (
-                  <TableRow key={user.userUid} hover sx={!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : undefined}>
+                  <TableRow key={user.userUid} hover className="interactive-row" sx={!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : undefined}>
                     <TableCell><Stack direction="row" spacing={0.8} sx={{ alignItems: 'center' }}>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box><Typography sx={{ fontWeight: 750 }}>{user.nameMasked}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{user.userUid}</Typography></Box></Stack></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{user.phoneMasked}</TableCell>
                     <TableCell><Typography noWrap>{user.emailMasked}</Typography></TableCell>

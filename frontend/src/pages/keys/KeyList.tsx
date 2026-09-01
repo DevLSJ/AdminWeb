@@ -7,7 +7,6 @@ import {
   DeleteOutlineRounded,
   FilterAltOffRounded,
   SearchRounded,
-  ShieldOutlined,
   WarningAmberRounded,
 } from '@mui/icons-material'
 import {
@@ -212,8 +211,7 @@ function KeyList() {
           <FormControl size="small"><InputLabel>용도</InputLabel><Select label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : purposeLabels[option]}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel>정렬</InputLabel><Select label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
         </Box>
-        <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
-          <StatusBadge icon={<ShieldOutlined />} label="외부 식별자는 UUID(key_uid)만 사용" tone="neutral" minWidth={0} />
+        <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center', justifyContent: 'flex-end' }}>
           <Button size="small" color="inherit" startIcon={<FilterAltOffRounded />} onClick={() => setParams((current) => ({ ...defaultParams, size: current.size }))}>필터 초기화</Button>
         </Stack>
       </FilterCard>
@@ -225,7 +223,7 @@ function KeyList() {
             <TableHead><TableRow><TableCell>키 이름 / UID</TableCell><TableCell>알고리즘·모드</TableCell><TableCell>용도</TableCell><TableCell>상태</TableCell><TableCell>버전</TableCell><TableCell>자동 갱신</TableCell><TableCell>만료일</TableCell><TableCell>무결성</TableCell><TableCell align="right">관리</TableCell></TableRow></TableHead>
             <TableBody>
               {pageContent.map((key) => (
-                <TableRow key={key.keyUid} hover sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? 'action.hover' : (theme) => alpha(theme.palette.error.main, 0.13) } }} onDoubleClick={() => navigate(`/keys/${key.keyUid}`)}>
+                <TableRow key={key.keyUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? (theme) => alpha(theme.palette.primary.main, 0.07) : (theme) => alpha(theme.palette.error.main, 0.13) } }} onClick={() => navigate(`/keys/${key.keyUid}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(`/keys/${key.keyUid}`) }}>
                   <TableCell><Typography noWrap sx={{ maxWidth: 220, fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography noWrap sx={{ maxWidth: 220, color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
                   <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
                   <TableCell sx={{ fontSize: 12 }}>{purposeLabels[key.purpose]}</TableCell>
@@ -234,7 +232,7 @@ function KeyList() {
                   <TableCell sx={{ fontSize: 11.5 }}>{key.autoRotationDays ? `${key.autoRotationDays}일` : '—'}</TableCell>
                   <TableCell sx={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{key.expireAt || '—'}</TableCell>
                   <TableCell>{key.integrityValid ? <StatusBadge status="VALID" icon={<CheckCircleRounded />} /> : <StatusBadge status="INVALID" icon={<WarningAmberRounded />} sx={{ animation: 'integrity-pulse 1.8s ease-in-out infinite' }} />}</TableCell>
-                  <TableCell align="right"><Stack direction="row" spacing={0.35} sx={{ justifyContent: 'flex-end' }}><Button size="small" variant="text" onClick={() => navigate(`/keys/${key.keyUid}`)}>상세</Button>{isAdmin && <Button size="small" variant="outlined" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => openTransition(key)}>상태</Button>}{isAdmin && <Button size="small" color="error" onClick={() => openDelete(key)}><DeleteOutlineRounded sx={{ fontSize: 17 }} /></Button>}</Stack></TableCell>
+                  <TableCell align="right"><Stack direction="row" spacing={0.35} sx={{ justifyContent: 'flex-end' }}>{isAdmin && <Button size="small" variant="outlined" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={(event) => { event.stopPropagation(); openTransition(key) }}>상태</Button>}{isAdmin && <Button size="small" color="error" disabled={key.status === 'DESTROYED'} onClick={(event) => { event.stopPropagation(); openDelete(key) }}><DeleteOutlineRounded sx={{ fontSize: 17 }} /></Button>}</Stack></TableCell>
                 </TableRow>
               ))}
               {!listLoading && pageContent.length === 0 && <TableRow><TableCell colSpan={9} align="center" sx={{ py: 8, color: 'text.secondary' }}>조건에 맞는 키가 없습니다.</TableCell></TableRow>}
