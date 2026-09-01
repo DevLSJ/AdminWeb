@@ -19,9 +19,9 @@ import { useAuth } from '../../hooks/useAuth'
 import type { UserRole } from '../../types/auth'
 
 const rolePresentation: Record<UserRole, { label: string; color: string; accent: string; description: string }> = {
-  'S.ADMIN': { label: 'S.Admin', color: '#b51f5f', accent: '#7652b8', description: '최고 관리자' },
-  ADMIN: { label: 'Admin', color: '#d92f81', accent: '#9d4cc5', description: '시스템 관리자' },
-  CLIENT: { label: 'Client', color: '#596273', accent: '#8b93a1', description: '일반 사용자' },
+  'S.ADMIN': { label: 'S.Admin', color: '#0d5fe7', accent: '#1647c8', description: '최고 관리자' },
+  ADMIN: { label: 'Admin', color: '#1769e8', accent: '#315bd8', description: '시스템 관리자' },
+  CLIENT: { label: 'Client', color: '#3979cf', accent: '#6c94dc', description: '일반 사용자' },
 }
 
 function Profile() {
@@ -59,14 +59,14 @@ function Profile() {
 
   return (
     <Box>
-      <PageHeader title="프로필 관리" description="로그인한 계정의 기본정보와 비밀번호를 관리합니다." />
+      <PageHeader title="프로필 관리" />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '340px minmax(0, 1fr)' }, gap: 2.5 }}>
         <Card>
           <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, textAlign: 'center', background: `linear-gradient(180deg, ${alpha(roleStyle.color, 0.09)} 0%, transparent 48%)` }}>
             <Avatar sx={{ width: 82, height: 82, bgcolor: alpha(roleStyle.color, 0.14), color: roleStyle.color, border: '3px solid', borderColor: alpha(roleStyle.accent, 0.28), boxShadow: `0 10px 28px ${alpha(roleStyle.color, 0.18)}` }}><AccountCircleRounded sx={{ fontSize: 52 }} /></Avatar>
             <Typography variant="h5" sx={{ mt: 2, color: roleStyle.color, fontWeight: 850, letterSpacing: '-0.025em', textShadow: `0 4px 16px ${alpha(roleStyle.color, 0.16)}` }}>{user.name}</Typography>
             <Typography sx={{ mt: 0.5, color: 'text.secondary' }}>{user.loginId}</Typography>
-            <StatusBadge status={user.role} icon={<ShieldRounded />} label={`${roleStyle.label} · ${roleStyle.description}`} sx={{ mt: 2 }} />
+            <StatusBadge status={user.role} tone="info" icon={<ShieldRounded />} label={`${roleStyle.label} · ${roleStyle.description}`} sx={{ mt: 2 }} />
             <Divider flexItem sx={{ my: 3 }} />
             <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>사용자 UID</Typography>
             <Typography sx={{ mt: 0.5, fontFamily: 'monospace', fontSize: 13 }}>{user.userUid}</Typography>

@@ -141,6 +141,12 @@ input {
 .section-card {
   border-radius: 8px !important;
   box-shadow: none !important;
+  transition: border-color 200ms ease, box-shadow 220ms ease, transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.section-card:hover {
+  border-color: rgba(23, 105, 232, 0.24);
+  box-shadow: 0 12px 30px rgba(23, 105, 232, 0.075) !important;
 }
 
 .section-card-header {

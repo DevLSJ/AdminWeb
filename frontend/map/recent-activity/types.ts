@@ -16,8 +16,9 @@ export interface RecentActivity {
   userId: string
   timestamp: string
   activityType: RecentActivityType
-  targetKey: string | null
-  targetKeyUid?: string
+  activityLabel: string
+  targetLabel: string
+  targetReference?: string
   keyVersion?: string
   status: RecentActivityStatus
   ipAddress: string

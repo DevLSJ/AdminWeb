@@ -1,5 +1,6 @@
-import { fetchAuditLogPage } from '../../src/api/kms'
+import { fetchAuditLogPage, fetchKeys } from '../../src/api/kms'
 import type { AuditAction } from '../../src/types/api'
+import { auditActionLabels, getAuditTargetTypeLabel } from '../../src/utils/auditPresentation'
 import type { RecentActivitySource, RecentActivityType } from './types'
 
 const toAuditAction: Partial<Record<RecentActivityType, AuditAction>> = {
@@ -14,19 +15,34 @@ const toActivityType = (action: AuditAction): RecentActivityType => {
   return (Object.keys(toAuditAction).find((type) => toAuditAction[type as RecentActivityType] === action) ?? 'AUDIT_EVENT') as RecentActivityType
 }
 
+let cachedKeyNames = new Map<string, string>()
+let keyNamesCachedAt = 0
+
+async function getKeyNames() {
+  if (Date.now() - keyNamesCachedAt < 60_000) return cachedKeyNames
+  const keys = await fetchKeys()
+  cachedKeyNames = new Map(keys.map((key) => [key.keyUid, key.keyName]))
+  keyNamesCachedAt = Date.now()
+  return cachedKeyNames
+}
+
 export const apiRecentActivitySource: RecentActivitySource = {
   async fetchActivities(query) {
-    const page = await fetchAuditLogPage({
-      from: query.fromDate, to: query.toDate, actor: query.userId,
-      action: query.activityType === 'ALL' ? 'ALL' : (toAuditAction[query.activityType] ?? 'ALL'),
-      page: query.page, size: query.size,
-    })
+    const [page, keyNames] = await Promise.all([
+      fetchAuditLogPage({
+        from: query.fromDate, to: query.toDate, actor: query.userId,
+        action: query.activityType === 'ALL' ? 'ALL' : (toAuditAction[query.activityType] ?? 'ALL'),
+        page: query.page, size: query.size,
+      }),
+      getKeyNames(),
+    ])
     return {
       page: page.page, size: page.size, totalElements: page.totalElements, totalPages: page.totalPages,
       content: page.content.map((log) => ({
         id: log.logUid, userId: log.actor, timestamp: log.createdAt,
-        activityType: toActivityType(log.action), targetKey: log.targetId || null,
-        targetKeyUid: log.targetId || undefined, status: log.chainValid ? 'SUCCESS' : 'FAILURE',
+        activityType: toActivityType(log.action), activityLabel: auditActionLabels[log.action],
+        targetLabel: keyNames.get(log.targetId) ?? getAuditTargetTypeLabel(log.targetType),
+        targetReference: log.targetId || undefined, status: log.chainValid ? 'SUCCESS' : 'FAILURE',
         ipAddress: '서버 감사로그', description: log.detail,
       })),
     }

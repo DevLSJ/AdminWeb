@@ -27,7 +27,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -298,7 +297,7 @@ export function RecentActivityPage({
               <TableRow sx={{ bgcolor: '#f7f8fb' }}>
                 <TableCell>일시</TableCell>
                 <TableCell>활동 유형</TableCell>
-                <TableCell>대상 키</TableCell>
+                <TableCell>대상</TableCell>
                 <TableCell>상세 내용</TableCell>
                 <TableCell align="center">결과</TableCell>
               </TableRow>
@@ -330,24 +329,22 @@ export function RecentActivityPage({
                         <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(activityStyle.color, 0.12), color: activityStyle.color, '& svg': { fontSize: 16 } }}>
                           {activityStyle.icon}
                         </Avatar>
-                        <Chip label={activityStyle.label} size="small" sx={{ bgcolor: alpha(activityStyle.color, 0.1), color: activityStyle.color }} />
+                        <Typography sx={{ color: activityStyle.color, fontSize: 12.75, fontWeight: 800 }}>{activity.activityLabel}</Typography>
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      {activity.targetKey ? (
-                        <Box>
-                          <Typography sx={{ fontSize: 12.75, fontWeight: 750 }}>{activity.targetKey}</Typography>
-                          <Typography sx={{ mt: 0.1, color: 'text.secondary', fontSize: 10.75 }}>
-                            {[activity.targetKeyUid, activity.keyVersion].filter(Boolean).join(' · ')}
-                          </Typography>
-                        </Box>
-                      ) : <Typography sx={{ color: 'text.disabled' }}>—</Typography>}
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 12.75, fontWeight: 750 }}>{activity.targetLabel}</Typography>
+                        <Tooltip title={activity.targetReference ?? ''} placement="bottom-start">
+                          <Typography noWrap sx={{ maxWidth: 210, mt: 0.1, overflow: 'hidden', textOverflow: 'ellipsis', color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.75 }}>{activity.targetReference ?? '대상 식별자 없음'}</Typography>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                     <TableCell sx={{ maxWidth: 350 }}>
-                      <Typography sx={{ fontSize: 12.5, lineHeight: 1.45 }}>{activity.description}</Typography>
+                      <Tooltip title={activity.description} placement="bottom-start"><Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12.5, lineHeight: 1.45 }}>{activity.description}</Typography></Tooltip>
                     </TableCell>
                     <TableCell align="center">
-                      <StatusBadge status={activity.status} />
+                      <StatusBadge dot status={activity.status} />
                     </TableCell>
                   </TableRow>
                 )
