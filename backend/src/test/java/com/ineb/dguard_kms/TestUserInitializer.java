@@ -19,6 +19,7 @@ class TestUserInitializer {
         return (ApplicationArguments args) -> {
             createIfMissing(repository, passwordService, "admin", "admin", "관리자", "ADMIN");
             createIfMissing(repository, passwordService, "client", "client", "클라이언트 사용자", "CLIENT");
+            createIfMissing(repository, passwordService, "dguard", "dguard", "시연 최고 관리자", "S.ADMIN");
         };
     }
 

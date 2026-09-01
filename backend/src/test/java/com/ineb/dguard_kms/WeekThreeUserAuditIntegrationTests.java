@@ -62,6 +62,7 @@ class WeekThreeUserAuditIntegrationTests {
                 {"name":"홍길동","phone":"%s","email":"%s","password":"Week3-Secure-1234!"}
                 """.formatted(phone, email), 200);
         UUID userUid = UUID.fromString(created.path("data").path("userUid").asText());
+        assertThat(created.path("data").path("name").asText()).isEqualTo("홍길동");
         assertThat(created.path("data").path("nameMasked").asText()).isEqualTo("홍*동");
         assertThat(created.path("data").path("phoneMasked").asText()).contains("****");
         assertThat(created.path("data").path("emailMasked").asText()).endsWith("@example.com");
@@ -86,6 +87,7 @@ class WeekThreeUserAuditIntegrationTests {
 
         JsonNode list = sendJson(client, "GET", "/api/users?page=0&size=20", adminToken, "", 200);
         JsonNode listed = findUser(list.path("data").path("content"), userUid);
+        assertThat(listed.path("name").asText()).isEqualTo("홍길동");
         assertThat(listed.path("integrityValid").asBoolean()).isTrue();
         assertThat(listed.has("phonePlain")).isFalse();
         assertThat(listed.has("emailPlain")).isFalse();

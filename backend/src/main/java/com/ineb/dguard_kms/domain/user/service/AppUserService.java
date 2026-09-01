@@ -79,14 +79,14 @@ public class AppUserService {
         var result = repository.findAll(
                 specification,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
-        ).map(user -> UserResponse.from(user, verifyIntegrity(user)));
+        ).map(this::response);
         return PageResponse.from(result);
     }
 
     @Transactional(readOnly = true)
     public UserResponse get(UUID userUid) {
         AppUser user = findRequired(userUid);
-        return UserResponse.from(user, verifyIntegrity(user));
+        return response(user);
     }
 
     @Transactional
@@ -112,7 +112,7 @@ public class AppUserService {
             saveWithUniqueConstraintHandling(user);
             auditLogService.append(actor, "USER_CREATE", "APP_USER", user.getUserUid().toString(),
                     "개인정보 암호화 사용자 등록");
-            return UserResponse.from(user, true);
+            return UserResponse.from(user, true, normalized.name());
         } finally {
             encryptedName.clear();
             encryptedPhone.clear();
@@ -143,7 +143,7 @@ public class AppUserService {
             saveWithUniqueConstraintHandling(user);
             auditLogService.append(actor, "USER_UPDATE", "APP_USER", userUid.toString(),
                     "개인정보 재암호화 및 검색·무결성 HMAC 갱신");
-            return UserResponse.from(user, true);
+            return UserResponse.from(user, true, normalized.name());
         } finally {
             encryptedName.clear();
             encryptedPhone.clear();
@@ -161,7 +161,7 @@ public class AppUserService {
         repository.saveAndFlush(user);
         auditLogService.append(actor, "USER_STATUS_CHANGE", "APP_USER", userUid.toString(),
                 "사용자 상태 변경: " + status);
-        return UserResponse.from(user, true);
+        return response(user);
     }
 
     @Transactional
@@ -252,6 +252,11 @@ public class AppUserService {
 
     private boolean verifyIntegrity(AppUser user) {
         return integrityService.verify(user.getIntegrityHash(), integrityValues(user));
+    }
+
+    private UserResponse response(AppUser user) {
+        boolean valid = verifyIntegrity(user);
+        return UserResponse.from(user, valid, valid ? decrypt(user.getNameCiphertext(), user.getNameIv()) : user.getNameMasked());
     }
 
     private void assertIntegrity(AppUser user) {

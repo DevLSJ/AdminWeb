@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   AddRounded,
+  ArrowBackRounded,
   EditRounded,
   LockResetRounded,
-  PersonSearchRounded,
   RefreshRounded,
   SearchRounded,
   VisibilityRounded,
@@ -32,22 +32,28 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material'
 import {
   changeUserStatus,
+  changeAdminAccountStatus,
   createUser,
   fetchAdminAccounts,
+  fetchAdminAccount,
+  fetchUser,
   fetchUserPage,
   fetchUserPlain,
   getApiErrorMessage,
   resetUserPassword,
+  resetAdminAccountPassword,
+  updateAdminAccount,
   updateUser,
 } from '../../api/kms'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
-import type { AdminAccount, AppUser, AppUserPlain, PageResponse, UserListParams, UserStatus } from '../../types/api'
+import { useAuth } from '../../hooks/useAuth'
+import type { AdminAccount, AppUser, AppUserPlain, PageResponse, UserListParams } from '../../types/api'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const emptyPage: PageResponse<AppUser> = { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0 }
 const emptyForm = { name: '', phone: '', email: '', password: '' }
@@ -61,6 +67,9 @@ function formatKst(value: string) {
 }
 
 function UserList() {
+  const { user: sessionUser } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [draft, setDraft] = useState(initialParams)
   const [params, setParams] = useState(initialParams)
   const [pageData, setPageData] = useState(emptyPage)
@@ -68,7 +77,6 @@ function UserList() {
   const [busyUserUid, setBusyUserUid] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [detailUser, setDetailUser] = useState<AppUser | null>(null)
   const [plainCandidate, setPlainCandidate] = useState<AppUser | null>(null)
   const [plainReason, setPlainReason] = useState('')
   const [plainUser, setPlainUser] = useState<AppUserPlain | null>(null)
@@ -77,6 +85,16 @@ function UserList() {
   const [passwordUser, setPasswordUser] = useState<AppUser | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([])
+  const [managedAdmin, setManagedAdmin] = useState<AdminAccount | null>(null)
+  const [managedAppUser, setManagedAppUser] = useState<AppUser | null>(null)
+  const [adminName, setAdminName] = useState('')
+  const [adminRole, setAdminRole] = useState<AdminAccount['role']>('CLIENT')
+  const [managedPassword, setManagedPassword] = useState('')
+
+  const pathParts = location.pathname.split('/').filter(Boolean)
+  const detailKind = pathParts[1]
+  const detailUid = pathParts[2]
+  const isDetailRoute = (detailKind === 'admin' || detailKind === 'app') && Boolean(detailUid)
 
   const loadUsers = useCallback(async (nextParams: UserListParams) => {
     setLoading(true)
@@ -99,6 +117,16 @@ function UserList() {
       .then(setAdminAccounts)
       .catch((requestError) => setError(getApiErrorMessage(requestError, '관리 계정을 불러오지 못했습니다.')))
   }, [])
+
+  useEffect(() => {
+    if (!isDetailRoute || !detailUid) { setManagedAdmin(null); setManagedAppUser(null); return }
+    setError('')
+    setLoading(true)
+    const request = detailKind === 'admin'
+      ? fetchAdminAccount(detailUid).then((account) => { setManagedAdmin(account); setManagedAppUser(null); setAdminName(account.name); setAdminRole(account.role) })
+      : fetchUser(detailUid).then((appUser) => { setManagedAppUser(appUser); setManagedAdmin(null) })
+    void request.catch((requestError) => setError(getApiErrorMessage(requestError, '사용자 상세를 불러오지 못했습니다.'))).finally(() => setLoading(false))
+  }, [detailKind, detailUid, isDetailRoute])
 
   const visibleAdminAccounts = useMemo(() => {
     if (params.page !== 0 || params.phone.trim()) return []
@@ -145,7 +173,8 @@ function UserList() {
     setError('')
     try {
       if (formUser) {
-        await updateUser(formUser.userUid, { name: form.name, phone: form.phone, email: form.email })
+        const updated = await updateUser(formUser.userUid, { name: form.name, phone: form.phone, email: form.email })
+        if (managedAppUser?.userUid === updated.userUid) setManagedAppUser(updated)
         setMessage('개인정보를 새 IV로 재암호화하고 검색·무결성 HMAC을 갱신했습니다.')
       } else {
         await createUser(form)
@@ -174,21 +203,6 @@ function UserList() {
     }
   }
 
-  const toggleStatus = async (user: AppUser) => {
-    const nextStatus: UserStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    setBusyUserUid(user.userUid)
-    setError('')
-    try {
-      await changeUserStatus(user.userUid, nextStatus)
-      setMessage(`${user.nameMasked} 사용자를 ${nextStatus} 상태로 변경했습니다.`)
-      await loadUsers(params)
-    } catch (requestError) {
-      setError(getApiErrorMessage(requestError, '사용자 상태를 변경하지 못했습니다.'))
-    } finally {
-      setBusyUserUid(null)
-    }
-  }
-
   const resetPassword = async () => {
     if (!passwordUser || newPassword.length < 8) return
     setBusyUserUid(passwordUser.userUid)
@@ -206,11 +220,66 @@ function UserList() {
     }
   }
 
+  const canManageAdmin = (account: AdminAccount) => sessionUser?.role === 'S.ADMIN' || (sessionUser?.role === 'ADMIN' && account.role === 'CLIENT')
+
+  const saveManagedAdmin = async () => {
+    if (!managedAdmin || !canManageAdmin(managedAdmin)) return
+    try {
+      const updated = await updateAdminAccount(managedAdmin.userUid, { name: adminName.trim(), role: adminRole })
+      setManagedAdmin(updated)
+      setMessage('관리 계정 이름과 권한을 서버 DB에 반영했습니다.')
+    } catch (requestError) { setError(getApiErrorMessage(requestError, '관리 계정을 수정하지 못했습니다.')) }
+  }
+
+  const toggleManagedAdminStatus = async () => {
+    if (!managedAdmin || !canManageAdmin(managedAdmin)) return
+    try {
+      const updated = await changeAdminAccountStatus(managedAdmin.userUid, managedAdmin.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')
+      setManagedAdmin(updated)
+      setMessage(`계정을 ${updated.status === 'ACTIVE' ? '활성화' : '정지'}했습니다.`)
+    } catch (requestError) { setError(getApiErrorMessage(requestError, '계정 상태를 변경하지 못했습니다.')) }
+  }
+
+  const resetManagedAdminPassword = async () => {
+    if (!managedAdmin || managedPassword.length < 8 || !canManageAdmin(managedAdmin)) return
+    try {
+      await resetAdminAccountPassword(managedAdmin.userUid, managedPassword)
+      setManagedPassword('')
+      setMessage('새 Salt와 PBKDF2 해시로 로그인 비밀번호를 재설정했습니다.')
+    } catch (requestError) { setError(getApiErrorMessage(requestError, '로그인 비밀번호를 재설정하지 못했습니다.')) }
+  }
+
+  const toggleManagedAppStatus = async () => {
+    if (!managedAppUser) return
+    try {
+      const updated = await changeUserStatus(managedAppUser.userUid, managedAppUser.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')
+      setManagedAppUser(updated)
+      setMessage(`사용자를 ${updated.status === 'ACTIVE' ? '활성화' : '정지'}했습니다.`)
+    } catch (requestError) { setError(getApiErrorMessage(requestError, '사용자 상태를 변경하지 못했습니다.')) }
+  }
+
+  if (isDetailRoute) {
+    const accountManageable = managedAdmin ? canManageAdmin(managedAdmin) : false
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2.5 }}><Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}><Button color="inherit" startIcon={<ArrowBackRounded />} onClick={() => navigate('/users')}>사용자 목록</Button><Typography variant="h5">사용자 상세</Typography></Stack>{managedAdmin && sessionUser?.loginId === managedAdmin.loginId && <StatusBadge label="현재 로그인" tone="positive" minWidth={0} />}</Box>
+        {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
+        {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
+        {loading && <Box sx={{ display: 'grid', minHeight: 240, placeItems: 'center' }}><CircularProgress /></Box>}
+        {managedAdmin && !loading && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0,1.25fr) minmax(320px,.75fr)' }, gap: 2 }}><Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">로그인 계정</Typography><StatusBadge label={managedAdmin.integrityValid ? '정상' : '비정상'} tone={managedAdmin.integrityValid ? 'positive' : 'danger'} minWidth={0} /></Box><Box sx={{ p: 2.5 }}><InfoRow label="로그인 ID" value={managedAdmin.loginId} /><InfoRow label="상태" value={<StatusBadge status={managedAdmin.status} minWidth={0} />} /><InfoRow label="최근 접속일" value={managedAdmin.lastLoginAt ? formatKst(managedAdmin.lastLoginAt) : '접속 이력 없음'} /><Stack spacing={2} sx={{ mt: 2 }}><TextField label="이름" value={adminName} disabled={!accountManageable} onChange={(event) => setAdminName(event.target.value)} /><FormControl disabled={!accountManageable}><InputLabel>권한</InputLabel><Select label="권한" value={adminRole} onChange={(event) => setAdminRole(event.target.value as AdminAccount['role'])}>{sessionUser?.role === 'S.ADMIN' && <MenuItem value="S.ADMIN">S.ADMIN</MenuItem>}{sessionUser?.role === 'S.ADMIN' && <MenuItem value="ADMIN">ADMIN</MenuItem>}<MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>{accountManageable && <Button variant="contained" onClick={() => void saveManagedAdmin()}>상세 정보 저장</Button>}</Stack></Box></Card><Stack spacing={2}><Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">계정 제어</Typography></Box><Box sx={{ p: 2.5 }}><Button fullWidth variant="outlined" color={managedAdmin.status === 'ACTIVE' ? 'error' : 'primary'} disabled={!accountManageable || sessionUser?.loginId === managedAdmin.loginId} onClick={() => void toggleManagedAdminStatus()}>{managedAdmin.status === 'ACTIVE' ? '계정 정지' : '계정 활성화'}</Button></Box></Card><Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">비밀번호 재설정</Typography></Box><Stack spacing={1.5} sx={{ p: 2.5 }}><TextField type="password" label="새 비밀번호" disabled={!accountManageable} value={managedPassword} onChange={(event) => setManagedPassword(event.target.value)} helperText="8자 이상 · 새 Salt와 PBKDF2-HMAC-SHA256 적용" /><Button variant="contained" disabled={!accountManageable || managedPassword.length < 8} onClick={() => void resetManagedAdminPassword()}>비밀번호 재설정</Button></Stack></Card></Stack></Box>}
+        {managedAppUser && !loading && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0,1.25fr) minmax(320px,.75fr)' }, gap: 2 }}><Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">개인정보 사용자</Typography><StatusBadge label={managedAppUser.integrityValid ? '정상' : '비정상'} tone={managedAppUser.integrityValid ? 'positive' : 'danger'} minWidth={0} /></Box><Box sx={{ p: 2.5 }}><InfoRow label="이름" value={managedAppUser.name} /><InfoRow label="연락처" value={managedAppUser.phoneMasked} /><InfoRow label="이메일" value={managedAppUser.emailMasked} /><InfoRow label="상태" value={<StatusBadge status={managedAppUser.status} minWidth={0} />} /><InfoRow label="등록일" value={formatKst(managedAppUser.createdAt)} /></Box></Card><Stack spacing={2}><Button variant="contained" startIcon={<EditRounded />} disabled={!managedAppUser.integrityValid} onClick={() => void openEdit(managedAppUser)}>상세 수정</Button><Button variant="outlined" startIcon={<VisibilityRounded />} disabled={!managedAppUser.integrityValid} onClick={() => { setPlainCandidate(managedAppUser); setPlainReason('') }}>개인정보 원문 조회</Button><Button variant="outlined" startIcon={<LockResetRounded />} disabled={!managedAppUser.integrityValid} onClick={() => { setPasswordUser(managedAppUser); setNewPassword('') }}>비밀번호 재설정</Button><Button variant="outlined" color={managedAppUser.status === 'ACTIVE' ? 'error' : 'primary'} disabled={!managedAppUser.integrityValid} onClick={() => void toggleManagedAppStatus()}>{managedAppUser.status === 'ACTIVE' ? '사용자 정지' : '사용자 활성화'}</Button></Stack></Box>}
+        {formUser !== undefined && <Dialog open onClose={() => setFormUser(undefined)} fullWidth maxWidth="sm"><Box component="form" onSubmit={saveUser}><DialogTitle>사용자 개인정보 수정</DialogTitle><DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="이름" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /><TextField required label="연락처" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /><TextField required type="email" label="이메일" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></Stack></DialogContent><DialogActions><Button onClick={() => setFormUser(undefined)}>취소</Button><Button type="submit" variant="contained">저장</Button></DialogActions></Box></Dialog>}
+        <Dialog open={Boolean(plainCandidate)} onClose={() => setPlainCandidate(null)} fullWidth maxWidth="sm"><DialogTitle>개인정보 원문 조회 승인</DialogTitle><DialogContent><TextField autoFocus fullWidth required multiline minRows={3} label="조회 사유" value={plainReason} onChange={(event) => setPlainReason(event.target.value)} sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setPlainCandidate(null)}>취소</Button><Button variant="contained" disabled={plainReason.trim().length < 2} onClick={() => void viewPlain()}>감사 기록 후 조회</Button></DialogActions></Dialog>
+        <Dialog open={Boolean(passwordUser)} onClose={() => setPasswordUser(null)} fullWidth maxWidth="xs"><DialogTitle>비밀번호 재설정</DialogTitle><DialogContent><TextField autoFocus fullWidth type="password" label="새 비밀번호" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setPasswordUser(null)}>취소</Button><Button variant="contained" disabled={newPassword.length < 8} onClick={() => void resetPassword()}>재설정</Button></DialogActions></Dialog>
+        <Dialog open={Boolean(plainUser)} onClose={() => setPlainUser(null)} fullWidth maxWidth="sm"><DialogTitle>개인정보 원문</DialogTitle><DialogContent>{plainUser && <><InfoRow label="이름" value={plainUser.name} /><InfoRow label="연락처" value={plainUser.phone} /><InfoRow label="이메일" value={plainUser.email} /></>}</DialogContent><DialogActions><Button onClick={() => setPlainUser(null)}>확인</Button></DialogActions></Dialog>
+      </Box>
+    )
+  }
+
   return (
     <Box>
       <PageHeader
         title="사용자 관리"
-        description="개인정보 원문을 DB에 남기지 않고 마스킹 조회·사유 기반 원문 조회·행 무결성 검증을 수행합니다."
         action={<Button data-testid="user-create-button" variant="contained" startIcon={<AddRounded />} onClick={openCreate}>사용자 등록</Button>}
       />
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
@@ -223,44 +292,37 @@ function UserList() {
           <FormControl size="small"><InputLabel>상태</InputLabel><Select label="상태" value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as UserListParams['status'] }))}><MenuItem value="ALL">전체</MenuItem><MenuItem value="ACTIVE">ACTIVE</MenuItem><MenuItem value="INACTIVE">INACTIVE</MenuItem></Select></FormControl>
           <Stack direction="row" spacing={1}><Button type="submit" variant="contained">검색</Button><Button color="inherit" startIcon={<RefreshRounded />} onClick={resetFilters}>초기화</Button></Stack>
         </Box>
-        <Typography sx={{ mt: 1, color: 'text.secondary', fontSize: 12.5 }}>검색어는 복호화하지 않고 정규화된 HMAC 검색값으로 정확히 일치시킵니다.</Typography>
       </FilterCard>
 
       <Card>
         <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {(pageData.totalElements + adminAccounts.length).toLocaleString()}명</Typography></Box>
         <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
           <Table stickyHeader size="small" sx={{ minWidth: 1080, tableLayout: 'fixed' }}>
-            <TableHead><TableRow><TableCell sx={{ width: '16%' }}>사용자</TableCell><TableCell sx={{ width: '15%' }}>연락처</TableCell><TableCell sx={{ width: '21%' }}>이메일</TableCell><TableCell sx={{ width: '10%' }}>상태</TableCell><TableCell sx={{ width: '12%' }}>무결성</TableCell><TableCell sx={{ width: '12%' }}>등록일</TableCell><TableCell align="right" sx={{ width: '24%' }}>관리</TableCell></TableRow></TableHead>
+            <TableHead><TableRow><TableCell sx={{ width: '18%' }}>사용자</TableCell><TableCell sx={{ width: '14%' }}>연락처</TableCell><TableCell sx={{ width: '20%' }}>이메일</TableCell><TableCell sx={{ width: '10%' }}>상태</TableCell><TableCell sx={{ width: '12%' }}>무결성</TableCell><TableCell sx={{ width: '12%' }}>등록일</TableCell><TableCell align="right" sx={{ width: '14%' }}>최근 접속일</TableCell></TableRow></TableHead>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
               {!loading && pageData.content.length === 0 && visibleAdminAccounts.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
               {!loading && visibleAdminAccounts.map((account) => (
-                <TableRow key={`admin-${account.userUid}`} hover className="interactive-row">
-                  <TableCell><Typography sx={{ fontWeight: 800 }}>{account.name}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontSize: 11.5 }}>{account.loginId} · {account.role}</Typography></TableCell>
+                <TableRow key={`admin-${account.userUid}`} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer' }} onClick={() => navigate(`/users/admin/${account.userUid}`)}>
+                  <TableCell><Typography sx={{ fontWeight: 800 }}>{account.name}</Typography><Typography noWrap sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', color: 'text.secondary', fontSize: 11.5 }}>{account.loginId} · {account.role}</Typography></TableCell>
                   <TableCell sx={{ color: 'text.disabled' }}>—</TableCell>
                   <TableCell sx={{ color: 'text.disabled' }}>—</TableCell>
                   <TableCell><StatusBadge status={account.status} /></TableCell>
-                  <TableCell><StatusBadge label="LOGIN" tone="info" /></TableCell>
+                  <TableCell><StatusBadge label={account.integrityValid ? '정상' : '비정상'} tone={account.integrityValid ? 'positive' : 'danger'} minWidth={0} /></TableCell>
                   <TableCell>{formatKst(account.createdAt)}</TableCell>
-                  <TableCell align="right"><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{account.lastLoginAt ? `최근 로그인 ${formatKst(account.lastLoginAt)}` : '로그인 이력 없음'}</Typography></TableCell>
+                  <TableCell align="right"><Stack direction="row" spacing={.5} sx={{ alignItems: 'center', justifyContent: 'flex-end' }}>{sessionUser?.loginId === account.loginId && <StatusBadge label="로그인" tone="info" minWidth={0} />}<Typography sx={{ color: 'text.secondary', fontSize: 11.5 }}>{account.lastLoginAt ? formatKst(account.lastLoginAt) : '접속 이력 없음'}</Typography></Stack></TableCell>
                 </TableRow>
               ))}
               {!loading && pageData.content.map((user) => {
-                const busy = busyUserUid === user.userUid
                 return (
-                  <TableRow key={user.userUid} hover className="interactive-row" sx={!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : undefined}>
-                    <TableCell><Stack direction="row" spacing={0.8} sx={{ alignItems: 'center' }}>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box><Typography sx={{ fontWeight: 750 }}>{user.nameMasked}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{user.userUid}</Typography></Box></Stack></TableCell>
+                  <TableRow key={user.userUid} hover tabIndex={0} className="interactive-row" onClick={() => navigate(`/users/app/${user.userUid}`)} sx={{ cursor: 'pointer', ...(!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : {}) }}>
+                    <TableCell><Stack direction="row" spacing={0.8} sx={{ alignItems: 'center', minWidth: 0 }}>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 750 }}>{user.name}</Typography><Typography noWrap sx={{ maxWidth: 205, overflow: 'hidden', textOverflow: 'ellipsis', color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{user.userUid}</Typography></Box></Stack></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{user.phoneMasked}</TableCell>
                     <TableCell><Typography noWrap>{user.emailMasked}</Typography></TableCell>
                     <TableCell><StatusBadge status={user.status} /></TableCell>
-                    <TableCell><StatusBadge status={user.integrityValid ? 'VALID' : 'INVALID'} /></TableCell>
+                    <TableCell><StatusBadge label={user.integrityValid ? '정상' : '비정상'} tone={user.integrityValid ? 'positive' : 'danger'} minWidth={0} /></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatKst(user.createdAt).slice(0, 13)}</TableCell>
-                    <TableCell align="right"><Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end' }}>
-                      <Tooltip title="마스킹 상세"><Button size="small" startIcon={<PersonSearchRounded />} onClick={() => setDetailUser(user)}>상세</Button></Tooltip>
-                      <Tooltip title={user.integrityValid ? '원문 조회 감사기록 후 수정' : '무결성 위반으로 수정 차단'}><span><Button size="small" startIcon={<EditRounded />} disabled={!user.integrityValid || busy} onClick={() => void openEdit(user)}>수정</Button></span></Tooltip>
-                      <Tooltip title="비밀번호 재설정"><span><Button size="small" aria-label="비밀번호 재설정" disabled={!user.integrityValid || busy} onClick={() => { setPasswordUser(user); setNewPassword('') }}><LockResetRounded fontSize="small" /></Button></span></Tooltip>
-                      <Button size="small" disabled={!user.integrityValid || busy} onClick={() => void toggleStatus(user)}>{user.status === 'ACTIVE' ? '정지' : '활성'}</Button>
-                    </Stack></TableCell>
+                    <TableCell align="right" sx={{ color: 'text.disabled' }}>—</TableCell>
                   </TableRow>
                 )
               })}
@@ -269,15 +331,6 @@ function UserList() {
         </TableContainer>
         <PaginationBar page={params.page} size={params.size} totalElements={pageData.totalElements} onPageChange={(page) => setParams((current) => ({ ...current, page }))} onSizeChange={(size) => setParams((current) => ({ ...current, page: 0, size }))} />
       </Card>
-
-      <Dialog open={Boolean(detailUser)} onClose={() => setDetailUser(null)} fullWidth maxWidth="sm">
-        <DialogTitle>사용자 마스킹 상세</DialogTitle>
-        <DialogContent>{detailUser && <>
-          <Alert severity={detailUser.integrityValid ? 'success' : 'error'} sx={{ mb: 2 }}>{detailUser.integrityValid ? '암호문·IV·검색값·상태의 행 무결성이 정상입니다.' : '행 무결성이 훼손되어 원문 조회와 변경이 차단됩니다.'}</Alert>
-          <InfoRow label="사용자 UID" value={detailUser.userUid} /><InfoRow label="이름" value={detailUser.nameMasked} /><InfoRow label="연락처" value={detailUser.phoneMasked} /><InfoRow label="이메일" value={detailUser.emailMasked} /><InfoRow label="상태" value={<StatusBadge status={detailUser.status} />} /><InfoRow label="암호화 버전" value={`enc_ver ${detailUser.encVer}`} /><InfoRow label="등록자" value={detailUser.createdBy} /><InfoRow label="수정 시각" value={`${formatKst(detailUser.updatedAt)} KST`} />
-        </>}</DialogContent>
-        <DialogActions><Button onClick={() => setDetailUser(null)}>닫기</Button><Button data-testid="plain-view-start" variant="contained" startIcon={<VisibilityRounded />} disabled={!detailUser?.integrityValid} onClick={() => { setPlainCandidate(detailUser); setPlainReason(''); setDetailUser(null) }}>원문 보기</Button></DialogActions>
-      </Dialog>
 
       <Dialog open={Boolean(plainCandidate)} onClose={() => setPlainCandidate(null)} fullWidth maxWidth="sm">
         <DialogTitle>개인정보 원문 조회 승인</DialogTitle>

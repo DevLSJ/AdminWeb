@@ -158,6 +158,7 @@ export interface UserListParams {
 
 export interface AppUser {
   userUid: string
+  name: string
   nameMasked: string
   phoneMasked: string
   emailMasked: string
@@ -183,6 +184,7 @@ export interface AdminAccount {
   name: string
   role: 'S.ADMIN' | 'ADMIN' | 'CLIENT'
   status: UserStatus
+  integrityValid: boolean
   createdAt: string
   updatedAt: string
   lastLoginAt: string | null
@@ -208,9 +210,14 @@ export type AuditAction =
   | 'USER_PASSWORD_RESET'
   | 'AUDIT_EXPORT'
   | 'NOTICE_CREATE'
+  | 'NOTICE_VIEW'
   | 'NOTICE_UPDATE'
   | 'NOTICE_DELETE'
   | 'FILE_DOWNLOAD'
+  | 'FILE_DELETE'
+  | 'ADMIN_ACCOUNT_UPDATE'
+  | 'ADMIN_ACCOUNT_STATUS_CHANGE'
+  | 'ADMIN_ACCOUNT_PASSWORD_RESET'
 
 export interface AuditListParams {
   from: string

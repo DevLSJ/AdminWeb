@@ -43,7 +43,7 @@ function App() {
             <Route element={<RequireRole allowedRoles={['S.ADMIN', 'ADMIN']} />}>
               <Route path="/my/recent-activity" element={<MyRecentActivityRoute />} />
               <Route path="/keys/register" element={<Navigate to="/keys" replace />} />
-              <Route path="/users" element={<UserList />} />
+              <Route path="/users/*" element={<UserList />} />
               <Route path="/audit-logs" element={<AuditLog />} />
             </Route>
           </Route>

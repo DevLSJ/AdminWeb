@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowBackRounded, AutorenewRounded, EditRounded, ShieldRounded } from '@mui/icons-material'
 import {
   Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  Divider, FormControl, InputLabel, MenuItem, Select, Stack, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, TextField, Typography,
+  Divider, FormControl, InputLabel, MenuItem, Select, Stack, TextField, Typography,
 } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { InfoRow } from '../../components/admin/AdminPage'
@@ -11,7 +10,7 @@ import { StatusBadge } from '../../components/common/StatusBadge'
 import { KeyLifecycleTimeline } from '../../components/keys/KeyLifecycleTimeline'
 import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
-import { canRotateWithStatus, getManualKeyStatusTransitions, keyStatusMetadata } from '../../utils/keyLifecycle'
+import { canRotateWithStatus, getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
 import { getKeyAlgorithmLabel, getKeyCategoryLabel } from '../../utils/keyPresentation'
 import type { AutoRotationDays, KeyPurpose, KeyStatus } from '../../types/api'
 import { isAdminRole } from '../../types/auth'
@@ -21,12 +20,11 @@ const usageLabels: Record<string, string> = { total: '전체 사용', success: '
 
 function KeyDetail() {
   const { user } = useAuth()
-  const { keys, keyHistories, keyVersions, keyUsage, autoRotationByKey, loadKeyDetail, loadKeyHistory, loadKeyVersions, loadKeyUsage, updateKeyMetadata, changeKeyStatus, rotateKey, setAutoRotation } = useKmsMock()
+  const { keys, keyHistories, keyUsage, autoRotationByKey, loadKeyDetail, loadKeyHistory, loadKeyUsage, updateKeyMetadata, changeKeyStatus, rotateKey, setAutoRotation } = useKmsMock()
   const isAdmin = isAdminRole(user?.role)
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const key = useMemo(() => keys.find((item) => item.keyUid === id), [id, keys])
-  const versions = key ? keyVersions[key.keyUid] ?? [] : []
   const histories = key ? keyHistories[key.keyUid] ?? [] : []
   const usage = key ? keyUsage[key.keyUid] : undefined
   const autoRotation = key ? autoRotationByKey[key.keyUid] ?? null : null
@@ -45,10 +43,10 @@ function KeyDetail() {
     if (!id) return
     setLoading(true)
     setRequestError('')
-    void Promise.all([loadKeyDetail(id), loadKeyHistory(id), loadKeyVersions(id), loadKeyUsage(id)])
+    void Promise.all([loadKeyDetail(id), loadKeyHistory(id), loadKeyUsage(id)])
       .catch((error: unknown) => setRequestError(error instanceof Error ? error.message : '키 상세를 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [id, loadKeyDetail, loadKeyHistory, loadKeyUsage, loadKeyVersions])
+  }, [id, loadKeyDetail, loadKeyHistory, loadKeyUsage])
 
   useEffect(() => {
     if (key) setEditForm({ keyName: key.keyName, purpose: key.purpose, expireAt: key.expireAt })
@@ -131,7 +129,7 @@ function KeyDetail() {
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">기본 정보</Typography></Box>
             <CardContent sx={{ p: '16px 20px !important' }}>
               <InfoRow label="이름" value={<Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography>{key.keyName}</Typography>{isAdmin && <Button size="small" startIcon={<EditRounded />} onClick={openEdit}>Edit</Button>}</Stack>} />
-              <InfoRow label="상태" value={<Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}><StatusBadge status={key.status} minWidth={0} sx={{ height: 24, '& .MuiChip-label': { px: .8 } }} /><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>{keyStatusMetadata[key.status].description}</Typography></Stack>} />
+              <InfoRow label="상태" value={<StatusBadge status={key.status} minWidth={0} sx={{ height: 24, '& .MuiChip-label': { px: .8 } }} />} />
               <InfoRow label="키 유형" value={`${getKeyCategoryLabel(key.algorithm)} · ${getKeyAlgorithmLabel(key)}`} />
               <InfoRow label="키 용도" value={key.purpose} />
               <InfoRow label="현재 버전" value={`v${key.version}`} />
@@ -142,15 +140,10 @@ function KeyDetail() {
 
           <Card className="section-card">
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">회전 설정</Typography></Box>
-            <CardContent sx={{ p: '16px 20px !important' }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '150px minmax(180px,1fr) auto auto' }, alignItems: 'center', gap: 1.25 }}><Typography sx={{ fontWeight: 750, fontSize: 13.5 }}>자동 회전 주기</Typography><TextField size="small" type="number" value={rotationDraft} placeholder="미사용" disabled={!isAdmin} onChange={(event) => setRotationDraft(event.target.value)} slotProps={{ htmlInput: { min: 1, max: 3650 } }} /><Button size="small" variant="outlined" disabled={!isAdmin || (rotationDraft !== '' && (Number(rotationDraft) < 1 || Number(rotationDraft) > 3650))} onClick={() => void updateAutoRotation()}>적용</Button>{isAdmin && <Button size="small" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !canRotateWithStatus(key.status)} onClick={() => setRotateOpen(true)}>키 갱신</Button>}</Box><Typography sx={{ mt: 1, ml: { sm: '150px' }, color: 'text.secondary', fontSize: 12 }}>현재 {autoRotation ? `${autoRotation}일` : '미사용'} · 비활성 상태에서도 설정된 회전 주기는 유지됩니다.</Typography></CardContent>
+            <CardContent sx={{ p: '16px 20px !important' }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '150px minmax(180px,1fr) auto auto' }, alignItems: 'center', gap: 1.25 }}><Typography sx={{ fontWeight: 750, fontSize: 13.5 }}>자동 회전 주기</Typography><TextField size="small" type="number" value={rotationDraft} placeholder="미사용" disabled={!isAdmin} onChange={(event) => setRotationDraft(event.target.value)} slotProps={{ htmlInput: { min: 1, max: 3650 } }} /><Button size="small" variant="outlined" disabled={!isAdmin || (rotationDraft !== '' && (Number(rotationDraft) < 1 || Number(rotationDraft) > 3650))} onClick={() => void updateAutoRotation()}>적용</Button>{isAdmin && <Button size="small" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !canRotateWithStatus(key.status)} onClick={() => setRotateOpen(true)}>키 갱신</Button>}</Box></CardContent>
           </Card>
 
-          <Card className="section-card" sx={{ overflow: 'hidden' }}>
-            <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">버전 이력</Typography></Box>
-            <TableContainer><Table size="small" className="dense-data-table"><TableHead><TableRow><TableCell>버전</TableCell><TableCell>상태</TableCell><TableCell>사용 범위</TableCell><TableCell>생성자</TableCell><TableCell>생성 시각</TableCell></TableRow></TableHead><TableBody>{versions.map((version) => <TableRow key={version.version} hover className="interactive-row"><TableCell sx={{ fontWeight: 850 }}>v{version.version}</TableCell><TableCell><StatusBadge status={version.status} minWidth={0} /></TableCell><TableCell>{version.decryptOnly ? <StatusBadge status="DECRYPT_ONLY" minWidth={0} /> : <StatusBadge status="ACTIVE" label="암호화·복호화" minWidth={0} />}</TableCell><TableCell>{version.createdBy}</TableCell><TableCell>{version.createdAt}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
-          </Card>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', md: 'repeat(5,1fr)' }, gap: 1 }}>{usage && Object.entries(usage).map(([label, value]) => <Box key={label} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{usageLabels[label] ?? label}</Typography><Typography sx={{ mt: .25, fontSize: 20, fontWeight: 850 }}>{value.toLocaleString()}</Typography></Box>)}</Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', md: 'repeat(5,1fr)' }, gap: 1 }}>{usage && Object.entries(usage).map(([label, value]) => <Box key={label} sx={{ minHeight: 76, p: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{usageLabels[label] ?? label}</Typography><Typography sx={{ mt: .25, fontSize: 20, fontWeight: 850 }}>{value.toLocaleString()}</Typography></Box>)}</Box>
         </Stack>
 
         <KeyLifecycleTimeline histories={histories} sticky />

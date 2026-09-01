@@ -21,6 +21,8 @@ import type {
   PageResponse,
   UserListParams,
   UserStatus,
+  Notice,
+  NoticeListParams,
 } from '../types/api'
 import { apiClient } from './client'
 import { apiEndpoints } from './endpoints'
@@ -179,6 +181,22 @@ export async function fetchAdminAccounts() {
   return unwrap(await apiClient.get<ApiResponse<AdminAccount[]>>(apiEndpoints.adminAccounts.list))
 }
 
+export async function fetchAdminAccount(userUid: string) {
+  return unwrap(await apiClient.get<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.detail(userUid)))
+}
+
+export async function updateAdminAccount(userUid: string, request: { name: string; role: AdminAccount['role'] }) {
+  return unwrap(await apiClient.put<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.update(userUid), request))
+}
+
+export async function changeAdminAccountStatus(userUid: string, status: UserStatus) {
+  return unwrap(await apiClient.patch<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.status(userUid), { status }))
+}
+
+export async function resetAdminAccountPassword(userUid: string, password: string) {
+  await apiClient.post<ApiResponse<null>>(apiEndpoints.adminAccounts.password(userUid), { password })
+}
+
 export async function fetchAuditLogPage(params: AuditListParams) {
   return unwrap(await apiClient.get<ApiResponse<PageResponse<AuditLog>>>(
     apiEndpoints.auditLogs.list,
@@ -247,4 +265,39 @@ export async function changeUserStatus(userUid: string, status: UserStatus) {
 
 export async function resetUserPassword(userUid: string, password: string) {
   await apiClient.post<ApiResponse<null>>(apiEndpoints.users.password(userUid), { password })
+}
+
+export async function fetchNoticePage(params: NoticeListParams) {
+  return unwrap(await apiClient.get<ApiResponse<PageResponse<Notice>>>(apiEndpoints.notices.list, { params: { title: params.title.trim() || undefined, exposeYn: params.exposeYn === 'ALL' ? undefined : params.exposeYn, page: params.page, size: params.size } }))
+}
+
+export async function fetchNotice(noticeUid: string) {
+  return unwrap(await apiClient.get<ApiResponse<Notice>>(apiEndpoints.notices.detail(noticeUid)))
+}
+
+function noticeFormData(metadata: Pick<Notice, 'title' | 'content' | 'exposeYn'>, files: File[]) {
+  const data = new FormData()
+  data.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+  files.forEach((file) => data.append('files', file))
+  return data
+}
+
+export async function createNotice(metadata: Pick<Notice, 'title' | 'content' | 'exposeYn'>, files: File[]) {
+  return unwrap(await apiClient.post<ApiResponse<Notice>>(apiEndpoints.notices.create, noticeFormData(metadata, files)))
+}
+
+export async function updateNotice(noticeUid: string, metadata: Pick<Notice, 'title' | 'content' | 'exposeYn'>, files: File[]) {
+  return unwrap(await apiClient.put<ApiResponse<Notice>>(apiEndpoints.notices.update(noticeUid), noticeFormData(metadata, files)))
+}
+
+export async function deleteNotice(noticeUid: string) { await apiClient.delete<ApiResponse<null>>(apiEndpoints.notices.delete(noticeUid)) }
+export async function deleteNoticeFile(fileUid: string) { await apiClient.delete<ApiResponse<null>>(apiEndpoints.files.delete(fileUid)) }
+export async function downloadNoticeFile(fileUid: string, originalName: string) {
+  const response = await apiClient.get<Blob>(apiEndpoints.files.download(fileUid), { responseType: 'blob' })
+  const url = URL.createObjectURL(response.data)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = originalName
+  anchor.click()
+  URL.revokeObjectURL(url)
 }

@@ -56,6 +56,9 @@ public class AdminUser {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    @Column(name = "integrity_hash", length = 128)
+    private String integrityHash;
+
     protected AdminUser() {
     }
 
@@ -136,8 +139,19 @@ public class AdminUser {
         lastLoginAt = Instant.now();
     }
 
+    public void updateProfile(String name, String role) { this.name = name; this.role = role; }
+    public void changeStatus(String status) { this.status = status; }
+    public void replacePassword(String hash, String salt, String algorithm, int iterations) {
+        this.passwordHash = hash;
+        this.passwordSalt = salt;
+        this.passwordAlgorithm = algorithm;
+        this.passwordIterations = iterations;
+    }
+    public void updateIntegrityHash(String integrityHash) { this.integrityHash = integrityHash; }
+
     public Long getId() { return id; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getLastLoginAt() { return lastLoginAt; }
+    public String getIntegrityHash() { return integrityHash; }
 }

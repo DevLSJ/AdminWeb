@@ -45,6 +45,10 @@ export const apiEndpoints = {
   },
   adminAccounts: {
     list: '/api/admin-accounts',
+    detail: (id: string) => `/api/admin-accounts/${id}`,
+    update: (id: string) => `/api/admin-accounts/${id}`,
+    status: (id: string) => `/api/admin-accounts/${id}/status`,
+    password: (id: string) => `/api/admin-accounts/${id}/password`,
   },
   auditLogs: {
     list: '/api/audit-logs',

@@ -11,13 +11,21 @@ public record AdminAccountResponse(
         String name,
         String role,
         String status,
+        boolean integrityValid,
         Instant createdAt,
         Instant updatedAt,
         Instant lastLoginAt
 ) {
     public static AdminAccountResponse from(AdminUser user) {
         return new AdminAccountResponse(
-                user.getUserUid(), user.getLoginId(), user.getName(), user.getRole(), user.getStatus(),
+                user.getUserUid(), user.getLoginId(), user.getName(), user.getRole(), user.getStatus(), true,
+                user.getCreatedAt(), user.getUpdatedAt(), user.getLastLoginAt()
+        );
+    }
+
+    public static AdminAccountResponse from(AdminUser user, boolean integrityValid) {
+        return new AdminAccountResponse(
+                user.getUserUid(), user.getLoginId(), user.getName(), user.getRole(), user.getStatus(), integrityValid,
                 user.getCreatedAt(), user.getUpdatedAt(), user.getLastLoginAt()
         );
     }

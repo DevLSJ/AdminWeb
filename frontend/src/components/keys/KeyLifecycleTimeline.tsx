@@ -1,6 +1,5 @@
 import { HistoryRounded } from '@mui/icons-material'
 import { Box, Card, Stack, Typography } from '@mui/material'
-import { alpha } from '@mui/material/styles'
 import type { KeyStatusHistory } from '../../types/api'
 import { getStatusLabel } from '../../utils/status'
 import { StatusBadge } from '../common/StatusBadge'
@@ -18,13 +17,12 @@ export function KeyLifecycleTimeline({ histories, sticky = false, maxHeight = 'c
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><HistoryRounded color="primary" /><Typography variant="h6">생명주기 타임라인</Typography></Stack>
         <StatusBadge label={`${histories.length}건`} tone="neutral" minWidth={0} />
       </Box>
-      <Box className="timeline-scroll" sx={{ maxHeight, minHeight: 360, overflowY: 'auto', p: 1.5 }}>
+      <Box className="timeline-scroll" sx={{ position: 'relative', maxHeight, minHeight: 360, overflowY: 'auto', p: 1.5, '&::before': histories.length > 1 ? { content: '""', position: 'absolute', left: 31, top: 35, bottom: 35, width: 2, bgcolor: 'divider' } : undefined }}>
         {histories.length === 0 && <Typography sx={{ py: 6, color: 'text.secondary', fontSize: 13, textAlign: 'center' }}>표시할 생명주기 이력이 없습니다.</Typography>}
         {histories.map((history, index) => (
-          <Box key={history.id} className="timeline-entry" sx={{ position: 'relative', display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 1.1, p: 1.25, mb: index === histories.length - 1 ? 0 : 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+          <Box key={history.id} className="timeline-entry" sx={{ position: 'relative', display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 1.1, px: 1, py: 1.4, mb: index === histories.length - 1 ? 0 : .4, border: '1px solid transparent' }}>
             <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-              <Box sx={{ zIndex: 1, width: 10, height: 10, mt: .65, flexShrink: 0, bgcolor: index === 0 ? 'primary.main' : 'background.paper', border: '2px solid', borderColor: 'primary.main' }} />
-              {index < histories.length - 1 && <Box sx={{ position: 'absolute', top: 18, bottom: -12, width: 2, bgcolor: (theme) => alpha(theme.palette.primary.main, .2) }} />}
+              <Box sx={{ zIndex: 1, width: 14, height: 14, mt: .45, flexShrink: 0, borderRadius: '50%', bgcolor: index === 0 ? 'primary.main' : 'background.paper', border: '2px solid', borderColor: index < 2 ? 'primary.main' : 'divider', boxShadow: '0 0 0 4px var(--mui-palette-background-paper)' }} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={.7} sx={{ alignItems: 'center', justifyContent: 'space-between' }}><Typography noWrap sx={{ fontWeight: 800, fontSize: 13 }}>{history.fromStatus ? `${getStatusLabel(history.fromStatus)} → ` : ''}{getStatusLabel(history.toStatus)}</Typography><StatusBadge label={`v${history.keyVersion}`} tone="info" minWidth={0} /></Stack>

@@ -83,9 +83,9 @@ function KeyRegisterDialog({ open, onClose, onCreated }: KeyRegisterDialogProps)
         <StatusBadge label={form.algorithm === 'RSA' ? 'ASYMMETRIC' : 'SYMMETRIC'} tone={form.algorithm === 'RSA' ? 'accent' : 'info'} minWidth={0} />
       </DialogTitle>
       <DialogContent dividers sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.08fr) minmax(390px, 0.92fr)' }, gap: 2.5 }}>
-          <Box id="key-register-form" component="form" onSubmit={handleSubmit}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1.5fr) minmax(150px, 0.5fr)' }, gap: 1.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' }, alignItems: 'stretch', gap: 2.5 }}>
+          <Box id="key-register-form" component="form" onSubmit={handleSubmit} sx={{ display: 'flex', minHeight: { lg: 510 }, flexDirection: 'column', justifyContent: 'space-between', p: { xs: 0, lg: 1 }, '& .MuiInputBase-root': { minHeight: 46 } }}>
+            <Box><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1.25fr) minmax(220px, .75fr)' }, gap: 1.5 }}>
               <TextField size="small" fullWidth required disabled={Boolean(created)} label="키 이름" placeholder="PAYMENT-AES-010" value={form.keyName} onChange={(event) => setForm((current) => ({ ...current, keyName: event.target.value }))} helperText="서비스-알고리즘-순번 형식을 권장합니다." />
               <FormControl size="small" fullWidth disabled={Boolean(created)}><InputLabel>알고리즘</InputLabel><Select label="알고리즘" value={form.algorithm} onChange={(event) => changeAlgorithm(event.target.value as 'AES' | 'RSA')}><MenuItem value="AES">대칭키 · AES-256-GCM</MenuItem><MenuItem value="RSA">공개키 · RSA-2048-SHA256</MenuItem></Select></FormControl>
             </Box>
@@ -104,9 +104,10 @@ function KeyRegisterDialog({ open, onClose, onCreated }: KeyRegisterDialogProps)
 
             {error && <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert>}
             {created && <Alert severity="success" sx={{ mt: 1.5 }}><Typography sx={{ fontWeight: 800 }}>{created.keyName} 등록 완료</Typography><Typography sx={{ mt: 0.35, fontFamily: 'monospace', fontSize: 12 }}>{created.keyUid}</Typography><Stack direction="row" spacing={0.75} sx={{ mt: 1 }}><StatusBadge status={created.status} /><StatusBadge label={`v${created.version}`} tone="accent" /><StatusBadge status={created.integrityValid ? 'VALID' : 'INVALID'} /></Stack></Alert>}
+            </Box>
           </Box>
 
-          <Stack spacing={1.5}>
+          <Stack spacing={1.5} sx={{ minHeight: { lg: 510 }, justifyContent: 'space-between' }}>
             <LargeDateCalendar value={form.expireAt} onChange={(expireAt) => setForm((current) => ({ ...current, expireAt }))} disabled={Boolean(created)} />
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
               {[30, 180, 365].map((days) => <Button key={days} size="small" variant="outlined" disabled={Boolean(created)} onClick={() => setForm((current) => ({ ...current, expireAt: futureDate(days) }))}>{days === 365 ? '1년 후' : `${days}일 후`}</Button>)}

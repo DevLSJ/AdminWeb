@@ -35,7 +35,8 @@ const auditActions: Array<AuditAction | 'ALL'> = [
   'KEY_STATUS_CHANGE', 'KEY_DEPLOY', 'KEY_DEPLOY_ROLLBACK', 'KEY_ROTATE',
   'KEY_AUTO_ROTATION_UPDATE', 'KEY_TEST', 'USER_CREATE', 'USER_UPDATE',
   'USER_VIEW_PLAIN', 'USER_STATUS_CHANGE', 'USER_PASSWORD_RESET', 'AUDIT_EXPORT',
-  'NOTICE_CREATE', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD',
+  'NOTICE_CREATE', 'NOTICE_VIEW', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD', 'FILE_DELETE',
+  'ADMIN_ACCOUNT_UPDATE', 'ADMIN_ACCOUNT_STATUS_CHANGE', 'ADMIN_ACCOUNT_PASSWORD_RESET',
 ]
 
 const auditActionLabels: Record<AuditAction | 'ALL', string> = {
@@ -45,7 +46,8 @@ const auditActionLabels: Record<AuditAction | 'ALL', string> = {
   KEY_AUTO_ROTATION_UPDATE: '자동 갱신 설정', KEY_TEST: '키 테스트', USER_CREATE: '사용자 생성',
   USER_UPDATE: '사용자 수정', USER_VIEW_PLAIN: '개인정보 원문 조회', USER_STATUS_CHANGE: '사용자 상태 변경',
   USER_PASSWORD_RESET: '비밀번호 재설정', AUDIT_EXPORT: '감사 CSV 내보내기', NOTICE_CREATE: '공지 생성',
-  NOTICE_UPDATE: '공지 수정', NOTICE_DELETE: '공지 삭제', FILE_DOWNLOAD: '파일 내려받기',
+  NOTICE_VIEW: '공지 조회', NOTICE_UPDATE: '공지 수정', NOTICE_DELETE: '공지 삭제', FILE_DOWNLOAD: '파일 내려받기', FILE_DELETE: '파일 삭제',
+  ADMIN_ACCOUNT_UPDATE: '관리 계정 수정', ADMIN_ACCOUNT_STATUS_CHANGE: '관리 계정 상태 변경', ADMIN_ACCOUNT_PASSWORD_RESET: '관리 계정 비밀번호 재설정',
 }
 
 function isoDate(date: Date) {
@@ -92,6 +94,14 @@ function AuditLog() {
   useEffect(() => {
     void loadLogs(params)
   }, [loadLogs, params])
+
+  useEffect(() => {
+    if (!detail) return
+    const timer = window.setInterval(() => {
+      void verifyAuditLogEntry(detail.logUid).then(setEntryVerification).catch((requestError) => setError(getApiErrorMessage(requestError, '실시간 인접 체인 검증에 실패했습니다.')))
+    }, 3_000)
+    return () => window.clearInterval(timer)
+  }, [detail])
 
   const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -176,7 +186,7 @@ function AuditLog() {
       </Card>
 
       <Dialog open={Boolean(detail)} onClose={() => { setDetail(null); setEntryVerification(null) }} fullWidth maxWidth="md" slotProps={{ paper: { sx: { borderRadius: 1 } } }}>
-        <DialogTitle>감사 이벤트 · 해시 체인 무결성</DialogTitle>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>감사 이벤트 · 해시 체인 무결성<StatusBadge label="3초 실시간 검증" tone="positive" minWidth={0} /></DialogTitle>
         <DialogContent dividers>{detail && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0,1fr) minmax(320px,.85fr)' }, gap: 3 }}><Box><Typography sx={{ mb: 1, fontSize: 12, fontWeight: 850, letterSpacing: '.08em', color: 'text.secondary' }}>EVENT</Typography><InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={auditActionLabels[detail.action] ?? detail.action} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="대상 ID" value={detail.targetId} /><InfoRow label="기록 시각" value={`${formatKst(detail.createdAt)} KST`} /><InfoRow label="상세" value={<Box component="pre" sx={{ m: 0, p: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'action.hover', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 13, lineHeight: 1.6 }}>{detail.detail}</Box>} /></Box><Box sx={{ p: 2, borderLeft: { md: '1px solid' }, borderColor: { md: 'divider' } }}><Typography sx={{ mb: 1.5, fontSize: 12, fontWeight: 850, letterSpacing: '.08em', color: 'text.secondary' }}>CHAIN VERIFICATION</Typography>{verifyingUid === detail.logUid && <Box sx={{ display: 'grid', minHeight: 220, placeItems: 'center' }}><CircularProgress size={28} /></Box>}{entryVerification && <><Alert severity={entryVerification.valid ? 'success' : 'error'} sx={{ mb: 2 }}>{entryVerification.valid ? '선택 행과 인접 체인이 정상입니다.' : '선택 행 구간에서 위변조 가능성이 발견되었습니다.'}</Alert><InfoRow label="행 HMAC" value={<StatusBadge status={entryVerification.rowHashValid ? 'VALID' : 'INVALID'} />} /><InfoRow label="이전 연결" value={<StatusBadge status={entryVerification.previousLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.previousLinkValid ? 'prev_hash 일치' : 'prev_hash 불일치'} />} /><InfoRow label="다음 연결" value={<StatusBadge status={entryVerification.nextLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLinkValid ? 'next.prev_hash 일치' : 'next.prev_hash 불일치'} />} /><InfoRow label="체인 헤드" value={<StatusBadge status={entryVerification.chainHeadValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLogUid ? '중간 행' : entryVerification.chainHeadValid ? '최종 헤드 일치' : '최종 헤드 불일치'} />} /><InfoRow label="이전 로그" value={entryVerification.previousLogUid ?? 'Genesis'} /><InfoRow label="다음 로그" value={entryVerification.nextLogUid ?? 'Chain head'} /><InfoRow label="검증 시각" value={`${formatKst(entryVerification.verifiedAt)} KST`} /></>}</Box></Box>}</DialogContent>
         <DialogActions><Button variant="contained" onClick={() => { setDetail(null); setEntryVerification(null) }}>닫기</Button></DialogActions>
       </Dialog>
