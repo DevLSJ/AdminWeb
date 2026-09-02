@@ -3,6 +3,7 @@ package com.ineb.dguard_kms;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -65,7 +66,7 @@ class WeekThreeUserAuditIntegrationTests {
                 {"name":"홍길동","phone":"%s","email":"%s","password":"Week3-Secure-1234!"}
                 """.formatted(phone, email), 200);
         UUID userUid = UUID.fromString(created.path("data").path("userUid").asText());
-        assertThat(created.path("data").path("name").asText()).isEqualTo("홍길동");
+        assertThat(created.path("data").has("name")).isFalse();
         assertThat(created.path("data").path("nameMasked").asText()).isEqualTo("홍*동");
         assertThat(created.path("data").path("phoneMasked").asText()).contains("****");
         assertThat(created.path("data").path("emailMasked").asText()).endsWith("@example.com");
@@ -87,23 +88,39 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(stored.getPasswordHash()).isNotEqualTo("Week3-Secure-1234!");
         assertThat(stored.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
         assertThat(stored.getIntegrityHash()).isNotBlank();
+        String initialPasswordHash = stored.getPasswordHash();
+        String initialPasswordSalt = stored.getPasswordSalt();
 
         JsonNode list = sendJson(client, "GET", "/api/users?page=0&size=20", adminToken, "", 200);
         JsonNode listed = findUser(list.path("data").path("content"), userUid);
-        assertThat(listed.path("name").asText()).isEqualTo("홍길동");
+        assertThat(listed.has("name")).isFalse();
+        assertThat(listed.path("nameMasked").asText()).isEqualTo("홍*동");
         assertThat(listed.path("integrityValid").asBoolean()).isTrue();
         assertThat(listed.has("phonePlain")).isFalse();
         assertThat(listed.has("emailPlain")).isFalse();
 
-        JsonNode forbidden = sendJson(client, "POST", "/api/users/" + userUid + "/plain", clientToken,
-                "{\"reason\":\"권한 검증\"}", 403);
-        assertThat(forbidden.path("errorCode").asText()).isEqualTo("FORBIDDEN");
-        JsonNode noReason = sendJson(client, "POST", "/api/users/" + userUid + "/plain", adminToken,
-                "{\"reason\":\"\"}", 400);
-        assertThat(noReason.path("errorCode").asText()).isEqualTo("VALIDATION_FAILED");
+        JsonNode nameSearch = sendJson(client, "GET",
+                "/api/users?name=" + URLEncoder.encode("홍길동", StandardCharsets.UTF_8) + "&page=0&size=1",
+                adminToken, "", 200);
+        assertThat(nameSearch.path("data").path("content")).hasSize(1);
+        assertThat(nameSearch.path("data").path("size").asInt()).isEqualTo(1);
+        assertThat(findUser(nameSearch.path("data").path("content"), userUid).path("nameMasked").asText())
+                .isEqualTo("홍*동");
+        JsonNode phoneSearch = sendJson(client, "GET",
+                "/api/users?phone=" + phone.replace("-", "") + "&page=0&size=20",
+                adminToken, "", 200);
+        assertThat(findUser(phoneSearch.path("data").path("content"), userUid).path("phoneMasked").asText())
+                .contains("****");
 
-        HttpResponse<String> plainResponse = send(client, "POST", "/api/users/" + userUid + "/plain", adminToken,
-                "{\"reason\":\"본인 확인 요청 처리\"}");
+        JsonNode forbidden = sendJson(client, "GET", "/api/users/" + userUid + "/plain?reason=permission-check", clientToken,
+                "", 403);
+        assertThat(forbidden.path("errorCode").asText()).isEqualTo("FORBIDDEN");
+        JsonNode noReason = sendJson(client, "GET", "/api/users/" + userUid + "/plain", adminToken,
+                "", 400);
+        assertThat(noReason.path("errorCode").asText()).isEqualTo("INVALID_REQUEST");
+
+        HttpResponse<String> plainResponse = send(client, "GET", "/api/users/" + userUid + "/plain?reason=identity-check", adminToken,
+                "");
         assertThat(plainResponse.statusCode()).isEqualTo(200);
         assertThat(plainResponse.headers().firstValue("cache-control")).hasValueSatisfying(value ->
                 assertThat(value).contains("no-store"));
@@ -117,7 +134,7 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(logs.path("data").path("content")).anySatisfy(log -> {
             assertThat(log.path("targetId").asText()).isEqualTo(userUid.toString());
             assertThat(log.path("actor").asText()).isEqualTo("admin");
-            assertThat(log.path("detail").asText()).contains("본인 확인 요청 처리");
+            assertThat(log.path("detail").asText()).contains("identity-check");
             assertThat(log.path("detail").asText()).doesNotContain(phone, email, "홍길동");
         });
 
@@ -130,8 +147,15 @@ class WeekThreeUserAuditIntegrationTests {
         JsonNode status = sendJson(client, "PATCH", "/api/users/" + userUid + "/status", adminToken,
                 "{\"status\":\"INACTIVE\"}", 200);
         assertThat(status.path("data").path("status").asText()).isEqualTo("INACTIVE");
-        sendJson(client, "POST", "/api/users/" + userUid + "/password", adminToken,
+        sendJson(client, "PATCH", "/api/users/" + userUid + "/password", adminToken,
                 "{\"password\":\"Reset-Password-9876!\"}", 200);
+        var passwordResetUser = userRepository.findByUserUid(userUid).orElseThrow();
+        assertThat(passwordResetUser.getPasswordSalt()).isNotEqualTo(initialPasswordSalt);
+        assertThat(passwordResetUser.getPasswordHash()).isNotEqualTo(initialPasswordHash);
+        JsonNode inactiveUsers = sendJson(client, "GET", "/api/users?status=INACTIVE&page=0&size=20",
+                adminToken, "", 200);
+        assertThat(findUser(inactiveUsers.path("data").path("content"), userUid).path("integrityValid").asBoolean())
+                .isTrue();
 
         JsonNode verification = sendJson(client, "GET", "/api/audit-logs/verify", adminToken, "", 200);
         assertThat(verification.path("data").path("valid").asBoolean()).isTrue();
@@ -164,8 +188,8 @@ class WeekThreeUserAuditIntegrationTests {
         UUID userUid = UUID.fromString(created.path("data").path("userUid").asText());
 
         jdbcTemplate.update("UPDATE app_user SET phone_masked = ? WHERE user_uid = ?", "010-****-0000", userUid);
-        JsonNode blocked = sendJson(client, "POST", "/api/users/" + userUid + "/plain", token,
-                "{\"reason\":\"무결성 실패 검증\"}", 409);
+        JsonNode blocked = sendJson(client, "GET", "/api/users/" + userUid + "/plain?reason=integrity-check", token,
+                "", 409);
         assertThat(blocked.path("errorCode").asText()).isEqualTo("USER_INTEGRITY_VIOLATION");
         JsonNode list = sendJson(client, "GET", "/api/users?page=0&size=100", token, "", 200);
         assertThat(findUser(list.path("data").path("content"), userUid).path("integrityValid").asBoolean()).isFalse();

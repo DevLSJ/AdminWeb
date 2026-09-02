@@ -258,7 +258,7 @@ export async function updateUser(userUid: string, request: UpdateUserRequest) {
 }
 
 export async function fetchUserPlain(userUid: string, reason: string) {
-  return unwrap(await apiClient.post<ApiResponse<AppUserPlain>>(apiEndpoints.users.plain(userUid), { reason }))
+  return unwrap(await apiClient.get<ApiResponse<AppUserPlain>>(apiEndpoints.users.plain(userUid), { params: { reason } }))
 }
 
 export async function changeUserStatus(userUid: string, status: UserStatus) {
@@ -266,7 +266,7 @@ export async function changeUserStatus(userUid: string, status: UserStatus) {
 }
 
 export async function resetUserPassword(userUid: string, password: string) {
-  await apiClient.post<ApiResponse<null>>(apiEndpoints.users.password(userUid), { password })
+  await apiClient.patch<ApiResponse<null>>(apiEndpoints.users.password(userUid), { password })
 }
 
 export async function fetchNoticePage(params: NoticeListParams) {

@@ -167,7 +167,6 @@ export interface UserListParams {
 
 export interface AppUser {
   userUid: string
-  name: string
   nameMasked: string
   phoneMasked: string
   emailMasked: string

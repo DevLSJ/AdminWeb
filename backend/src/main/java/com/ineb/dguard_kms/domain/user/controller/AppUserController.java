@@ -26,7 +26,6 @@ import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserCreateRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPasswordResetRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPlainResponse;
-import com.ineb.dguard_kms.domain.user.dto.UserPlainViewRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserStatusChangeRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserUpdateRequest;
@@ -99,7 +98,7 @@ public class AppUserController {
         );
     }
 
-    @PostMapping("/{userUid}/password")
+    @PatchMapping("/{userUid}/password")
     @Operation(summary = "사용자 비밀번호 재설정")
     public ApiResponse<Void> resetPassword(
             @PathVariable UUID userUid,
@@ -110,14 +109,14 @@ public class AppUserController {
         return ApiResponse.success(null, "사용자 비밀번호를 재설정했습니다.");
     }
 
-    @PostMapping("/{userUid}/plain")
+    @GetMapping("/{userUid}/plain")
     @Operation(summary = "개인정보 원문 조회", description = "조회 사유를 필수로 기록하고 응답 캐시를 금지합니다.")
     public ResponseEntity<ApiResponse<UserPlainResponse>> readPlain(
             @PathVariable UUID userUid,
-            @Valid @RequestBody UserPlainViewRequest request,
+            @RequestParam(required = false) String reason,
             @AuthenticationPrincipal AdminUserDetails actor
     ) {
-        UserPlainResponse response = service.readPlain(userUid, request.reason(), actor.getUsername());
+        UserPlainResponse response = service.readPlain(userUid, reason, actor.getUsername());
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .header("Pragma", "no-cache")

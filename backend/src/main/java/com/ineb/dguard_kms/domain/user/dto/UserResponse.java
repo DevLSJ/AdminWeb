@@ -7,10 +7,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import com.ineb.dguard_kms.domain.user.entity.AppUser;
 
-@Schema(description = "사용자 일반 응답. 이름은 표시하고 연락처·이메일은 마스킹합니다.")
+@Schema(description = "사용자 일반 응답. 이름·연락처·이메일은 마스킹하고 원문은 반환하지 않습니다.")
 public record UserResponse(
         UUID userUid,
-        String name,
         String nameMasked,
         String phoneMasked,
         String emailMasked,
@@ -21,9 +20,9 @@ public record UserResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static UserResponse from(AppUser user, boolean integrityValid, String name) {
+    public static UserResponse from(AppUser user, boolean integrityValid) {
         return new UserResponse(
-                user.getUserUid(), name, user.getNameMasked(), user.getPhoneMasked(), user.getEmailMasked(),
+                user.getUserUid(), user.getNameMasked(), user.getPhoneMasked(), user.getEmailMasked(),
                 user.getStatus(), integrityValid, user.getEncryptionVersion(), user.getCreatedBy(),
                 user.getCreatedAt(), user.getUpdatedAt()
         );

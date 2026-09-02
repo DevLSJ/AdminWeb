@@ -8,10 +8,10 @@
 
 ## 1. 구현 목표와 완료 범위
 
-3주차 구현은 기존 React 목업을 실제 Spring Boot API와 DB에 연결하고 다음 보안 동작을 검증 가능한 상태로 만드는 데 초점을 둔다.
+3주차 구현은 실제 Spring Boot API와 DB에 연결하고 다음 보안 동작을 검증 가능한 상태로 만드는 데 초점을 둔다.
 
 - 사용자 이름·연락처·이메일을 마스터키 기반 AES-256-GCM 암호문으로 저장
-- 일반 사용자 조회 응답은 이름을 표시하고 연락처·이메일은 마스킹
+- 일반 사용자 조회 응답은 이름·연락처·이메일을 모두 마스킹
 - 개인정보 원문 조회 전에 행 무결성을 검증하고 조회 사유를 필수로 기록
 - 원문 조회 시 `USER_VIEW_PLAIN` 감사 이벤트를 append-only 해시 체인에 추가
 - 감사 로그의 행 HMAC, `prev_hash` 연결, 최종 체인 헤드를 일괄 검증
@@ -47,16 +47,16 @@
 - 인증 준비 필드: `password_hash`, `password_salt`, `password_algo`, `password_iter`
 - 통제 필드: `status`, `integrity_hash`, `enc_ver`, 등록·수정 시각, 낙관적 잠금 버전
 
-일반 목록·상세 DTO인 `UserResponse`는 사용자 식별을 위해 복호화한 이름을 표시하고 `phoneMasked`, `emailMasked`만 제공한다. 연락처·이메일 원문은 사유 기반 원문 조회 API에서만 반환한다.
+일반 목록·상세 DTO인 `UserResponse`는 `nameMasked`, `phoneMasked`, `emailMasked`만 제공하며 암호문을 복호화하지 않는다. 이름·연락처·이메일 원문은 사유 기반 원문 조회 API에서만 반환한다.
 
 이름과 연락처 검색은 복호화나 SQL `LIKE`를 사용하지 않는다. 입력을 정규화한 뒤 필드별 도메인 HMAC을 계산하여 정확히 일치하는 행을 찾는다. 전화번호와 이메일 검색 HMAC에는 UNIQUE 제약을 적용해 중복 등록 경쟁 조건을 DB에서도 차단한다.
 
 ### 2.3 원문 조회 정책
 
-원문 조회는 조회 의미를 명확히 하고 캐시를 통제하기 위해 `POST /api/users/{userUid}/plain`으로 제공한다.
+원문 조회는 과제 API 계약에 맞춰 `GET /api/users/{userUid}/plain?reason=...`으로 제공한다. 조회 사유는 URL에 남을 수 있으므로 고객 식별정보나 원문 개인정보를 입력하지 않는다.
 
 1. JWT와 `ADMIN` 또는 `S.ADMIN` 권한을 확인한다.
-2. 2~200자의 조회 사유를 Bean Validation으로 강제한다.
+2. 2~200자의 조회 사유를 서비스 경계에서 강제한다.
 3. 저장된 사용자 행 HMAC을 상수 시간 비교로 검증한다.
 4. 무결성 실패 시 `409 USER_INTEGRITY_VIOLATION`으로 복호화를 차단한다.
 5. 이름·연락처·이메일을 마스터키로 복호화한다.
@@ -77,7 +77,7 @@
 4. 계산한 `rowHash`로 `audit_log`를 INSERT한다.
 5. `audit_chain_head.current_hash`를 새 `rowHash`로 전진시킨다.
 
-감사 상세에는 개인정보 원문, 비밀번호, 키 원문, JWT를 넣지 않는다. `V9__week_three_users_and_audit.sql`은 PostgreSQL `BEFORE UPDATE OR DELETE` 트리거를 설치해 `audit_log`를 DB 수준에서도 append-only로 유지한다.
+감사 상세에는 개인정보 원문, 비밀번호, 키 원문, JWT를 넣지 않는다. `V10__week_three_users_and_audit.sql`은 PostgreSQL `BEFORE UPDATE OR DELETE` 트리거를 설치해 `audit_log`를 DB 수준에서도 append-only로 유지한다.
 
 ### 3.2 검증 동작
 
@@ -102,8 +102,8 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 | POST | `/api/users` | 사용자 등록 | 개인정보 암호화, 검색/행 HMAC, 비밀번호 PBKDF2 |
 | PUT | `/api/users/{userUid}` | 개인정보 수정 | 기존 무결성 검증 후 새 IV로 전체 재암호화 |
 | PATCH | `/api/users/{userUid}/status` | ACTIVE/INACTIVE 전환 | 무결성 검증, 행 HMAC 재계산, 감사 기록 |
-| POST | `/api/users/{userUid}/password` | 비밀번호 재설정 | 새 Salt·PBKDF2 해시, 행 HMAC 재계산 |
-| POST | `/api/users/{userUid}/plain` | 개인정보 원문 조회 | 조회 사유 필수, 무결성 검증, no-store, 감사 기록 |
+| PATCH | `/api/users/{userUid}/password` | 비밀번호 재설정 | 새 Salt·PBKDF2 해시, 행 HMAC 재계산 |
+| GET | `/api/users/{userUid}/plain?reason=...` | 개인정보 원문 조회 | 조회 사유 필수, 무결성 검증, no-store, 감사 기록 |
 | GET | `/api/audit-logs` | 기간·행위자·행위 검색 | 서버 페이징, 행 HMAC 결과 포함 |
 | GET | `/api/audit-logs/verify` | 전체 체인 검증 | 행·연결·헤드 검증 |
 | GET | `/api/audit-logs/export` | 감사 CSV | 최대 10,000건, CSV 주입 방지, 내보내기 감사 기록 |
@@ -135,7 +135,7 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 
 ## 6. 주요 구현 파일
 
-- DB: `backend/src/main/resources/db/migration/V9__week_three_users_and_audit.sql`
+- DB: `backend/src/main/resources/db/migration/V10__week_three_users_and_audit.sql`
 - 사용자 엔티티: `backend/src/main/java/com/ineb/dguard_kms/domain/user/entity/AppUser.java`
 - 사용자 서비스: `backend/src/main/java/com/ineb/dguard_kms/domain/user/service/AppUserService.java`
 - 사용자 API: `backend/src/main/java/com/ineb/dguard_kms/domain/user/controller/AppUserController.java`
@@ -150,7 +150,7 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 
 자동 통합 테스트는 다음을 실제 HTTP 요청과 DB 조회로 확인한다.
 
-1. 사용자 생성 응답은 이름을 표시하고 연락처·이메일은 마스킹 값만 제공한다.
+1. 사용자 생성·목록·상세 응답은 이름·연락처·이메일 원문을 제외하고 마스킹 값만 제공한다.
 2. DB의 이름·연락처·이메일 값이 평문이 아닌 AES-GCM 암호문이고 IV가 12바이트다.
 3. 비밀번호가 평문이 아니며 개별 Salt와 PBKDF2 반복 횟수가 저장된다.
 4. CLIENT의 원문 조회는 403이고 빈 조회 사유는 400이다.
@@ -164,12 +164,12 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 
 최종 검증 결과는 다음과 같다.
 
-- 백엔드: `./gradlew test bootJar --no-daemon` 성공, 8개 테스트 클래스 21개 테스트, 실패/오류/skip 0건
+- 백엔드: `./gradlew clean test bootJar --no-daemon` 성공, 9개 테스트 클래스 23개 테스트, 실패/오류/skip 0건
 - 3주차 전용: `WeekThreeUserAuditIntegrationTests` 2개 시나리오와 `SensitiveDtoRedactionTests` 통과
 - 프론트: TypeScript `tsc -b`, Vite production build, oxlint 모두 성공
 - 실제 로컬 서버: Spring Boot `:18080`, Vite `:15173` 동시 기동 및 CORS 허용 출처 확인
 - 실제 연동 흐름: admin 로그인 → 사용자 등록 → 이름/연락처 HMAC 검색 → 마스킹 응답 → 사유 기반 원문 조회 → `USER_VIEW_PLAIN` 검색 → 전체 체인 검증 성공
-- 연동 관측값: 일반 응답의 연락처·이메일 원문 없음, 행 무결성 `true`, 사유 기반 원문 값 일치, `Cache-Control: no-store`, 체인 `valid=true`, `headValid=true`
+- 연동 관측값: 일반 응답의 이름·연락처·이메일 원문 없음, 행 무결성 `true`, 사유 기반 원문 값 일치, `Cache-Control: no-store`, 체인 `valid=true`, `headValid=true`
 
 브라우저 제어 인스턴스가 이 세션에 연결되어 있지 않아 자동 클릭·스크린샷 검증은 실행할 수 없었다. 대신 같은 Vite 서버에서 `/`, 사용자 화면 모듈, 감사 화면 모듈이 모두 HTTP 200으로 제공되는지 확인하고, 해당 화면 함수가 호출하는 동일 API 계약을 실제 서버에서 끝까지 수행했다. 화면 번들 자체는 production build로 별도 검증했다.
 
@@ -228,7 +228,7 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 - 0바이트로 남아 있던 공지 백엔드 계층을 실제 Spring Data JPA CRUD로 구현했다. 공지 등록·수정은 `multipart/form-data`의 JSON `metadata`와 최대 10개 첨부파일을 함께 받고, 목록·상세·삭제·파일 다운로드까지 PostgreSQL 데이터를 사용한다.
 - 첨부파일 본문은 파일당 최대 10MB로 제한하고 마스터키 AES-256-GCM으로 암호화하여 `notice_file.content_enc`에 저장한다. DB에는 암호문과 12바이트 IV만 남고, 다운로드 시에만 복호화하며 응답은 `Cache-Control: no-store`로 제공한다.
 - 공지 상세 `GET /api/notices/{noticeUid}`는 행 잠금 트랜잭션에서 `view_count`를 원자적으로 1 증가시키고 `NOTICE_VIEW` 감사 이벤트를 남긴다. 따라서 목록 버튼이나 프론트 상태가 아닌 실제 상세 API 접속 횟수가 DB 조회수 기준이다.
-- 사용자 관리 단일 목록은 기존 `admin_user`의 `admin`, `client`, `dguard` 계정과 `app_user`를 함께 표시한다. 관리 계정은 무결성 HMAC을 검증하여 정상/비정상으로 표시하고 현재 JWT 계정에는 로그인 배지를 표시한다. 서비스 사용자 이름은 요구사항에 따라 마스킹하지 않되 연락처·이메일은 계속 마스킹한다.
+- 사용자 관리 단일 목록은 기존 `admin_user`의 `admin`, `client`, `dguard` 계정과 `app_user`를 함께 표시한다. 관리 계정은 무결성 HMAC을 검증하여 정상/비정상으로 표시하고, 서비스 사용자는 이름·연락처·이메일을 모두 마스킹한다.
 - 사용자 행 클릭 시 `/users/admin/{uid}` 또는 `/users/app/{uid}` 상세 페이지로 이동한다. ADMIN은 CLIENT 계정만, S.ADMIN은 모든 하위 계정을 수정·정지·활성화·PBKDF2 비밀번호 재설정할 수 있으며 동일 정책을 프론트 버튼과 백엔드 권한 검사 양쪽에서 강제한다.
 - 감사 이벤트 상세 모달이 열려 있는 동안 3초마다 선택 행의 HMAC, 이전 행 연결, 다음 행 연결, 마지막 행의 체인 헤드를 서버에서 다시 검증한다. 결과는 `rowHashValid`, `previousLinkValid`, `nextLinkValid`, `chainHeadValid`로 각각 표시한다.
 - 키 상세에서 상태 보조 설명, 회전 보조 설명, 버전 이력 패널을 제거하고 실제 사용 집계 카드를 위로 올렸다. 생명주기 타임라인은 하나의 연속 세로선과 호버 애니메이션을 사용하며 키 상세와 암복호화 화면에서 동일 컴포넌트를 공유한다.
@@ -276,3 +276,22 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 - 상세 통계의 선 그리기, 지점 선택, 지표 카드 상승, 분포 막대 진입 모션은 `prefers-reduced-motion` 환경에서 비활성화된다.
 
 검증: 프론트 oxlint, TypeScript 프로젝트 검사, Vite production build와 `git diff --check`가 성공했다. 프론트 변경만 포함하므로 백엔드 이미지·DB 스키마는 변경하지 않으며 기존 대시보드 API 계약을 그대로 재사용한다.
+
+## 17. 3주차 요구사항·시연 기준 재점검 (2026-09-02)
+
+제공된 이미지 4건을 API 계약, 데이터 보호 방식, 패스프레이즈 제약으로 나누어 반영했다.
+
+- API 표: 사용자 목록·상세·원문 조회, 등록·수정, 비밀번호·상태 변경, 감사 검색·체인 검증·CSV 내려받기의 HTTP method와 URI를 그대로 맞춰 검증한다.
+- 데이터 보호 표: `app_user` 한 테이블에 비밀번호 PBKDF2+Salt, 이름·연락처·이메일 AES-256-GCM, 정규화 검색 HMAC, 행 무결성 HMAC을 적용한다. `audit_log`는 별도 행 HMAC과 `prev_hash` 해시 체인을 사용한다.
+- 패스프레이즈 제약: 랜덤 32바이트 이상을 사용하고 데이터베이스에 저장하지 않는다. Salt는 비밀이 아니므로 DB에 두어도 되지만, 패스프레이즈는 DB 백업에 포함하지 않는다. 패스프레이즈 변경은 전체 개인정보 재암호화가 필요하며 이번 과제 범위에서는 자동 교체를 구현하지 않는다.
+
+시연 합격 기준은 다음과 같다.
+
+1. 목록·상세 응답에는 이름·연락처·이메일 원문이 없고 마스킹 필드와 `integrityValid`만 있어야 한다.
+2. 이름·연락처는 정규화 후 HMAC 정확 일치로 검색하고 상태·페이징을 함께 적용한다.
+3. ADMIN/S.ADMIN만 2~200자 사유로 원문을 조회하며, 복호화 전 행 무결성을 검증하고 응답은 `no-store`로 보호한다.
+4. 원문 조회 직후 `USER_VIEW_PLAIN`에 행위자·대상 UID·사유만 남고 개인정보 원문은 남지 않아야 한다.
+5. 비밀번호 재설정 전후 Salt와 해시가 달라지고, 상태·개인정보 수정 후에도 행 무결성은 정상이어야 한다.
+6. 감사 목록은 기간·행위자·행위 유형·페이징으로 검색하고, CSV 내려받기와 전체/개별 해시 체인 검증 결과를 표시한다.
+
+원격 PostgreSQL 읽기 전용 점검 결과, `dguard_kms` DB의 `app_user`, `audit_log`, `audit_chain_head`, Flyway 히스토리가 존재하고 `audit_log_append_only` 트리거가 활성화되어 있었다. 시연 쿼리는 운영 행을 수정·삭제하지 않고 스키마, 보호 필드 길이, 체인 연결, 체인 헤드, append-only 차단을 검증하도록 구성한다.

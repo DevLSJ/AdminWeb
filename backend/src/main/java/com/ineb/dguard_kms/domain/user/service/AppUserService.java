@@ -112,7 +112,7 @@ public class AppUserService {
             saveWithUniqueConstraintHandling(user);
             auditLogService.append(actor, "USER_CREATE", "APP_USER", user.getUserUid().toString(),
                     "개인정보 암호화 사용자 등록");
-            return UserResponse.from(user, true, normalized.name());
+            return UserResponse.from(user, true);
         } finally {
             encryptedName.clear();
             encryptedPhone.clear();
@@ -143,7 +143,7 @@ public class AppUserService {
             saveWithUniqueConstraintHandling(user);
             auditLogService.append(actor, "USER_UPDATE", "APP_USER", userUid.toString(),
                     "개인정보 재암호화 및 검색·무결성 HMAC 갱신");
-            return UserResponse.from(user, true, normalized.name());
+            return UserResponse.from(user, true);
         } finally {
             encryptedName.clear();
             encryptedPhone.clear();
@@ -178,13 +178,14 @@ public class AppUserService {
 
     @Transactional
     public UserPlainResponse readPlain(UUID userUid, String reason, String actor) {
+        String normalizedReason = normalizeReason(reason);
         AppUser user = findRequired(userUid);
         assertIntegrity(user);
         String name = decrypt(user.getNameCiphertext(), user.getNameIv());
         String phone = decrypt(user.getPhoneCiphertext(), user.getPhoneIv());
         String email = decrypt(user.getEmailCiphertext(), user.getEmailIv());
         auditLogService.append(actor, "USER_VIEW_PLAIN", "APP_USER", userUid.toString(),
-                "개인정보 원문 조회 (사유: " + normalizeReason(reason) + ")");
+                "개인정보 원문 조회 (사유: " + normalizedReason + ")");
         return new UserPlainResponse(userUid, name, phone, email, user.getEncryptionVersion());
     }
 
@@ -256,7 +257,7 @@ public class AppUserService {
 
     private UserResponse response(AppUser user) {
         boolean valid = verifyIntegrity(user);
-        return UserResponse.from(user, valid, valid ? decrypt(user.getNameCiphertext(), user.getNameIv()) : user.getNameMasked());
+        return UserResponse.from(user, valid);
     }
 
     private void assertIntegrity(AppUser user) {
@@ -323,7 +324,9 @@ public class AppUserService {
 
     private String normalizeReason(String reason) {
         String normalized = reason == null ? "" : reason.trim().replaceAll("[\\r\\n]+", " ");
-        if (normalized.length() > 200) return normalized.substring(0, 200);
+        if (normalized.length() < 2 || normalized.length() > 200) {
+            throw new IllegalArgumentException("조회 사유는 2~200자여야 합니다.");
+        }
         return normalized;
     }
 

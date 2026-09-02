@@ -15,7 +15,6 @@ import com.ineb.dguard_kms.domain.key.dto.KeyEncryptResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserCreateRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPasswordResetRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPlainResponse;
-import com.ineb.dguard_kms.domain.user.dto.UserPlainViewRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserUpdateRequest;
 
 class SensitiveDtoRedactionTests {
@@ -34,7 +33,6 @@ class SensitiveDtoRedactionTests {
                 new UserUpdateRequest("김보안", "010-9876-5432", "updated@example.com"),
                 "김보안", "010-9876-5432", "updated@example.com"
         );
-        assertRedacted(new UserPlainViewRequest("민감한 조회 사유"), "민감한 조회 사유");
         assertRedacted(
                 new UserPlainResponse(userUid, "이원문", "010-1111-2222", "plain@example.com", 1),
                 "이원문", "010-1111-2222", "plain@example.com"
