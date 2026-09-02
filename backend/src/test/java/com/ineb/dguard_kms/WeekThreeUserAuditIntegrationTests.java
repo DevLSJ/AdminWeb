@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.ineb.dguard_kms.domain.audit.repository.AuditLogRepository;
 import com.ineb.dguard_kms.domain.user.repository.AppUserRepository;
+import com.ineb.dguard_kms.security.PasswordService;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -88,10 +90,24 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(stored.getPhoneIv()).hasSize(12);
         assertThat(stored.getEmailIv()).hasSize(12);
         assertThat(stored.getPasswordHash()).isNotEqualTo("Week3-Secure-1234!");
+        assertThat(stored.getPasswordAlgorithm()).isEqualTo(PasswordService.ALGORITHM);
         assertThat(stored.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
+        assertThat(Base64.getDecoder().decode(stored.getPasswordSalt())).hasSize(16);
+        assertThat(Base64.getDecoder().decode(stored.getPasswordHash())).hasSize(32);
         assertThat(stored.getIntegrityHash()).isNotBlank();
         String initialPasswordHash = stored.getPasswordHash();
         String initialPasswordSalt = stored.getPasswordSalt();
+        byte[] initialPhoneCiphertext = stored.getPhoneCiphertext();
+        byte[] initialPhoneIv = stored.getPhoneIv();
+        String initialPhoneSearchHash = stored.getPhoneSearchHash();
+
+        sendJson(client, "PUT", "/api/users/" + userUid, adminToken, """
+                {"name":"홍길동","phone":"%s","email":"%s"}
+                """.formatted(phone, email), 200);
+        var reEncrypted = userRepository.findByUserUid(userUid).orElseThrow();
+        assertThat(Arrays.equals(reEncrypted.getPhoneCiphertext(), initialPhoneCiphertext)).isFalse();
+        assertThat(Arrays.equals(reEncrypted.getPhoneIv(), initialPhoneIv)).isFalse();
+        assertThat(reEncrypted.getPhoneSearchHash()).isEqualTo(initialPhoneSearchHash);
 
         JsonNode list = sendJson(client, "GET", "/api/users?page=0&size=20", adminToken, "", 200);
         JsonNode listed = findUser(list.path("data").path("content"), userUid);

@@ -31,6 +31,9 @@ D'Guard KMS 구현 3주차 시연순서
 
 - 1번 SQL의 `--3.`을 실행한다.
 - IV가 필드별 12바이트이고, AES-GCM 암호문·PBKDF2 해시/Salt·검색 HMAC·행 HMAC이 모두 저장되어 있음을 확인한다.
+- `--6.`을 실행해 random_gcm_iv_valid, phone_ciphertext_valid, password_kdf_policy_valid, password_salt_format_valid가 모두 true인지 확인한다.
+- 연락처 원문은 phone_ciphertext에 저장되지 않고, 사용자 저장 건마다 만든 12바이트 난수 phone_iv와 서버 마스터키를 함께 사용해야만 복호화할 수 있음을 설명한다.
+- 비밀번호는 복호화 대상이 아니며, 사용자별 16바이트 난수 Salt와 PBKDF2-HMAC-SHA256 210,000회 이상의 결과만 저장한다고 설명한다.
 - Salt는 비밀이 아니지만 패스프레이즈는 DB에 저장/백업하지 않음을 설명한다.
 
 == 5. 마스킹 조회·정확 검색·페이징 시연 ==
@@ -53,7 +56,7 @@ D'Guard KMS 구현 3주차 시연순서
 - 상세의 `상세 수정`으로 연락처 또는 이메일을 바꾸어 저장한다. 기존 값을 채우는 원문 조회도 감사로그에 남는다.
 - `사용자 정지`와 `사용자 활성화`를 순서대로 실행해 상태 변경과 감사 기록을 확인한다.
 - `비밀번호 재설정`으로 새 8자 이상 비밀번호를 저장한다. 원문은 다시 보여주지 않고 새 Salt·PBKDF2 해시만 저장된다.
-- 1번 SQL의 `--6.`을 실행해 `USER_UPDATE`, `USER_STATUS_CHANGE`, `USER_PASSWORD_RESET`을 확인한다.
+- 1번 SQL의 `--7.`을 실행해 `USER_UPDATE`, `USER_STATUS_CHANGE`, `USER_PASSWORD_RESET`을 확인한다.
 
 == 8. 감사로그 검색·페이징·CSV 시연 ==
 

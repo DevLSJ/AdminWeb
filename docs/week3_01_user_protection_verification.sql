@@ -71,7 +71,20 @@ SELECT
     ) duplicated_phone_hashes) AS duplicate_phone_search_hashes,
     (SELECT count(*) FROM app_user) AS total_users;
 
---6. 최근 서비스 사용자의 등록·수정·상태·비밀번호·원문조회 감사 이력 확인
+--6. 최근 사용자 1건의 암호화 저장 정책을 평문 노출 없이 판정
+--    네 결과가 모두 true이면 연락처 AES-GCM 저장과 PBKDF2+Salt 정책이 정상입니다.
+SELECT
+    octet_length(phone_iv) = 12 AS random_gcm_iv_valid,
+    octet_length(phone_ciphertext) >= 16 AS phone_ciphertext_valid,
+    password_algo = 'PBKDF2WithHmacSHA256'
+        AND password_iter >= 210000 AS password_kdf_policy_valid,
+    length(password_salt) = 24
+        AND password_salt ~ '^[A-Za-z0-9+/]{22}==$' AS password_salt_format_valid
+FROM app_user
+ORDER BY created_at DESC
+LIMIT 1;
+
+--7. 최근 서비스 사용자의 등록·수정·상태·비밀번호·원문조회 감사 이력 확인
 WITH latest_user AS (
     SELECT user_uid::text AS target_id
     FROM app_user
