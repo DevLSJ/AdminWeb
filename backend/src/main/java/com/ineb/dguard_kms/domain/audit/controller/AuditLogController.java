@@ -2,6 +2,7 @@ package com.ineb.dguard_kms.domain.audit.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
@@ -59,9 +60,12 @@ public class AuditLogController {
     }
 
     @GetMapping("/verify")
-    @Operation(summary = "감사 로그 체인 검증", description = "감사 로그 해시 체인의 무결성을 검증합니다.")
-    public ApiResponse<AuditVerificationResponse> verify() {
-        return ApiResponse.success(service.verifyChain(), "감사 로그 체인 검증을 완료했습니다.");
+    @Operation(summary = "감사 로그 기간 체인 검증", description = "선택 기간의 행 HMAC과 범위 앞뒤 연결을 검증합니다. 기간을 생략하면 전체 체인을 검증합니다.")
+    public ApiResponse<AuditVerificationResponse> verify(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
+    ) {
+        return ApiResponse.success(service.verifyChain(from, to), "감사 로그 체인 검증을 완료했습니다.");
     }
 
     @GetMapping("/{logUid}/verify")

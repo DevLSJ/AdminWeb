@@ -8,6 +8,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.UUID;
 
@@ -161,7 +163,31 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(verification.path("data").path("valid").asBoolean()).isTrue();
         assertThat(verification.path("data").path("headValid").asBoolean()).isTrue();
         assertThat(verification.path("data").path("checkedCount").asLong()).isPositive();
+        String rangeFrom = Instant.now().minus(1, ChronoUnit.DAYS).toString();
+        String rangeTo = Instant.now().plus(1, ChronoUnit.MINUTES).toString();
+        JsonNode rangedVerification = sendJson(client, "GET",
+                "/api/audit-logs/verify?from=" + URLEncoder.encode(rangeFrom, StandardCharsets.UTF_8)
+                        + "&to=" + URLEncoder.encode(rangeTo, StandardCharsets.UTF_8),
+                adminToken, "", 200);
+        assertThat(rangedVerification.path("data").path("valid").asBoolean()).isTrue();
+        assertThat(rangedVerification.path("data").path("checkedCount").asLong()).isPositive();
+        assertThat(rangedVerification.path("data").path("rangeFrom").asText()).isEqualTo(rangeFrom);
+        assertThat(rangedVerification.path("data").path("rangeTo").asText()).isEqualTo(rangeTo);
         String selectedLogUid = logs.path("data").path("content").get(0).path("logUid").asText();
+        var selectedAuditLog = auditLogRepository.findByLogUid(UUID.fromString(selectedLogUid)).orElseThrow();
+        String narrowFrom = selectedAuditLog.getCreatedAt().minus(1, ChronoUnit.MICROS).toString();
+        String narrowTo = selectedAuditLog.getCreatedAt().plus(1, ChronoUnit.MICROS).toString();
+        JsonNode boundaryVerification = sendJson(client, "GET",
+                "/api/audit-logs/verify?from=" + URLEncoder.encode(narrowFrom, StandardCharsets.UTF_8)
+                        + "&to=" + URLEncoder.encode(narrowTo, StandardCharsets.UTF_8),
+                adminToken, "", 200);
+        assertThat(boundaryVerification.path("data").path("valid").asBoolean()).isTrue();
+        assertThat(boundaryVerification.path("data").path("checkedCount").asLong()).isEqualTo(1);
+        assertThat(boundaryVerification.path("data").path("headValid").asBoolean()).isTrue();
+        sendJson(client, "GET",
+                "/api/audit-logs/verify?from=" + URLEncoder.encode(rangeTo, StandardCharsets.UTF_8)
+                        + "&to=" + URLEncoder.encode(rangeFrom, StandardCharsets.UTF_8),
+                adminToken, "", 400);
         JsonNode entryVerification = sendJson(client, "GET", "/api/audit-logs/" + selectedLogUid + "/verify", adminToken, "", 200);
         assertThat(entryVerification.path("data").path("valid").asBoolean()).isTrue();
         assertThat(entryVerification.path("data").path("rowHashValid").asBoolean()).isTrue();

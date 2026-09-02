@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { CloseRounded, DownloadRounded, FactCheckRounded, SearchRounded, VerifiedRounded, WarningAmberRounded } from '@mui/icons-material'
+import { CalendarMonthRounded, CloseRounded, DownloadRounded, FactCheckRounded, FlightTakeoffRounded, SearchRounded, VerifiedRounded, WarningAmberRounded } from '@mui/icons-material'
 import {
   Alert,
   Box,
   Button,
   Card,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   FormControl,
   InputAdornment,
@@ -66,6 +70,19 @@ function formatKst(value: string) {
   }).format(new Date(value))
 }
 
+function localDateTimeValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function defaultVerificationRange() {
+  const to = new Date()
+  const from = new Date(to)
+  from.setDate(from.getDate() - 7)
+  from.setHours(0, 0, 0, 0)
+  return { from: localDateTimeValue(from), to: localDateTimeValue(to) }
+}
+
 function AuditLog() {
   const [draft, setDraft] = useState(defaultParams)
   const [params, setParams] = useState(defaultParams)
@@ -75,6 +92,10 @@ function AuditLog() {
   const [detail, setDetail] = useState<AuditLogType | null>(null)
   const [entryVerification, setEntryVerification] = useState<AuditEntryVerification | null>(null)
   const [verifyingUid, setVerifyingUid] = useState<string | null>(null)
+  const [verificationOpen, setVerificationOpen] = useState(false)
+  const [verificationRange, setVerificationRange] = useState(defaultVerificationRange)
+  const [verificationRangeError, setVerificationRangeError] = useState('')
+  const [verifyingRange, setVerifyingRange] = useState(false)
   const [error, setError] = useState('')
 
   const loadLogs = useCallback(async (nextParams: AuditListParams) => {
@@ -106,12 +127,37 @@ function AuditLog() {
     setParams({ ...draft, page: 0 })
   }
 
+  const openVerification = () => {
+    setVerificationRange(defaultVerificationRange())
+    setVerificationRangeError('')
+    setVerificationOpen(true)
+  }
+
   const verifyChain = async () => {
+    const fromTime = new Date(verificationRange.from).getTime()
+    const toTime = new Date(verificationRange.to).getTime()
+    if (!verificationRange.from || !verificationRange.to || Number.isNaN(fromTime) || Number.isNaN(toTime)) {
+      setVerificationRangeError('시작일시와 종료일시를 모두 선택해 주세요.')
+      return
+    }
+    if (fromTime >= toTime) {
+      setVerificationRangeError('종료일시는 시작일시보다 이후여야 합니다.')
+      return
+    }
+    if (toTime - fromTime > 366 * 24 * 60 * 60 * 1000) {
+      setVerificationRangeError('검증 기간은 최대 366일까지 선택할 수 있습니다.')
+      return
+    }
     setError('')
+    setVerificationRangeError('')
+    setVerifyingRange(true)
     try {
-      setVerification(await verifyAuditLogs())
+      setVerification(await verifyAuditLogs(verificationRange.from, verificationRange.to))
+      setVerificationOpen(false)
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, '감사 로그 체인을 검증하지 못했습니다.'))
+      setVerificationRangeError(getApiErrorMessage(requestError, '선택 기간의 감사 로그 체인을 검증하지 못했습니다.'))
+    } finally {
+      setVerifyingRange(false)
     }
   }
 
@@ -149,11 +195,11 @@ function AuditLog() {
     <Box>
       <PageHeader
         title="감사 로그"
-        description="서버의 append-only 감사 이벤트를 검색하고 행 HMAC·prev_hash 연결·체인 헤드를 한 번에 검증합니다."
-        action={<Stack direction="row" spacing={1}><Button data-testid="audit-verify-button" variant="outlined" startIcon={<FactCheckRounded />} onClick={() => void verifyChain()}>해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={() => void exportCsv()}>서명 CSV 내려받기</Button></Stack>}
+        description="서버의 append-only 감사 이벤트를 검색하고 선택 기간의 행 HMAC·prev_hash 경계 연결을 검증합니다."
+        action={<Stack direction="row" spacing={1}><Button data-testid="audit-verify-button" variant="outlined" startIcon={<FactCheckRounded />} onClick={openVerification}>기간 해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={() => void exportCsv()}>서명 CSV 내려받기</Button></Stack>}
       />
-      {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity="success" onClose={() => setVerification(null)} sx={{ mb: 2 }}>총 {verification.checkedCount.toLocaleString()}건의 행 HMAC, prev_hash 연결, 최종 체인 헤드가 정상입니다. · {formatKst(verification.verifiedAt)} KST</Alert>}
-      {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '체인 헤드'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
+      {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity={verification.checkedCount === 0 ? 'info' : 'success'} onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? `${formatKst(verification.rangeFrom)} ~ ${formatKst(verification.rangeTo)} KST · ` : ''}{verification.checkedCount === 0 ? '선택 기간에 검증할 감사 로그가 없습니다.' : `총 ${verification.checkedCount.toLocaleString()}건의 행 HMAC과 기간 경계 연결이 정상입니다.`} · {formatKst(verification.verifiedAt)} KST</Alert>}
+      {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? `${formatKst(verification.rangeFrom)} ~ ${formatKst(verification.rangeTo)} KST · ` : ''}해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '기간 경계'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
       <FilterCard>
@@ -182,6 +228,37 @@ function AuditLog() {
         </TableContainer>
         <PaginationBar page={params.page} size={params.size} totalElements={pageData.totalElements} onPageChange={(page) => setParams((current) => ({ ...current, page }))} onSizeChange={(size) => setParams((current) => ({ ...current, page: 0, size }))} />
       </Card>
+
+      <Dialog open={verificationOpen} onClose={() => { if (!verifyingRange) setVerificationOpen(false) }} fullWidth maxWidth="md" slotProps={{ paper: { sx: { overflow: 'hidden', borderRadius: 3 } } }}>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}><Box sx={{ display: 'grid', width: 38, height: 38, placeItems: 'center', borderRadius: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}><CalendarMonthRounded /></Box><Box><Typography variant="h6">검증 기간 선택</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>여정 구간을 고르듯 시작일시와 종료일시를 지정하세요.</Typography></Box></Stack>
+        </DialogTitle>
+        <DialogContent sx={{ pt: '18px !important' }}>
+          <Box sx={{ position: 'relative', mb: 2.5, px: { xs: 1, sm: 4 }, height: 62 }}>
+            <Box sx={{ position: 'absolute', top: 27, left: { xs: 24, sm: 66 }, right: { xs: 24, sm: 66 }, height: 2, bgcolor: 'divider', overflow: 'hidden', '&::after': { content: '""', position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent, rgba(54,112,246,.75), transparent)', animation: 'audit-route-shimmer 2.1s ease-in-out infinite', '@keyframes audit-route-shimmer': { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(100%)' } } } }} />
+            <Box sx={{ position: 'absolute', top: 15, left: { xs: 18, sm: 60 }, width: 26, height: 26, borderRadius: '50%', border: '6px solid', borderColor: 'background.paper', bgcolor: 'primary.main', boxShadow: '0 0 0 2px rgba(54,112,246,.18)' }} />
+            <FlightTakeoffRounded sx={{ position: 'absolute', zIndex: 1, top: 15, color: 'primary.main', animation: 'audit-flight 2.1s ease-in-out infinite', '@keyframes audit-flight': { '0%': { left: '12%', opacity: 0, transform: 'translateY(5px) rotate(-5deg)' }, '18%': { opacity: 1 }, '82%': { opacity: 1 }, '100%': { left: '82%', opacity: 0, transform: 'translateY(-5px) rotate(4deg)' } } }} />
+            <Box sx={{ position: 'absolute', top: 15, right: { xs: 18, sm: 60 }, width: 26, height: 26, borderRadius: '50%', border: '6px solid', borderColor: 'background.paper', bgcolor: 'secondary.main', boxShadow: '0 0 0 2px rgba(89,200,183,.22)' }} />
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr auto 1fr' }, alignItems: 'stretch', gap: 1.5 }}>
+            <Box sx={{ p: 2.25, border: '1px solid', borderColor: 'primary.main', borderRadius: 2.5, bgcolor: 'rgba(54,112,246,.045)', transition: 'transform .2s ease, box-shadow .2s ease', '&:focus-within': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(54,112,246,.13)' } }}>
+              <Typography sx={{ mb: .5, color: 'primary.main', fontWeight: 850, fontSize: 12, letterSpacing: '.08em' }}>START</Typography>
+              <Typography sx={{ mb: 1.5, fontWeight: 800 }}>시작일시</Typography>
+              <TextField data-testid="audit-verify-from" fullWidth type="datetime-local" value={verificationRange.from} onChange={(event) => setVerificationRange((current) => ({ ...current, from: event.target.value }))} slotProps={{ htmlInput: { max: verificationRange.to || localDateTimeValue(new Date()) } }} />
+            </Box>
+            <Box sx={{ display: { xs: 'none', md: 'grid' }, placeItems: 'center', color: 'text.disabled', fontSize: 22 }}>→</Box>
+            <Box sx={{ p: 2.25, border: '1px solid', borderColor: 'secondary.main', borderRadius: 2.5, bgcolor: 'rgba(89,200,183,.055)', transition: 'transform .2s ease, box-shadow .2s ease', '&:focus-within': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(89,200,183,.14)' } }}>
+              <Typography sx={{ mb: .5, color: 'secondary.dark', fontWeight: 850, fontSize: 12, letterSpacing: '.08em' }}>END</Typography>
+              <Typography sx={{ mb: 1.5, fontWeight: 800 }}>종료일시</Typography>
+              <TextField data-testid="audit-verify-to" fullWidth type="datetime-local" value={verificationRange.to} onChange={(event) => setVerificationRange((current) => ({ ...current, to: event.target.value }))} slotProps={{ htmlInput: { min: verificationRange.from, max: localDateTimeValue(new Date()) } }} />
+            </Box>
+          </Box>
+          <Alert severity="info" sx={{ mt: 2 }}>선택 기간 내부의 모든 행 HMAC과 첫 행의 이전 연결, 마지막 행의 다음 연결 또는 최종 체인 헤드까지 검증합니다.</Alert>
+          {verificationRangeError && <Alert severity="error" sx={{ mt: 1.5 }}>{verificationRangeError}</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}><Button color="inherit" disabled={verifyingRange} onClick={() => setVerificationOpen(false)}>취소</Button><Button data-testid="audit-verify-submit" variant="contained" disabled={verifyingRange} startIcon={verifyingRange ? <CircularProgress size={17} color="inherit" /> : <FactCheckRounded />} onClick={() => void verifyChain()}>{verifyingRange ? '검증 중' : '선택 기간 검증'}</Button></DialogActions>
+      </Dialog>
 
       <Drawer anchor="right" open={Boolean(detail)} onClose={() => { setDetail(null); setEntryVerification(null) }} slotProps={{ backdrop: { sx: { bgcolor: 'rgba(20,29,48,.34)', backdropFilter: 'blur(5px)' } }, paper: { sx: { width: { xs: '100%', sm: 720, xl: 880 }, maxWidth: '100%', borderRadius: { sm: '18px 0 0 18px' }, boxShadow: '-24px 0 64px rgba(25,42,78,.2)' } } }}>
         <Box sx={{ height: '100%', overflowY: 'auto' }}>

@@ -14,8 +14,12 @@ public record AuditVerificationResponse(
         long checkedCount,
         @Schema(description = "무결성이 실패한 로그 UUID 목록")
         List<UUID> invalidLogUids,
-        @Schema(description = "저장된 체인 헤드와 계산된 마지막 해시의 일치 여부")
+        @Schema(description = "기간 마지막 행의 다음 연결 또는 최종 체인 헤드 일치 여부")
         boolean headValid,
+        @Schema(description = "검증 범위 시작 시각(UTC). 전체 검증이면 null")
+        Instant rangeFrom,
+        @Schema(description = "검증 범위 종료 시각(UTC). 전체 검증이면 null")
+        Instant rangeTo,
         @Schema(description = "검증 완료 시각(UTC)")
         Instant verifiedAt
 ) {

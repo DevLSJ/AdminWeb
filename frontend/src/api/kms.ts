@@ -171,8 +171,11 @@ export async function fetchAuditLogs() {
   })).content
 }
 
-export async function verifyAuditLogs() {
-  return unwrap(await apiClient.get<ApiResponse<AuditVerification>>(apiEndpoints.auditLogs.verify))
+export async function verifyAuditLogs(from: string, to: string) {
+  return unwrap(await apiClient.get<ApiResponse<AuditVerification>>(
+    apiEndpoints.auditLogs.verify,
+    { params: { from: new Date(from).toISOString(), to: new Date(to).toISOString() } },
+  ))
 }
 
 export async function verifyAuditLogEntry(logUid: string) {

@@ -252,6 +252,8 @@ export interface AuditVerification {
   checkedCount: number
   invalidLogUids: string[]
   headValid: boolean
+  rangeFrom: string | null
+  rangeTo: string | null
   verifiedAt: string
 }
 

@@ -110,20 +110,52 @@ public class AuditLogService {
 
     @Transactional(readOnly = true)
     public AuditVerificationResponse verifyChain() {
-        List<AuditLog> logs = repository.findAllByOrderByIdAsc();
+        return verifyChain(null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public AuditVerificationResponse verifyChain(Instant from, Instant to) {
+        boolean ranged = from != null || to != null;
+        if (ranged && (from == null || to == null)) {
+            throw new IllegalArgumentException("시작일시와 종료일시를 모두 입력해야 합니다.");
+        }
+        if (ranged && !from.isBefore(to)) {
+            throw new IllegalArgumentException("종료일시는 시작일시보다 이후여야 합니다.");
+        }
+        if (ranged && from.plus(366, ChronoUnit.DAYS).isBefore(to)) {
+            throw new IllegalArgumentException("해시 체인 검증 기간은 최대 366일까지 선택할 수 있습니다.");
+        }
+
+        List<AuditLog> logs = ranged
+                ? repository.findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByIdAsc(from, to)
+                : repository.findAllByOrderByIdAsc();
         List<UUID> invalid = new ArrayList<>();
-        String expectedPreviousHash = null;
+        AuditLog previous = logs.isEmpty()
+                ? null
+                : repository.findTopByIdLessThanOrderByIdDesc(logs.get(0).getId()).orElse(null);
+        String expectedPreviousHash = previous == null ? null : previous.getRowHash();
         for (AuditLog log : logs) {
             boolean previousValid = java.util.Objects.equals(expectedPreviousHash, log.getPreviousHash());
             boolean rowValid = verifyRow(log);
             if (!previousValid || !rowValid) invalid.add(log.getLogUid());
             expectedPreviousHash = log.getRowHash();
         }
-        String storedHead = chainHeadRepository.findById((short) 1)
-                .map(AuditChainHead::getCurrentHash)
-                .orElse(null);
-        boolean headValid = java.util.Objects.equals(expectedPreviousHash, storedHead);
-        if (!headValid && !logs.isEmpty()) {
+
+        boolean headValid = true;
+        if (!logs.isEmpty()) {
+            AuditLog last = logs.get(logs.size() - 1);
+            AuditLog next = repository.findTopByIdGreaterThanOrderByIdAsc(last.getId()).orElse(null);
+            if (next != null) {
+                // 기간의 마지막 행이 전체 체인의 중간에 있으면 다음 행과의 경계 연결까지 확인한다.
+                headValid = java.util.Objects.equals(last.getRowHash(), next.getPreviousHash());
+            } else {
+                String storedHead = chainHeadRepository.findById((short) 1)
+                        .map(AuditChainHead::getCurrentHash)
+                        .orElse(null);
+                headValid = java.util.Objects.equals(last.getRowHash(), storedHead);
+            }
+        }
+        if (!headValid) {
             UUID lastUid = logs.get(logs.size() - 1).getLogUid();
             if (!invalid.contains(lastUid)) invalid.add(lastUid);
         }
@@ -132,6 +164,8 @@ public class AuditLogService {
                 logs.size(),
                 List.copyOf(invalid),
                 headValid,
+                ranged ? from : null,
+                ranged ? to : null,
                 Instant.now().truncatedTo(ChronoUnit.MILLIS)
         );
     }
