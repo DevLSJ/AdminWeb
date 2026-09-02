@@ -62,12 +62,16 @@ public class CryptoKeyController {
             @RequestParam(required = false) String algorithm,
             @RequestParam(required = false) KeyStatus status,
             @RequestParam(required = false) String purpose,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer expiringWithinDays,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
         return ApiResponse.success(
-                keyService.findAll(keyword, algorithm, status, purpose, page, size, sort),
+                keyService.findAll(
+                        keyword, algorithm, status, purpose, category, expiringWithinDays, page, size, sort
+                ),
                 "키 목록 조회에 성공했습니다."
         );
     }

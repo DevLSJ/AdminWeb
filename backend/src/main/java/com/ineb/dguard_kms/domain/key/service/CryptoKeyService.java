@@ -3,10 +3,13 @@ package com.ineb.dguard_kms.domain.key.service;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -133,15 +136,37 @@ public class CryptoKeyService {
             String algorithm,
             KeyStatus status,
             String purpose,
+            String category,
+            Integer expiringWithinDays,
             int page,
             int size,
             String sort
     ) {
-        Specification<CryptoKey> filters = keyFilters(keyword, algorithm, status, purpose);
+        String normalizedCategory = normalizeCategory(category);
+        int normalizedExpiringDays = normalizeExpiringDays(expiringWithinDays);
+        Specification<CryptoKey> filters = keyFilters(
+                keyword, algorithm, status, purpose, normalizedCategory, normalizedExpiringDays
+        );
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        Sort normalizedSort = keySort(sort);
+        if ("INTEGRITY_VIOLATION".equals(normalizedCategory)) {
+            List<KeyResponse> invalidKeys = keyRepository.findAll(filters, normalizedSort).stream()
+                    .map(key -> KeyResponse.from(key, verifyKeyAndAllVersions(key).valid()))
+                    .filter(response -> !response.integrityValid())
+                    .toList();
+            int fromIndex = Math.min(normalizedPage * normalizedSize, invalidKeys.size());
+            int toIndex = Math.min(fromIndex + normalizedSize, invalidKeys.size());
+            int totalPages = (int) Math.ceil((double) invalidKeys.size() / normalizedSize);
+            return new PageResponse<>(
+                    invalidKeys.subList(fromIndex, toIndex), normalizedPage, normalizedSize,
+                    invalidKeys.size(), totalPages
+            );
+        }
         PageRequest pageable = PageRequest.of(
-                Math.max(page, 0),
-                Math.min(Math.max(size, 1), 100),
-                keySort(sort)
+                normalizedPage,
+                normalizedSize,
+                normalizedSort
         );
         Page<KeyResponse> result = keyRepository.findAll(filters, pageable).map(this::responseWithIntegrity);
         return PageResponse.from(result);
@@ -700,7 +725,9 @@ public class CryptoKeyService {
             String keyword,
             String algorithm,
             KeyStatus status,
-            String purpose
+            String purpose,
+            String category,
+            int expiringWithinDays
     ) {
         return (root, query, builder) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
@@ -726,8 +753,43 @@ public class CryptoKeyService {
             if (purpose != null && !purpose.isBlank()) {
                 predicates.add(builder.equal(builder.upper(root.get("purpose")), purpose.trim().toUpperCase(java.util.Locale.ROOT)));
             }
+            if ("ENCRYPT_CAPABLE".equals(category) || "DECRYPT_CAPABLE".equals(category)) {
+                predicates.add(root.get("status").in(KeyStatus.ACTIVE, KeyStatus.REACTIVATED, KeyStatus.DISTRIBUTED));
+            } else if ("EXPIRING".equals(category)) {
+                Instant today = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
+                Instant deadline = today.plusSeconds(expiringWithinDays * 86_400L);
+                predicates.add(builder.between(root.get("expireAt"), today, deadline));
+                predicates.add(builder.notEqual(root.get("status"), KeyStatus.DESTROYED));
+            }
             return builder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
+    }
+
+    private String normalizeCategory(String requestedCategory) {
+        String category = requestedCategory == null || requestedCategory.isBlank()
+                ? "ALL"
+                : requestedCategory.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("ALL", "ENCRYPT_CAPABLE", "DECRYPT_CAPABLE", "EXPIRING", "INTEGRITY_VIOLATION")
+                .contains(category)) {
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST,
+                    "지원하지 않는 키 목록 분류입니다.",
+                    "INVALID_KEY_LIST_CATEGORY"
+            );
+        }
+        return category;
+    }
+
+    private int normalizeExpiringDays(Integer requestedDays) {
+        int days = requestedDays == null ? 30 : requestedDays;
+        if (days < 1 || days > 3650) {
+            throw new KeyOperationException(
+                    HttpStatus.BAD_REQUEST,
+                    "만료 임박 조회 기준은 1~3650일이어야 합니다.",
+                    "INVALID_EXPIRING_DAYS"
+            );
+        }
+        return days;
     }
 
     private Sort keySort(String requestedSort) {

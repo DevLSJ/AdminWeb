@@ -33,10 +33,19 @@ export interface KeyListParams {
   algorithm: KeyAlgorithm | 'ALL'
   status: KeyStatus | 'ALL'
   purpose: KeyPurpose | 'ALL'
+  category: KeyListCategory
+  expiringWithinDays: number | null
   page: number
   size: number
   sort: string
 }
+
+export type KeyListCategory =
+  | 'ALL'
+  | 'ENCRYPT_CAPABLE'
+  | 'DECRYPT_CAPABLE'
+  | 'EXPIRING'
+  | 'INTEGRITY_VIOLATION'
 
 export interface CryptoKey {
   keyUid: string

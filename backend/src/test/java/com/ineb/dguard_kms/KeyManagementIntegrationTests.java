@@ -147,6 +147,26 @@ class KeyManagementIntegrationTests {
                 {"toStatus":"ACTIVE","reason":"통합 테스트 활성화"}
                 """, 200);
 
+        JsonNode encryptCapable = sendJson(
+                client,
+                "GET",
+                "/api/keys?category=ENCRYPT_CAPABLE&keyword=" + keyUid,
+                token,
+                "",
+                200
+        );
+        assertThat(encryptCapable.path("data").path("totalElements").asLong()).isEqualTo(1);
+
+        JsonNode expiring = sendJson(
+                client,
+                "GET",
+                "/api/keys?category=EXPIRING&expiringWithinDays=3650&keyword=" + keyUid,
+                token,
+                "",
+                200
+        );
+        assertThat(expiring.path("data").path("totalElements").asLong()).isEqualTo(1);
+
         JsonNode updated = sendJson(client, "PUT", "/api/keys/" + keyUid, token, """
                 {"keyName":"%s-UPDATED","purpose":"ENCRYPT","expireAt":"%s"}
                 """.formatted(keyName, LocalDate.now().plusYears(2)), 200);
@@ -232,6 +252,18 @@ class KeyManagementIntegrationTests {
         assertThat(tampered.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
         JsonNode blocked = sendJson(client, "POST", "/api/keys/" + keyUid + "/rotate", token, "{}", 409);
         assertThat(blocked.path("errorCode").asText()).isEqualTo("KEY_INTEGRITY_VIOLATION");
+
+        JsonNode integrityViolation = sendJson(
+                client,
+                "GET",
+                "/api/keys?category=INTEGRITY_VIOLATION&keyword=" + keyUid,
+                token,
+                "",
+                200
+        );
+        assertThat(integrityViolation.path("data").path("totalElements").asLong()).isEqualTo(1);
+        assertThat(integrityViolation.path("data").path("content").get(0).path("integrityValid").asBoolean())
+                .isFalse();
     }
 
     @Test

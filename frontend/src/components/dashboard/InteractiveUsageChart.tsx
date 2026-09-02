@@ -36,8 +36,11 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
   }
 
   const width = Math.max(detailed ? 980 : 720, points.length * (detailed ? 58 : 44))
-  const chartTop = detailed ? 48 : 40
-  const chartBottom = detailed ? 300 : 205
+  // Reserve enough room above the plot for the tooltip. Its Y position then
+  // follows the highest series value for the selected date instead of sitting
+  // at a fixed height over the chart lines.
+  const chartTop = detailed ? 138 : 118
+  const chartBottom = detailed ? 330 : 255
   const chartHeight = chartBottom - chartTop
   const maxValue = Math.max(1, ...points.flatMap((point) => series.map(({ field }) => point[field])))
   const roundedMax = Math.max(5, Math.ceil(maxValue / 5) * 5)
@@ -46,6 +49,7 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
   const pathFor = (field: typeof series[number]['field']) => points.map((point, index) => `${index ? 'L' : 'M'} ${xFor(index)} ${yFor(point[field])}`).join(' ')
   const selected = points[Math.min(activeIndex, points.length - 1)]
   const activeX = xFor(activeIndex)
+  const activeTop = Math.min(...series.map(({ field }) => yFor(selected[field])))
   const tooltipLeft = `${Math.min(88, Math.max(12, (activeX / width) * 100))}%`
   const labelEvery = Math.max(1, Math.ceil(points.length / (detailed ? 12 : 8)))
 
@@ -66,7 +70,7 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
             sx={{
               position: 'absolute',
               zIndex: 3,
-              top: detailed ? 58 : 50,
+              top: activeTop,
               left: tooltipLeft,
               minWidth: detailed ? 190 : 164,
               p: detailed ? 1.5 : 1.15,
@@ -74,9 +78,9 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
               borderColor: 'divider',
               bgcolor: 'background.paper',
               boxShadow: '0 12px 30px rgba(28,54,98,.16)',
-              transform: 'translateX(-50%)',
+              transform: 'translate(-50%, calc(-100% - 12px))',
               pointerEvents: 'none',
-              transition: 'left 180ms cubic-bezier(.16,1,.3,1)',
+              transition: 'left 180ms cubic-bezier(.16,1,.3,1), top 180ms cubic-bezier(.16,1,.3,1)',
             }}
           >
             <Typography sx={{ fontSize: 11.5, color: 'text.secondary', fontWeight: 800 }}>{selected.period}</Typography>
@@ -85,7 +89,7 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
             </Stack>
           </Box>
 
-          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 345 : 246}`} sx={{ display: 'block', width: '100%', height: detailed ? 345 : 246 }}>
+          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: detailed ? 382 : 296 }}>
             {[0, .25, .5, .75, 1].map((ratio) => {
               const y = chartBottom - ratio * chartHeight
               return <g key={ratio}><line x1="54" x2={width - 32} y1={y} y2={y} stroke="currentColor" opacity=".1" /><text x="45" y={y + 4} textAnchor="end" fill="currentColor" opacity=".56" fontSize="10">{Math.round(roundedMax * ratio)}</text></g>

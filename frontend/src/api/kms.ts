@@ -75,7 +75,7 @@ export async function fetchKeys() {
   let pageNumber = 0
   let totalPages = 1
   while (pageNumber < totalPages) {
-    const page = await fetchKeyPage({ keyword: '', algorithm: 'ALL', status: 'ALL', purpose: 'ALL', page: pageNumber, size: 100, sort: 'createdAt,desc' })
+    const page = await fetchKeyPage({ keyword: '', algorithm: 'ALL', status: 'ALL', purpose: 'ALL', category: 'ALL', expiringWithinDays: null, page: pageNumber, size: 100, sort: 'createdAt,desc' })
     keys.push(...page.content)
     totalPages = page.totalPages
     pageNumber += 1
@@ -92,6 +92,8 @@ export async function fetchKeyPage(params: KeyListParams) {
         algorithm: params.algorithm === 'ALL' ? undefined : params.algorithm,
         status: params.status === 'ALL' ? undefined : params.status,
         purpose: params.purpose === 'ALL' ? undefined : params.purpose,
+        category: params.category === 'ALL' ? undefined : params.category,
+        expiringWithinDays: params.category === 'EXPIRING' ? params.expiringWithinDays ?? 30 : undefined,
         page: params.page,
         size: params.size,
         sort: params.sort,

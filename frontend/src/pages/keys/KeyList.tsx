@@ -33,7 +33,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { alpha } from '@mui/material/styles'
 import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
@@ -42,7 +42,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { canEncryptWithStatus, getManualKeyStatusTransitions } from '../../utils/keyLifecycle'
 import { getKeyAlgorithmLabel, getKeyCategoryLabel } from '../../utils/keyPresentation'
-import type { CryptoKey, DeploymentTargetType, KeyListParams, KeyStatus } from '../../types/api'
+import type { CryptoKey, DeploymentTargetType, KeyListCategory, KeyListParams, KeyStatus } from '../../types/api'
 import { isAdminRole } from '../../types/auth'
 import { getStatusLabel } from '../../utils/status'
 import { fetchKeyPage, getApiErrorMessage } from '../../api/kms'
@@ -53,22 +53,50 @@ const defaultParams: KeyListParams = {
   algorithm: 'ALL',
   status: 'ALL',
   purpose: 'ALL',
+  category: 'ALL',
+  expiringWithinDays: null,
   page: 0,
   size: 20,
   sort: 'createdAt,desc',
 }
 
-const algorithmOptions = ['ALL', 'AES', 'RSA'] as const
+const categoryOptions = ['ALL', 'ENCRYPT_CAPABLE', 'DECRYPT_CAPABLE', 'EXPIRING', 'INTEGRITY_VIOLATION'] as const
+const categoryLabels: Record<KeyListCategory, string> = { ALL: '전체 관리 키', ENCRYPT_CAPABLE: '암호화 가능', DECRYPT_CAPABLE: '복호화 가능', EXPIRING: '만료 임박', INTEGRITY_VIOLATION: '무결성 위반' }
+const algorithmOptions = ['ALL', 'AES', 'RSA', 'HMAC'] as const
 const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'DEACTIVATED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
-const algorithmLabels = { AES: '대칭키 · AES-256-GCM', RSA: '공개키 · RSA-2048-SHA256' } as const
+const algorithmLabels = { AES: '대칭키 · AES-256-GCM', RSA: '공개키 · RSA-2048-SHA256', HMAC: '메시지 인증 · HMAC' } as const
 const purposeLabels = { ENCRYPT: '암복호화', SIGN: '서명', AUTH: '인증', WRAP: '키 래핑' } as const
 
+function initialParamsFrom(searchParams: URLSearchParams): KeyListParams {
+  const category = searchParams.get('category')
+  const algorithm = searchParams.get('algorithm')
+  const status = searchParams.get('status')
+  const purpose = searchParams.get('purpose')
+  const requestedDays = Number(searchParams.get('expiringWithinDays'))
+  const requestedPage = Number(searchParams.get('page'))
+  const requestedSize = Number(searchParams.get('size'))
+  const requestedSort = searchParams.get('sort')
+  return {
+    ...defaultParams,
+    keyword: searchParams.get('keyword') ?? '',
+    category: categoryOptions.includes(category as KeyListCategory) ? category as KeyListCategory : 'ALL',
+    algorithm: algorithmOptions.includes(algorithm as KeyListParams['algorithm']) ? algorithm as KeyListParams['algorithm'] : 'ALL',
+    status: statusOptions.includes(status as typeof statusOptions[number]) ? status as typeof statusOptions[number] : 'ALL',
+    purpose: purposeOptions.includes(purpose as KeyListParams['purpose']) ? purpose as KeyListParams['purpose'] : 'ALL',
+    expiringWithinDays: Number.isInteger(requestedDays) && requestedDays >= 1 && requestedDays <= 3650 ? requestedDays : null,
+    page: Number.isInteger(requestedPage) && requestedPage >= 0 ? requestedPage : 0,
+    size: [20, 50, 100].includes(requestedSize) ? requestedSize : 20,
+    sort: ['createdAt,desc', 'createdAt,asc', 'expireAt,asc', 'keyName,asc'].includes(requestedSort ?? '') ? requestedSort! : defaultParams.sort,
+  }
+}
+
 function KeyList() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const { keys, loading, error, changeKeyStatus, deleteKey, distributeKeys } = useKmsMock()
   const isAdmin = isAdminRole(user?.role)
-  const [params, setParams] = useState<KeyListParams>(defaultParams)
+  const [params, setParams] = useState<KeyListParams>(() => initialParamsFrom(searchParams))
   const [transitionKey, setTransitionKey] = useState<CryptoKey | null>(null)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [lifecycleOpen, setLifecycleOpen] = useState(false)
@@ -109,6 +137,20 @@ function KeyList() {
     const timer = window.setTimeout(() => void loadPage(), 200)
     return () => window.clearTimeout(timer)
   }, [loadPage])
+
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (params.keyword.trim()) next.set('keyword', params.keyword.trim())
+    if (params.category !== 'ALL') next.set('category', params.category)
+    if (params.category === 'EXPIRING') next.set('expiringWithinDays', String(params.expiringWithinDays ?? 30))
+    if (params.algorithm !== 'ALL') next.set('algorithm', params.algorithm)
+    if (params.status !== 'ALL') next.set('status', params.status)
+    if (params.purpose !== 'ALL') next.set('purpose', params.purpose)
+    if (params.sort !== defaultParams.sort) next.set('sort', params.sort)
+    if (params.page > 0) next.set('page', String(params.page))
+    if (params.size !== defaultParams.size) next.set('size', String(params.size))
+    setSearchParams(next, { replace: true })
+  }, [params, setSearchParams])
 
   const updateParam = <K extends keyof KeyListParams>(key: K, value: KeyListParams[K]) => {
     setParams((current) => ({ ...current, [key]: value, page: key === 'page' ? Number(value) : 0 }))
@@ -195,7 +237,7 @@ function KeyList() {
       {(loading || listLoading) && <Alert severity="info" sx={{ mb: 2 }}>키 목록을 불러오는 중입니다.</Alert>}
 
       <FilterCard>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 2fr) repeat(4, minmax(130px, 1fr))' }, gap: 1.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(230px, 1.7fr) repeat(5, minmax(125px, 1fr))' }, gap: 1.5 }}>
           <TextField
             size="small"
             label="검색어"
@@ -204,11 +246,13 @@ function KeyList() {
             onChange={(event) => updateParam('keyword', event.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }}
           />
-          <FormControl size="small"><InputLabel>키 카테고리</InputLabel><Select label="키 카테고리" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 키 카테고리' : algorithmLabels[option]}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>대시보드 분류</InputLabel><Select label="대시보드 분류" value={params.category} onChange={(event) => { const category = event.target.value as KeyListCategory; setParams((current) => ({ ...current, category, expiringWithinDays: category === 'EXPIRING' ? current.expiringWithinDays ?? 30 : null, page: 0 })) }}>{categoryOptions.map((option) => <MenuItem key={option} value={option}>{option === 'EXPIRING' && params.category === 'EXPIRING' ? `${categoryLabels[option]} (${params.expiringWithinDays ?? 30}일)` : categoryLabels[option]}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel>알고리즘</InputLabel><Select label="알고리즘" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 알고리즘' : algorithmLabels[option]}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel>상태</InputLabel><Select label="상태" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{statusOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : getStatusLabel(option)}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel>용도</InputLabel><Select label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : purposeLabels[option]}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel>정렬</InputLabel><Select label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
         </Box>
+        {params.category === 'EXPIRING' && <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>만료 기준</Typography><Select size="small" value={params.expiringWithinDays ?? 30} onChange={(event) => updateParam('expiringWithinDays', Number(event.target.value))}>{[7, 30, 60].map((days) => <MenuItem key={days} value={days}>{days}일 이내</MenuItem>)}</Select></Stack>}
         <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center', justifyContent: 'flex-end' }}>
           <Button size="small" color="inherit" startIcon={<FilterAltOffRounded />} onClick={() => setParams((current) => ({ ...defaultParams, size: current.size }))}>필터 초기화</Button>
         </Stack>
