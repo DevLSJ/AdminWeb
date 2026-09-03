@@ -51,7 +51,7 @@ class WeekOneIntegrationTests {
         assertThat(admin.getPasswordSalt()).isNotBlank();
         assertThat(admin.getPasswordAlgorithm()).isEqualTo("PBKDF2WithHmacSHA256");
         assertThat(admin.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
-        assertThat(admin.getRole()).isEqualTo("ADMIN");
+        assertThat(admin.getRole()).isEqualTo("S.ADMIN");
 
         assertThat(client.getPasswordHash()).isNotBlank().isNotEqualTo("client");
         assertThat(client.getPasswordSalt()).isNotBlank();
@@ -71,7 +71,7 @@ class WeekOneIntegrationTests {
         assertThat(login.statusCode()).isEqualTo(200);
         JsonNode loginBody = objectMapper.readTree(login.body());
         assertThat(loginBody.path("success").asBoolean()).isTrue();
-        assertThat(loginBody.path("data").path("role").asText()).isEqualTo("ADMIN");
+        assertThat(loginBody.path("data").path("role").asText()).isEqualTo("S.ADMIN");
         String token = loginBody.path("data").path("token").asText();
         assertThat(token).isNotBlank();
         JsonNode tokenClaims = objectMapper.readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));

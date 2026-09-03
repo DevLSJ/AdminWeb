@@ -13,6 +13,7 @@ public record UserResponse(
         String nameMasked,
         String phoneMasked,
         String emailMasked,
+        String role,
         String status,
         boolean integrityValid,
         int encVer,
@@ -23,7 +24,7 @@ public record UserResponse(
     public static UserResponse from(AppUser user, boolean integrityValid) {
         return new UserResponse(
                 user.getUserUid(), user.getNameMasked(), user.getPhoneMasked(), user.getEmailMasked(),
-                user.getStatus(), integrityValid, user.getEncryptionVersion(), user.getCreatedBy(),
+                user.getRole(), user.getStatus(), integrityValid, user.getEncryptionVersion(), user.getCreatedBy(),
                 user.getCreatedAt(), user.getUpdatedAt()
         );
     }

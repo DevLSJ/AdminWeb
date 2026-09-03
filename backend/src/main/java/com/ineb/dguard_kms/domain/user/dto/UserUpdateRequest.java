@@ -15,7 +15,9 @@ public record UserUpdateRequest(
         @NotBlank(message = "이메일을 입력하세요.")
         @Email(message = "이메일 형식을 확인하세요.")
         @Size(max = 254, message = "이메일은 254자 이하여야 합니다.")
-        String email
+        String email,
+        @Pattern(regexp = "ADMIN|CLIENT", message = "권한은 ADMIN 또는 CLIENT여야 합니다.")
+        String role
 ) {
     @Override
     public String toString() {

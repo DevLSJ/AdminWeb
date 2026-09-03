@@ -53,8 +53,9 @@ class WeekThreeUserAuditIntegrationTests {
     @Test
     void personalDataIsEncryptedMaskedAndPlainViewIsAudited() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
-        String adminToken = login(client, "admin", "admin");
+        String adminToken = login(client, "dguard", "dguard");
         String clientToken = login(client, "client", "client");
+        String superAdminToken = login(client, "admin", "admin");
         JsonNode adminAccounts = sendJson(client, "GET", "/api/admin-accounts", adminToken, "", 200);
         assertThat(adminAccounts.path("data")).anySatisfy(account -> {
             assertThat(account.path("loginId").asText()).isEqualTo("admin");
@@ -74,6 +75,7 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(created.path("data").path("nameMasked").asText()).isEqualTo("홍*동");
         assertThat(created.path("data").path("phoneMasked").asText()).contains("****");
         assertThat(created.path("data").path("emailMasked").asText()).endsWith("@example.com");
+        assertThat(created.path("data").path("role").asText()).isEqualTo("CLIENT");
         assertThat(created.path("data").has("phone")).isFalse();
         assertThat(created.path("data").has("email")).isFalse();
 
@@ -108,6 +110,22 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(Arrays.equals(reEncrypted.getPhoneCiphertext(), initialPhoneCiphertext)).isFalse();
         assertThat(Arrays.equals(reEncrypted.getPhoneIv(), initialPhoneIv)).isFalse();
         assertThat(reEncrypted.getPhoneSearchHash()).isEqualTo(initialPhoneSearchHash);
+
+        JsonNode managedUsers = sendJson(client, "GET", "/api/users/managed?page=0&size=100", adminToken, "", 200);
+        assertThat(managedUsers.path("data").path("content"))
+                .anySatisfy(account -> {
+                    assertThat(account.path("loginId").asText()).isEqualTo("admin");
+                    assertThat(account.path("role").asText()).isEqualTo("S.ADMIN");
+                })
+                .anySatisfy(account -> {
+                    assertThat(account.path("loginId").asText()).isEqualTo("client");
+                    assertThat(account.path("role").asText()).isEqualTo("CLIENT");
+                })
+                .anySatisfy(account -> {
+                    assertThat(account.path("loginId").asText()).isEqualTo("dguard");
+                    assertThat(account.path("role").asText()).isEqualTo("ADMIN");
+                })
+                .anySatisfy(account -> assertThat(account.path("userUid").asText()).isEqualTo(userUid.toString()));
 
         JsonNode list = sendJson(client, "GET", "/api/users?page=0&size=20", adminToken, "", 200);
         JsonNode listed = findUser(list.path("data").path("content"), userUid);
@@ -151,7 +169,7 @@ class WeekThreeUserAuditIntegrationTests {
                 "/api/audit-logs?action=USER_VIEW_PLAIN&page=0&size=100", adminToken, "", 200);
         assertThat(logs.path("data").path("content")).anySatisfy(log -> {
             assertThat(log.path("targetId").asText()).isEqualTo(userUid.toString());
-            assertThat(log.path("actor").asText()).isEqualTo("admin");
+            assertThat(log.path("actor").asText()).isEqualTo("dguard");
             assertThat(log.path("detail").asText()).contains("identity-check");
             assertThat(log.path("detail").asText()).doesNotContain(phone, email, "홍길동");
         });
@@ -174,6 +192,17 @@ class WeekThreeUserAuditIntegrationTests {
                 adminToken, "", 200);
         assertThat(findUser(inactiveUsers.path("data").path("content"), userUid).path("integrityValid").asBoolean())
                 .isTrue();
+
+        JsonNode adminRoleUser = sendJson(client, "POST", "/api/users", adminToken, """
+                {"name":"관리권한사용자","phone":"010-6888-%s","email":"role-%s@example.com","password":"Role-Test-1234!","role":"ADMIN"}
+                """.formatted(numericSuffix(suffix), suffix), 200);
+        String adminRoleUserUid = adminRoleUser.path("data").path("userUid").asText();
+        assertThat(adminRoleUser.path("data").path("role").asText()).isEqualTo("ADMIN");
+        sendJson(client, "PATCH", "/api/users/" + adminRoleUserUid + "/status", adminToken,
+                "{\"status\":\"INACTIVE\"}", 403);
+        JsonNode superAdminUpdated = sendJson(client, "PATCH", "/api/users/" + adminRoleUserUid + "/status",
+                superAdminToken, "{\"status\":\"INACTIVE\"}", 200);
+        assertThat(superAdminUpdated.path("data").path("status").asText()).isEqualTo("INACTIVE");
 
         JsonNode verification = sendJson(client, "GET", "/api/audit-logs/verify", adminToken, "", 200);
         assertThat(verification.path("data").path("valid").asBoolean()).isTrue();

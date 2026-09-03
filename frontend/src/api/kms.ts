@@ -4,6 +4,7 @@ import type {
   AppUser,
   AppUserPlain,
   AdminAccount,
+  ManagedUser,
   AuditLog,
   AuditListParams,
   AuditVerification,
@@ -21,6 +22,7 @@ import type {
   PageResponse,
   UserListParams,
   UserStatus,
+  UserRole,
   Notice,
   NoticeListParams,
 } from '../types/api'
@@ -55,6 +57,7 @@ export interface CreateUserRequest {
   phone: string
   email: string
   password: string
+  role: Exclude<UserRole, 'S.ADMIN'>
 }
 
 export type UpdateUserRequest = Omit<CreateUserRequest, 'password'>
@@ -190,7 +193,7 @@ export async function fetchAdminAccount(userUid: string) {
   return unwrap(await apiClient.get<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.detail(userUid)))
 }
 
-export async function updateAdminAccount(userUid: string, request: { name: string; role: AdminAccount['role'] }) {
+export async function updateAdminAccount(userUid: string, request: { name: string; role: 'ADMIN' | 'CLIENT' | null }) {
   return unwrap(await apiClient.put<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.update(userUid), request))
 }
 
@@ -236,6 +239,21 @@ export async function exportAuditLogs(params: AuditListParams) {
 export async function fetchUserPage(params: UserListParams) {
   return unwrap(await apiClient.get<ApiResponse<PageResponse<AppUser>>>(
     apiEndpoints.users.list,
+    {
+      params: {
+        name: params.name.trim() || undefined,
+        phone: params.phone.trim() || undefined,
+        status: params.status === 'ALL' ? undefined : params.status,
+        page: params.page,
+        size: params.size,
+      },
+    },
+  ))
+}
+
+export async function fetchManagedUserPage(params: UserListParams) {
+  return unwrap(await apiClient.get<ApiResponse<PageResponse<ManagedUser>>>(
+    apiEndpoints.users.managed,
     {
       params: {
         name: params.name.trim() || undefined,

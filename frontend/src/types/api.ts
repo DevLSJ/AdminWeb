@@ -156,6 +156,7 @@ export interface KeyDistributionResult {
 }
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE'
+export type UserRole = 'S.ADMIN' | 'ADMIN' | 'CLIENT'
 
 export interface UserListParams {
   name: string
@@ -170,6 +171,7 @@ export interface AppUser {
   nameMasked: string
   phoneMasked: string
   emailMasked: string
+  role: Exclude<UserRole, 'S.ADMIN'>
   status: UserStatus
   integrityValid: boolean
   encVer: number
@@ -190,7 +192,22 @@ export interface AdminAccount {
   userUid: string
   loginId: string
   name: string
-  role: 'S.ADMIN' | 'ADMIN' | 'CLIENT'
+  role: UserRole
+  status: UserStatus
+  integrityValid: boolean
+  createdAt: string
+  updatedAt: string
+  lastLoginAt: string | null
+}
+
+export interface ManagedUser {
+  accountType: 'ADMIN_ACCOUNT' | 'APP_USER'
+  userUid: string
+  loginId: string | null
+  nameDisplay: string
+  phoneMasked: string | null
+  emailMasked: string | null
+  role: UserRole
   status: UserStatus
   integrityValid: boolean
   createdAt: string

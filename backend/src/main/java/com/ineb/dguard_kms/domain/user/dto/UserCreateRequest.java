@@ -24,7 +24,10 @@ public record UserCreateRequest(
 
         @NotBlank(message = "초기 비밀번호를 입력하세요.")
         @Size(min = 8, max = 128, message = "비밀번호는 8~128자여야 합니다.")
-        String password
+        String password,
+
+        @Pattern(regexp = "ADMIN|CLIENT", message = "권한은 ADMIN 또는 CLIENT여야 합니다.")
+        String role
 ) {
     @Override
     public String toString() {

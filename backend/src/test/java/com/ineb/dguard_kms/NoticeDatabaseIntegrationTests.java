@@ -77,13 +77,13 @@ class NoticeDatabaseIntegrationTests {
 
     @Test
     void adminManagesClientAndSuperAdminManagesAdminWithIntegrityResigned() throws Exception {
-        String adminToken = login("admin", "admin");
-        String superToken = login("dguard", "dguard");
+        String adminToken = login("dguard", "dguard");
+        String superToken = login("admin", "admin");
         String accountsBody = mvc.perform(get("/api/admin-accounts").header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         JsonNode accounts = objectMapper.readTree(accountsBody).path("data");
         String clientUid = findAccount(accounts, "client").path("userUid").asText();
-        String adminUid = findAccount(accounts, "admin").path("userUid").asText();
+        String adminUid = findAccount(accounts, "dguard").path("userUid").asText();
 
         mvc.perform(patch("/api/admin-accounts/{uid}/status", clientUid).header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"INACTIVE\"}"))
@@ -92,7 +92,7 @@ class NoticeDatabaseIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"Client-New-Password-123!\"}"))
                 .andExpect(status().isOk());
         mvc.perform(put("/api/admin-accounts/{uid}", adminUid).header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"관리자\",\"role\":\"ADMIN\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"시연 관리자\",\"role\":\"ADMIN\"}"))
                 .andExpect(status().isForbidden());
         String updatedBody = mvc.perform(put("/api/admin-accounts/{uid}", adminUid).header("Authorization", "Bearer " + superToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"시연 관리자\",\"role\":\"ADMIN\"}"))

@@ -20,8 +20,11 @@ import jakarta.persistence.Version;
 public class AppUser {
 
     public static final int CURRENT_ENCRYPTION_VERSION = 1;
+    public static final int CURRENT_INTEGRITY_VERSION = 2;
     public static final String ACTIVE = "ACTIVE";
     public static final String INACTIVE = "INACTIVE";
+    public static final String ADMIN = "ADMIN";
+    public static final String CLIENT = "CLIENT";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -81,11 +84,17 @@ public class AppUser {
     @Column(nullable = false, length = 16)
     private String status;
 
+    @Column(nullable = false, length = 16)
+    private String role;
+
     @Column(name = "integrity_hash", nullable = false, length = 512)
     private String integrityHash;
 
     @Column(name = "enc_ver", nullable = false)
     private int encryptionVersion;
+
+    @Column(name = "integrity_ver", nullable = false)
+    private int integrityVersion;
 
     @Column(name = "created_by", nullable = false, updatable = false, length = 64)
     private String createdBy;
@@ -121,6 +130,7 @@ public class AppUser {
             String passwordSalt,
             String passwordAlgorithm,
             int passwordIterations,
+            String role,
             String createdBy
     ) {
         this.userUid = userUid;
@@ -132,7 +142,9 @@ public class AppUser {
         );
         replacePassword(passwordHash, passwordSalt, passwordAlgorithm, passwordIterations);
         this.status = ACTIVE;
+        changeRole(role);
         this.integrityHash = "PENDING";
+        this.integrityVersion = CURRENT_INTEGRITY_VERSION;
         this.createdBy = createdBy;
     }
 
@@ -180,6 +192,17 @@ public class AppUser {
         this.status = status;
     }
 
+    public void changeRole(String role) {
+        if (!ADMIN.equals(role) && !CLIENT.equals(role)) {
+            throw new IllegalArgumentException("사용자 권한은 ADMIN 또는 CLIENT여야 합니다.");
+        }
+        this.role = role;
+    }
+
+    public void upgradeIntegrityVersion() {
+        this.integrityVersion = CURRENT_INTEGRITY_VERSION;
+    }
+
     public void updateIntegrityHash(String integrityHash) {
         this.integrityHash = integrityHash;
     }
@@ -220,8 +243,10 @@ public class AppUser {
     public String getPasswordAlgorithm() { return passwordAlgorithm; }
     public int getPasswordIterations() { return passwordIterations; }
     public String getStatus() { return status; }
+    public String getRole() { return role; }
     public String getIntegrityHash() { return integrityHash; }
     public int getEncryptionVersion() { return encryptionVersion; }
+    public int getIntegrityVersion() { return integrityVersion; }
     public String getCreatedBy() { return createdBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

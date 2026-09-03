@@ -31,6 +31,10 @@ public class UserOperationException extends RuntimeException {
         );
     }
 
+    public static UserOperationException forbidden(String message) {
+        return new UserOperationException(HttpStatus.FORBIDDEN, "FORBIDDEN", message);
+    }
+
     public HttpStatus getStatus() { return status; }
     public String getErrorCode() { return errorCode; }
 }

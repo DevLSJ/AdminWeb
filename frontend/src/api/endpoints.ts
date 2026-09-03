@@ -36,6 +36,7 @@ export const apiEndpoints = {
   },
   users: {
     list: '/api/users',
+    managed: '/api/users/managed',
     create: '/api/users',
     detail: (id: string) => `/api/users/${id}`,
     update: (id: string) => `/api/users/${id}`,

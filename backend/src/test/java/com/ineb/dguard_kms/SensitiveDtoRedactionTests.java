@@ -26,11 +26,11 @@ class SensitiveDtoRedactionTests {
         assertRedacted(new LoginRequest("admin", "login-secret"), "login-secret");
         assertRedacted(new LoginResponse("jwt-secret", userUid, "admin", "관리자", "ADMIN"), "jwt-secret");
         assertRedacted(
-                new UserCreateRequest("홍길동", "010-1234-5678", "private@example.com", "password-secret"),
+                new UserCreateRequest("홍길동", "010-1234-5678", "private@example.com", "password-secret", "CLIENT"),
                 "홍길동", "010-1234-5678", "private@example.com", "password-secret"
         );
         assertRedacted(
-                new UserUpdateRequest("김보안", "010-9876-5432", "updated@example.com"),
+                new UserUpdateRequest("김보안", "010-9876-5432", "updated@example.com", "ADMIN"),
                 "김보안", "010-9876-5432", "updated@example.com"
         );
         assertRedacted(

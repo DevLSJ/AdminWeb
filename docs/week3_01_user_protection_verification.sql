@@ -28,6 +28,7 @@ SELECT
     name_masked,
     phone_masked,
     email_masked,
+    role,
     status,
     octet_length(name_ciphertext) AS name_cipher_bytes,
     octet_length(name_iv) AS name_iv_bytes,

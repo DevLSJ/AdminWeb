@@ -21,6 +21,8 @@ import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.crypto.CryptoUtil;
 import com.ineb.dguard_kms.crypto.IntegrityService;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
+import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
+import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
 import com.ineb.dguard_kms.domain.user.dto.UserCreateRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPasswordResetRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPlainResponse;
@@ -33,7 +35,8 @@ import com.ineb.dguard_kms.security.PasswordService;
 @Service
 public class AppUserService {
 
-    private static final String USER_INTEGRITY_DOMAIN = "APP_USER_ROW_V1";
+    private static final String USER_INTEGRITY_DOMAIN_V1 = "APP_USER_ROW_V1";
+    private static final String USER_INTEGRITY_DOMAIN_V2 = "APP_USER_ROW_V2";
     private static final String NAME_LOOKUP_DOMAIN = "APP_USER_NAME_LOOKUP_V1";
     private static final String PHONE_LOOKUP_DOMAIN = "APP_USER_PHONE_LOOKUP_V1";
     private static final String EMAIL_LOOKUP_DOMAIN = "APP_USER_EMAIL_LOOKUP_V1";
@@ -43,19 +46,22 @@ public class AppUserService {
     private final IntegrityService integrityService;
     private final PasswordService passwordService;
     private final AuditLogService auditLogService;
+    private final AdminUserRepository adminUserRepository;
 
     public AppUserService(
             AppUserRepository repository,
             CryptoUtil cryptoUtil,
             IntegrityService integrityService,
             PasswordService passwordService,
-            AuditLogService auditLogService
+            AuditLogService auditLogService,
+            AdminUserRepository adminUserRepository
     ) {
         this.repository = repository;
         this.cryptoUtil = cryptoUtil;
         this.integrityService = integrityService;
         this.passwordService = passwordService;
         this.auditLogService = auditLogService;
+        this.adminUserRepository = adminUserRepository;
     }
 
     @Transactional(readOnly = true)
@@ -66,21 +72,19 @@ public class AppUserService {
             int page,
             int size
     ) {
-        String nameHash = isBlank(name) ? null : lookupHash(NAME_LOOKUP_DOMAIN, normalizeName(name));
-        String phoneHash = isBlank(phone) ? null : lookupHash(PHONE_LOOKUP_DOMAIN, normalizePhone(phone));
-        String normalizedStatus = normalizeStatus(status, true);
-        Specification<AppUser> specification = (root, query, builder) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            if (nameHash != null) predicates.add(builder.equal(root.get("nameSearchHash"), nameHash));
-            if (phoneHash != null) predicates.add(builder.equal(root.get("phoneSearchHash"), phoneHash));
-            if (normalizedStatus != null) predicates.add(builder.equal(root.get("status"), normalizedStatus));
-            return builder.and(predicates.toArray(Predicate[]::new));
-        };
         var result = repository.findAll(
-                specification,
+                searchSpecification(name, phone, status),
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
         ).map(this::response);
         return PageResponse.from(result);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> searchAllForManagement(String name, String phone, String status) {
+        return repository.findAll(
+                searchSpecification(name, phone, status),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        ).stream().map(this::response).toList();
     }
 
     @Transactional(readOnly = true)
@@ -92,6 +96,7 @@ public class AppUserService {
     @Transactional
     public UserResponse create(UserCreateRequest request, String actor) {
         NormalizedPersonalData normalized = normalize(request.name(), request.phone(), request.email());
+        String role = normalizeRole(request.role(), AppUser.CLIENT);
         assertUnique(normalized, null);
         PasswordService.PasswordHash password = hashPassword(request.password());
         EncryptedValue encryptedName = encrypt(normalized.name());
@@ -106,7 +111,7 @@ public class AppUserService {
                     lookupHash(PHONE_LOOKUP_DOMAIN, normalized.phoneDigits()),
                     encryptedEmail.ciphertext(), encryptedEmail.iv(), maskEmail(normalized.email()),
                     lookupHash(EMAIL_LOOKUP_DOMAIN, normalized.email()),
-                    password.hash(), password.salt(), password.algorithm(), password.iterations(), actor
+                    password.hash(), password.salt(), password.algorithm(), password.iterations(), role, actor
             );
             user.updateIntegrityHash(calculateIntegrity(user));
             saveWithUniqueConstraintHandling(user);
@@ -124,7 +129,9 @@ public class AppUserService {
     public UserResponse update(UUID userUid, UserUpdateRequest request, String actor) {
         AppUser user = findForUpdate(userUid);
         assertIntegrity(user);
+        assertCanManage(actor(actor), user);
         NormalizedPersonalData normalized = normalize(request.name(), request.phone(), request.email());
+        String role = normalizeRole(request.role(), user.getRole());
         assertUnique(normalized, userUid);
         EncryptedValue encryptedName = encrypt(normalized.name());
         EncryptedValue encryptedPhone = encrypt(normalized.phone());
@@ -139,6 +146,8 @@ public class AppUserService {
                     lookupHash(EMAIL_LOOKUP_DOMAIN, normalized.email()),
                     AppUser.CURRENT_ENCRYPTION_VERSION
             );
+            user.changeRole(role);
+            user.upgradeIntegrityVersion();
             user.updateIntegrityHash(calculateIntegrity(user));
             saveWithUniqueConstraintHandling(user);
             auditLogService.append(actor, "USER_UPDATE", "APP_USER", userUid.toString(),
@@ -155,8 +164,10 @@ public class AppUserService {
     public UserResponse changeStatus(UUID userUid, String requestedStatus, String actor) {
         AppUser user = findForUpdate(userUid);
         assertIntegrity(user);
+        assertCanManage(actor(actor), user);
         String status = normalizeStatus(requestedStatus, false);
         user.changeStatus(status);
+        user.upgradeIntegrityVersion();
         user.updateIntegrityHash(calculateIntegrity(user));
         repository.saveAndFlush(user);
         auditLogService.append(actor, "USER_STATUS_CHANGE", "APP_USER", userUid.toString(),
@@ -168,8 +179,10 @@ public class AppUserService {
     public void resetPassword(UUID userUid, UserPasswordResetRequest request, String actor) {
         AppUser user = findForUpdate(userUid);
         assertIntegrity(user);
+        assertCanManage(actor(actor), user);
         PasswordService.PasswordHash password = hashPassword(request.password());
         user.replacePassword(password.hash(), password.salt(), password.algorithm(), password.iterations());
+        user.upgradeIntegrityVersion();
         user.updateIntegrityHash(calculateIntegrity(user));
         repository.saveAndFlush(user);
         auditLogService.append(actor, "USER_PASSWORD_RESET", "APP_USER", userUid.toString(),
@@ -181,6 +194,7 @@ public class AppUserService {
         String normalizedReason = normalizeReason(reason);
         AppUser user = findRequired(userUid);
         assertIntegrity(user);
+        assertCanManage(actor(actor), user);
         String name = decrypt(user.getNameCiphertext(), user.getNameIv());
         String phone = decrypt(user.getPhoneCiphertext(), user.getPhoneIv());
         String email = decrypt(user.getEmailCiphertext(), user.getEmailIv());
@@ -269,8 +283,24 @@ public class AppUserService {
     }
 
     private String[] integrityValues(AppUser user) {
+        if (user.getIntegrityVersion() < AppUser.CURRENT_INTEGRITY_VERSION) {
+            return legacyIntegrityValues(user);
+        }
         return new String[] {
-                USER_INTEGRITY_DOMAIN,
+                USER_INTEGRITY_DOMAIN_V2,
+                user.getUserUid().toString(),
+                encode(user.getNameCiphertext()), encode(user.getNameIv()), user.getNameMasked(), user.getNameSearchHash(),
+                encode(user.getPhoneCiphertext()), encode(user.getPhoneIv()), user.getPhoneMasked(), user.getPhoneSearchHash(),
+                encode(user.getEmailCiphertext()), encode(user.getEmailIv()), user.getEmailMasked(), user.getEmailSearchHash(),
+                user.getPasswordHash(), user.getPasswordSalt(), user.getPasswordAlgorithm(),
+                Integer.toString(user.getPasswordIterations()), user.getRole(), user.getStatus(),
+                Integer.toString(user.getEncryptionVersion()), Integer.toString(user.getIntegrityVersion()), user.getCreatedBy()
+        };
+    }
+
+    private String[] legacyIntegrityValues(AppUser user) {
+        return new String[] {
+                USER_INTEGRITY_DOMAIN_V1,
                 user.getUserUid().toString(),
                 encode(user.getNameCiphertext()), encode(user.getNameIv()), user.getNameMasked(), user.getNameSearchHash(),
                 encode(user.getPhoneCiphertext()), encode(user.getPhoneIv()), user.getPhoneMasked(), user.getPhoneSearchHash(),
@@ -320,6 +350,38 @@ public class AppUserService {
             throw new IllegalArgumentException("사용자 상태는 ACTIVE 또는 INACTIVE여야 합니다.");
         }
         return normalized;
+    }
+
+    private String normalizeRole(String role, String fallback) {
+        String normalized = isBlank(role) ? fallback : role.trim().toUpperCase(Locale.ROOT);
+        if (!AppUser.ADMIN.equals(normalized) && !AppUser.CLIENT.equals(normalized)) {
+            throw new IllegalArgumentException("사용자 권한은 ADMIN 또는 CLIENT여야 합니다.");
+        }
+        return normalized;
+    }
+
+    private Specification<AppUser> searchSpecification(String name, String phone, String status) {
+        String nameHash = isBlank(name) ? null : lookupHash(NAME_LOOKUP_DOMAIN, normalizeName(name));
+        String phoneHash = isBlank(phone) ? null : lookupHash(PHONE_LOOKUP_DOMAIN, normalizePhone(phone));
+        String normalizedStatus = normalizeStatus(status, true);
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (nameHash != null) predicates.add(builder.equal(root.get("nameSearchHash"), nameHash));
+            if (phoneHash != null) predicates.add(builder.equal(root.get("phoneSearchHash"), phoneHash));
+            if (normalizedStatus != null) predicates.add(builder.equal(root.get("status"), normalizedStatus));
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private AdminUser actor(String loginId) {
+        return adminUserRepository.findByLoginId(loginId)
+                .orElseThrow(() -> UserOperationException.forbidden("인증 계정을 찾을 수 없습니다."));
+    }
+
+    private void assertCanManage(AdminUser actor, AppUser target) {
+        if ("S.ADMIN".equals(actor.getRole())) return;
+        if ("ADMIN".equals(actor.getRole()) && AppUser.CLIENT.equals(target.getRole())) return;
+        throw UserOperationException.forbidden("해당 사용자 계정을 관리할 권한이 없습니다.");
     }
 
     private String normalizeReason(String reason) {

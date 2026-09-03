@@ -6,5 +6,5 @@ import jakarta.validation.constraints.Size;
 
 public record AdminAccountUpdateRequest(
         @NotBlank @Size(max = 64) String name,
-        @Pattern(regexp = "S\\.ADMIN|ADMIN|CLIENT") String role
+        @Pattern(regexp = "ADMIN|CLIENT") String role
 ) {}

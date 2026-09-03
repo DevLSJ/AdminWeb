@@ -47,7 +47,9 @@ public class AdminAccountService {
         AdminUser actor = actor(actorLoginId);
         assertCanManage(actor, target);
         String role = request.role() == null ? target.getRole() : request.role();
-        if (!"S.ADMIN".equals(actor.getRole()) && !"CLIENT".equals(role)) throw forbidden();
+        if ("S.ADMIN".equals(target.getRole()) && request.role() != null) {
+            throw new IllegalArgumentException("S.ADMIN 권한은 시스템 최고 관리자 계정에 고정되어 변경할 수 없습니다.");
+        }
         target.updateProfile(request.name().trim(), role);
         resign(target);
         repository.saveAndFlush(target);

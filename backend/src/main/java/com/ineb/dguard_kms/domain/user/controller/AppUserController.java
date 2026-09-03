@@ -24,12 +24,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.ineb.dguard_kms.common.ApiResponse;
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserCreateRequest;
+import com.ineb.dguard_kms.domain.user.dto.ManagedUserResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserPasswordResetRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPlainResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserResponse;
 import com.ineb.dguard_kms.domain.user.dto.UserStatusChangeRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserUpdateRequest;
 import com.ineb.dguard_kms.domain.user.service.AppUserService;
+import com.ineb.dguard_kms.domain.user.service.ManagedUserService;
 import com.ineb.dguard_kms.security.AdminUserDetails;
 
 @RestController
@@ -39,9 +41,27 @@ import com.ineb.dguard_kms.security.AdminUserDetails;
 public class AppUserController {
 
     private final AppUserService service;
+    private final ManagedUserService managedUserService;
 
-    public AppUserController(AppUserService service) {
+    public AppUserController(AppUserService service, ManagedUserService managedUserService) {
         this.service = service;
+        this.managedUserService = managedUserService;
+    }
+
+    @GetMapping("/managed")
+    @Operation(summary = "관리 계정과 암호화 사용자의 통합 목록 조회")
+    public ApiResponse<PageResponse<ManagedUserResponse>> searchManaged(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        return ApiResponse.success(
+                managedUserService.search(name, phone, status, Math.max(page, 0), safeSize),
+                "관리 대상 사용자 통합 목록을 조회했습니다."
+        );
     }
 
     @GetMapping
