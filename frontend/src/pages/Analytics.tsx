@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AnalyticsRounded, CheckCircleRounded, ErrorOutlineRounded, KeyRounded, LockRounded, ShieldRounded, VpnKeyRounded } from '@mui/icons-material'
+import { AnalyticsRounded, ErrorOutlineRounded, KeyRounded, LockRounded, ShieldRounded, VpnKeyRounded } from '@mui/icons-material'
 import { Alert, Avatar, Box, Card, CardContent, LinearProgress, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useNavigate } from 'react-router-dom'
@@ -52,13 +52,11 @@ function Analytics() {
   }, [keys])
   const algorithmItems = useMemo(() => ['AES', 'RSA', 'HMAC'].map((algorithm, index) => ({ label: algorithm, value: keys.filter((key) => key.algorithm === algorithm).length, color: ['#2478e8', '#28ad73', '#eea325'][index], href: `/keys?algorithm=${algorithm}` })), [keys])
   const expiring = useMemo(() => keys.filter((key) => key.status !== 'DESTROYED' && new Date(`${key.expireAt}T23:59:59`).getTime() >= Date.now() && new Date(`${key.expireAt}T23:59:59`).getTime() - Date.now() <= 30 * 86_400_000).length, [keys])
-  const successRate = summary?.totalOperations ? Math.round(summary.successfulOperations / summary.totalOperations * 1000) / 10 : 0
   const operationTotal = trend?.points.reduce((sum, point) => sum + point.totalOperations, 0) ?? 0
 
   const metrics = [
     { label: '전체 관리 키', value: String(summary?.totalKeys ?? 0), note: 'DB에 등록된 전체 키', color: '#2478e8', icon: <VpnKeyRounded />, href: '/keys?category=ALL' },
     { label: '기간 내 키 사용', value: operationTotal.toLocaleString(), note: period === 'DAY' ? '최근 30일 암·복호화' : '최근 12개월 암·복호화', color: '#28ad73', icon: <AnalyticsRounded /> },
-    { label: '작업 성공률', value: `${successRate}%`, note: `실패 ${summary?.failedOperations ?? 0}건`, color: successRate >= 99 ? '#28ad73' : '#df4c64', icon: <CheckCircleRounded /> },
     { label: '만료 임박', value: `${expiring}개`, note: '30일 이내 확인 필요', color: '#eea325', icon: <KeyRounded />, href: '/keys?category=EXPIRING&expiringWithinDays=30' },
     { label: '무결성 위반', value: `${summary?.integrityViolations ?? 0}개`, note: summary?.integrityViolations ? '즉시 조사 필요' : '전체 키 정상', color: '#df4c64', icon: summary?.integrityViolations ? <ErrorOutlineRounded /> : <ShieldRounded />, href: '/keys?category=INTEGRITY_VIOLATION' },
   ]
@@ -67,7 +65,7 @@ function Analytics() {
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2.5, alignItems: { sm: 'center' }, justifyContent: 'space-between' }}><Box><Typography variant="h5">키 통계</Typography><Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 12.5 }}>KMS 키 상태와 암·복호화 사용량을 서버 DB 기준으로 분석합니다.</Typography></Box><ToggleButtonGroup exclusive size="small" value={period} onChange={(_event, value) => value && setPeriod(value)}><ToggleButton value="DAY">최근 30일</ToggleButton><ToggleButton value="MONTH">최근 12개월</ToggleButton></ToggleButtonGroup></Stack>
     {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
     {loading && <LinearProgress sx={{ mb: 2 }} />}
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))', xl: 'repeat(5,minmax(0,1fr))' }, gap: 1.5 }}>{metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}</Box>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))', xl: 'repeat(4,minmax(0,1fr))' }, gap: 1.5 }}>{metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}</Box>
     <Card className="section-card" sx={{ mt: 1.5, overflow: 'hidden' }}><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Box><Typography variant="h6">키 생성·사용 상세</Typography><Typography sx={{ mt: .15, color: 'text.secondary', fontSize: 11.5 }}>그래프 지점에 마우스를 올리거나 클릭해 기간별 수치를 확인하세요.</Typography></Box><Stack direction="row" spacing={.75} sx={{ alignItems: 'center' }}><LockRounded sx={{ color: 'primary.main', fontSize: 18 }} /><Typography sx={{ color: 'text.secondary', fontSize: 11.5 }}>실시간 API 연동</Typography></Stack></Box><CardContent sx={{ p: '8px 20px 14px !important' }}><InteractiveUsageChart trend={trend} detailed /></CardContent></Card>
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(2,minmax(0,1fr))' }, gap: 1.5, mt: 1.5 }}><DistributionPanel title="전체 키 상태" items={statusItems} total={keys.length} /><DistributionPanel title="알고리즘 분포" items={algorithmItems} total={keys.length} /></Box>
   </Box>

@@ -35,7 +35,9 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
     return <Box sx={{ display: 'grid', height: detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
   }
 
-  const width = Math.max(detailed ? 980 : 720, points.length * (detailed ? 58 : 44))
+  // Keep the plot canvas stable when switching between daily and monthly data.
+  // Point count changes the spacing between samples, not the chart footprint.
+  const width = detailed ? 1080 : 900
   // Reserve enough room above the plot for the tooltip. Its Y position then
   // follows the highest series value for the selected date instead of sitting
   // at a fixed height over the chart lines.
