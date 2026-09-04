@@ -56,12 +56,16 @@ class WeekThreeUserAuditIntegrationTests {
         String adminToken = login(client, "dguard", "dguard");
         String clientToken = login(client, "client", "client");
         String superAdminToken = login(client, "admin", "admin");
+        long existingEncryptedUsers = userRepository.count();
         JsonNode adminAccounts = sendJson(client, "GET", "/api/admin-accounts", adminToken, "", 200);
         assertThat(adminAccounts.path("data")).anySatisfy(account -> {
             assertThat(account.path("loginId").asText()).isEqualTo("admin");
             assertThat(account.has("passwordHash")).isFalse();
             assertThat(account.has("passwordSalt")).isFalse();
         }).anySatisfy(account -> assertThat(account.path("loginId").asText()).isEqualTo("client"));
+        String clientAccountUid = findAccount(adminAccounts.path("data"), "client").path("userUid").asText();
+        sendJson(client, "PUT", "/api/admin-accounts/" + clientAccountUid, adminToken,
+                "{\"name\":\"클라이언트 사용자\",\"role\":\"ADMIN\"}", 403);
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         String email = "week3-" + suffix + "@example.com";
         String phone = "010-" + suffix.substring(0, 4).replaceAll("[^0-9]", "1")
@@ -112,7 +116,10 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(reEncrypted.getPhoneSearchHash()).isEqualTo(initialPhoneSearchHash);
 
         JsonNode managedUsers = sendJson(client, "GET", "/api/users/managed?page=0&size=100", adminToken, "", 200);
+        assertThat(managedUsers.path("data").path("totalElements").asLong())
+                .isEqualTo(adminAccounts.path("data").size() + existingEncryptedUsers + 1L);
         assertThat(managedUsers.path("data").path("content"))
+                .hasSize((int) managedUsers.path("data").path("totalElements").asLong())
                 .anySatisfy(account -> {
                     assertThat(account.path("loginId").asText()).isEqualTo("admin");
                     assertThat(account.path("role").asText()).isEqualTo("S.ADMIN");
@@ -193,7 +200,10 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(findUser(inactiveUsers.path("data").path("content"), userUid).path("integrityValid").asBoolean())
                 .isTrue();
 
-        JsonNode adminRoleUser = sendJson(client, "POST", "/api/users", adminToken, """
+        sendJson(client, "POST", "/api/users", adminToken, """
+                {"name":"관리권한사용자","phone":"010-6888-%s","email":"role-%s@example.com","password":"Role-Test-1234!","role":"ADMIN"}
+                """.formatted(numericSuffix(suffix), suffix), 403);
+        JsonNode adminRoleUser = sendJson(client, "POST", "/api/users", superAdminToken, """
                 {"name":"관리권한사용자","phone":"010-6888-%s","email":"role-%s@example.com","password":"Role-Test-1234!","role":"ADMIN"}
                 """.formatted(numericSuffix(suffix), suffix), 200);
         String adminRoleUserUid = adminRoleUser.path("data").path("userUid").asText();
@@ -288,6 +298,13 @@ class WeekThreeUserAuditIntegrationTests {
             if (userUid.toString().equals(user.path("userUid").asText())) return user;
         }
         throw new AssertionError("User not found in response: " + userUid);
+    }
+
+    private JsonNode findAccount(JsonNode content, String loginId) {
+        for (JsonNode account : content) {
+            if (loginId.equals(account.path("loginId").asText())) return account;
+        }
+        throw new AssertionError("Account not found in response: " + loginId);
     }
 
     private String login(HttpClient client, String loginId, String password) throws Exception {

@@ -9,7 +9,14 @@ SELECT
     current_setting('server_version') AS postgres_version,
     current_setting('TimeZone') AS timezone;
 
---2. app_user에 암호문·마스킹·검색 HMAC·Salt·행 HMAC 컬럼이 함께 있는지 확인
+--2. 사용자 저장소별 건수와 통합 사용자 수 확인
+--    웹의 /api/users/managed는 admin_user와 app_user를 중복 없이 합쳐 이 합계만큼 반환합니다.
+SELECT
+    (SELECT count(*) FROM admin_user) AS admin_accounts,
+    (SELECT count(*) FROM app_user) AS encrypted_users,
+    (SELECT count(*) FROM admin_user) + (SELECT count(*) FROM app_user) AS all_managed_users;
+
+--3. app_user에 암호문·마스킹·검색 HMAC·Salt·행 HMAC 컬럼이 함께 있는지 확인
 SELECT
     ordinal_position,
     column_name,
@@ -20,7 +27,7 @@ WHERE table_schema = 'public'
   AND table_name = 'app_user'
 ORDER BY ordinal_position;
 
---3. 최근 사용자 5건의 3가지 보호 상태 확인
+--4. 최근 사용자 5건의 3가지 보호 상태 확인
 --    1) 비밀번호: PBKDF2 해시+Salt  2) 개인정보: AES-GCM 암호문+IV
 --    3) 검색/행 무결성: HMAC-SHA256
 SELECT
@@ -48,7 +55,7 @@ FROM app_user
 ORDER BY created_at DESC
 LIMIT 5;
 
---4. 평문 개인정보·비밀번호 컬럼이 없는지 검증
+--5. 평문 개인정보·비밀번호 컬럼이 없는지 검증
 --    결과가 0행이면 password, phone, email, name 평문 컬럼이 없습니다.
 SELECT column_name
 FROM information_schema.columns
@@ -61,7 +68,7 @@ WHERE table_schema = 'public'
       'email', 'email_plain'
   );
 
---5. 비밀번호 Salt와 검색 HMAC의 사용자별 유일성 점검
+--6. 비밀번호 Salt와 검색 HMAC의 사용자별 유일성 점검
 --    duplicate_password_salts=0, duplicate_phone_search_hashes=0이 정상입니다.
 SELECT
     (SELECT count(*) FROM (
@@ -72,7 +79,7 @@ SELECT
     ) duplicated_phone_hashes) AS duplicate_phone_search_hashes,
     (SELECT count(*) FROM app_user) AS total_users;
 
---6. 최근 사용자 1건의 암호화 저장 정책을 평문 노출 없이 판정
+--7. 최근 사용자 1건의 암호화 저장 정책을 평문 노출 없이 판정
 --    네 결과가 모두 true이면 연락처 AES-GCM 저장과 PBKDF2+Salt 정책이 정상입니다.
 SELECT
     octet_length(phone_iv) = 12 AS random_gcm_iv_valid,
@@ -85,7 +92,7 @@ FROM app_user
 ORDER BY created_at DESC
 LIMIT 1;
 
---7. 최근 서비스 사용자의 등록·수정·상태·비밀번호·원문조회 감사 이력 확인
+--8. 최근 서비스 사용자의 등록·수정·상태·비밀번호·원문조회 감사 이력 확인
 WITH latest_user AS (
     SELECT user_uid::text AS target_id
     FROM app_user

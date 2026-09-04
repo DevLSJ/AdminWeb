@@ -97,6 +97,8 @@ public class AppUserService {
     public UserResponse create(UserCreateRequest request, String actor) {
         NormalizedPersonalData normalized = normalize(request.name(), request.phone(), request.email());
         String role = normalizeRole(request.role(), AppUser.CLIENT);
+        AdminUser authenticatedActor = actor(actor);
+        assertRoleAssignable(authenticatedActor, role);
         assertUnique(normalized, null);
         PasswordService.PasswordHash password = hashPassword(request.password());
         EncryptedValue encryptedName = encrypt(normalized.name());
@@ -129,9 +131,11 @@ public class AppUserService {
     public UserResponse update(UUID userUid, UserUpdateRequest request, String actor) {
         AppUser user = findForUpdate(userUid);
         assertIntegrity(user);
-        assertCanManage(actor(actor), user);
+        AdminUser authenticatedActor = actor(actor);
+        assertCanManage(authenticatedActor, user);
         NormalizedPersonalData normalized = normalize(request.name(), request.phone(), request.email());
         String role = normalizeRole(request.role(), user.getRole());
+        assertRoleAssignable(authenticatedActor, role);
         assertUnique(normalized, userUid);
         EncryptedValue encryptedName = encrypt(normalized.name());
         EncryptedValue encryptedPhone = encrypt(normalized.phone());
@@ -382,6 +386,12 @@ public class AppUserService {
         if ("S.ADMIN".equals(actor.getRole())) return;
         if ("ADMIN".equals(actor.getRole()) && AppUser.CLIENT.equals(target.getRole())) return;
         throw UserOperationException.forbidden("해당 사용자 계정을 관리할 권한이 없습니다.");
+    }
+
+    private void assertRoleAssignable(AdminUser actor, String role) {
+        if (AppUser.CLIENT.equals(role)) return;
+        if ("S.ADMIN".equals(actor.getRole()) && AppUser.ADMIN.equals(role)) return;
+        throw UserOperationException.forbidden("ADMIN 권한은 S.ADMIN만 부여할 수 있습니다.");
     }
 
     private String normalizeReason(String reason) {

@@ -229,7 +229,7 @@ docker start dguard-postgres
 | `SPRING_DATASOURCE_USERNAME` | DB 사용자 | `dguard` |
 | `SPRING_DATASOURCE_PASSWORD` | DB 비밀번호 | 필수 |
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL 정책 | 기본·운영 `validate`, local 프로필 `update` |
-| `KMS_MASTER_PASSPHRASE` | 마스터키 유도 패스프레이즈 | 필수, 20자 이상 |
+| `KMS_MASTER_PASSPHRASE` | 마스터키 유도 패스프레이즈 | 필수, UTF-8 32바이트 이상 |
 | `INTEGRITY_HMAC_KEY` | 무결성 HMAC 키 | 필수 |
 | `JWT_SECRET` | JWT 서명 키 | 필수 |
 | `KMS_PBKDF2_ITERATIONS` | 마스터키 PBKDF2 반복 횟수 | `210000` |
@@ -245,7 +245,7 @@ export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/dguard_kms
 export SPRING_DATASOURCE_USERNAME=dguard
 export SPRING_DATASOURCE_PASSWORD=dguard-local-password
 export SPRING_JPA_HIBERNATE_DDL_AUTO=update
-export KMS_MASTER_PASSPHRASE=local-master-passphrase-at-least-20-chars
+export KMS_MASTER_PASSPHRASE=local-master-passphrase-at-least-32-bytes
 export INTEGRITY_HMAC_KEY=local-integrity-hmac-key-at-least-32-chars
 export JWT_SECRET=local-jwt-secret-at-least-32-characters
 ```
@@ -348,7 +348,7 @@ docker exec -it dguard-db psql -U dguard -d dguard_kms -c \
 
 ```bash
 cd backend
-KMS_MASTER_PASSPHRASE=wrong-master-passphrase-at-least-20-chars ./gradlew bootRun
+KMS_MASTER_PASSPHRASE=wrong-master-passphrase-at-least-32-bytes ./gradlew bootRun
 ```
 
 로그에 아래 `ERROR` 메시지와 `Master key KCV verification failed` 예외가 출력되고 Spring Boot 기동이 중단되어야 합니다. 실제 패스프레이즈나 KCV 값은 로그에 출력되지 않습니다.

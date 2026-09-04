@@ -166,7 +166,7 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 
 최종 검증 결과는 다음과 같다.
 
-- 백엔드: `./gradlew clean test bootJar --no-daemon` 성공, 9개 테스트 클래스 23개 테스트, 실패/오류/skip 0건
+- 백엔드: `./gradlew clean test bootJar --no-daemon` 성공, 11개 테스트 클래스 27개 테스트, 실패/오류/skip 0건
 - 3주차 전용: `WeekThreeUserAuditIntegrationTests` 2개 시나리오와 `SensitiveDtoRedactionTests` 통과
 - 프론트: TypeScript `tsc -b`, Vite production build, oxlint 모두 성공
 - 실제 로컬 서버: Spring Boot `:18080`, Vite `:15173` 동시 기동 및 CORS 허용 출처 확인
@@ -314,3 +314,11 @@ CSV 내보내기는 서버 검색 조건을 그대로 사용하며 최대 10,000
 - `S.ADMIN`은 시스템 최고 관리자 계정 전용이며 등록·수정 선택지로 제공하지 않는다. ADMIN은 CLIENT 대상만 수정·원문조회·비밀번호 재설정·상태 변경할 수 있고, S.ADMIN은 ADMIN과 CLIENT 모두 관리할 수 있다. 이 규칙은 버튼 비활성화뿐 아니라 백엔드 서비스에서도 재검증한다.
 - V14에서 `admin/admin` 계정만 `S.ADMIN`으로 승격하고 그 외 `S.ADMIN`을 `ADMIN`으로 정규화한다. `ck_admin_user_super_admin_identity` 제약으로 다른 로그인 ID에는 최고관리자 권한을 저장할 수 없다.
 - app_user 행 HMAC 형식을 V2로 확장해 권한과 무결성 버전을 서명 대상에 포함한다. 기존 V1 행은 계속 검증하며 다음 정상 변경 시 V2로 승격한다.
+
+## 20. 3주차 최종 점검 보완 (2026-09-04)
+
+- 사용자 관리 화면과 `/api/users/managed`는 샘플 데이터를 만들지 않고 운영 DB의 `admin_user`와 `app_user` 실제 행을 모두 결합한다. 응답의 `totalElements`는 두 테이블의 합과 일치하며, 검색·상태 필터 뒤 서버 페이징을 적용한다.
+- 일반 `ADMIN`이 사용자 등록·수정 API를 직접 호출해 `ADMIN` 권한을 부여하는 우회 경로를 차단했다. `ADMIN` 역할 부여는 `S.ADMIN`만 가능하고, 일반 관리자는 `CLIENT`만 등록·관리한다.
+- 마스터 패스프레이즈 최소 길이를 문자 수가 아닌 UTF-8 바이트 기준 32바이트로 강제해 설정 설명과 실제 기동 검증을 일치시켰다.
+- 기간 감사 체인 검증에서 조회 구간이 비어 있더라도 구간 직전·직후 행과 체인 헤드를 비교한다. 따라서 선택 구간의 행이 모두 삭제된 경우에도 정상으로 오판하지 않는다.
+- Apidog용 OpenAPI 문서는 실행 중인 애플리케이션의 `/api/api-docs`에서 다시 생성하여 통합 사용자 목록, 원문 조회, 비밀번호·상태 변경, 감사 검색·검증·CSV API를 현재 코드와 동기화한다.

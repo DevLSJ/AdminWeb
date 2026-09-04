@@ -26,6 +26,22 @@ import com.ineb.dguard_kms.domain.config.repository.CryptoConfigRepository;
 class MasterKeyServiceKcvTests {
 
     @Test
+    void rejectsMasterPassphrasesShorterThan32Utf8Bytes() {
+        CryptoConfigRepository repository = mock(CryptoConfigRepository.class);
+        TransactionTemplate transactions = mock(TransactionTemplate.class);
+        MasterKeyService service = new MasterKeyService(
+                repository,
+                transactions,
+                new SecureRandom(),
+                environment("1234567890123456789012345678901")
+        );
+
+        assertThatThrownBy(service::initialize)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("at least 32 UTF-8 bytes");
+    }
+
+    @Test
     void rejectsAChangedPassphraseAgainstPersistedKcvAndLogsTheCause(CapturedOutput output) {
         AtomicReference<CryptoConfigEntry> persisted = new AtomicReference<>();
         CryptoConfigRepository repository = mock(CryptoConfigRepository.class);

@@ -131,7 +131,9 @@ public class AuditLogService {
                 : repository.findAllByOrderByIdAsc();
         List<UUID> invalid = new ArrayList<>();
         AuditLog previous = logs.isEmpty()
-                ? null
+                ? ranged
+                        ? repository.findTopByCreatedAtLessThanOrderByCreatedAtDescIdDesc(from).orElse(null)
+                        : null
                 : repository.findTopByIdLessThanOrderByIdDesc(logs.get(0).getId()).orElse(null);
         String expectedPreviousHash = previous == null ? null : previous.getRowHash();
         for (AuditLog log : logs) {
@@ -141,23 +143,26 @@ public class AuditLogService {
             expectedPreviousHash = log.getRowHash();
         }
 
-        boolean headValid = true;
-        if (!logs.isEmpty()) {
-            AuditLog last = logs.get(logs.size() - 1);
-            AuditLog next = repository.findTopByIdGreaterThanOrderByIdAsc(last.getId()).orElse(null);
-            if (next != null) {
-                // 기간의 마지막 행이 전체 체인의 중간에 있으면 다음 행과의 경계 연결까지 확인한다.
-                headValid = java.util.Objects.equals(last.getRowHash(), next.getPreviousHash());
-            } else {
-                String storedHead = chainHeadRepository.findById((short) 1)
-                        .map(AuditChainHead::getCurrentHash)
-                        .orElse(null);
-                headValid = java.util.Objects.equals(last.getRowHash(), storedHead);
-            }
+        AuditLog last = logs.isEmpty() ? previous : logs.get(logs.size() - 1);
+        AuditLog next = logs.isEmpty()
+                ? ranged
+                        ? repository.findTopByCreatedAtGreaterThanOrderByCreatedAtAscIdAsc(to).orElse(null)
+                        : null
+                : repository.findTopByIdGreaterThanOrderByIdAsc(last.getId()).orElse(null);
+        String lastHash = last == null ? null : last.getRowHash();
+        boolean headValid;
+        if (next != null) {
+            // 기간 안에 행이 없어도 직전·직후 연결을 비교해 통째로 삭제된 구간을 탐지한다.
+            headValid = java.util.Objects.equals(lastHash, next.getPreviousHash());
+        } else {
+            String storedHead = chainHeadRepository.findById((short) 1)
+                    .map(AuditChainHead::getCurrentHash)
+                    .orElse(null);
+            headValid = java.util.Objects.equals(lastHash, storedHead);
         }
         if (!headValid) {
-            UUID lastUid = logs.get(logs.size() - 1).getLogUid();
-            if (!invalid.contains(lastUid)) invalid.add(lastUid);
+            UUID boundaryUid = next != null ? next.getLogUid() : last == null ? null : last.getLogUid();
+            if (boundaryUid != null && !invalid.contains(boundaryUid)) invalid.add(boundaryUid);
         }
         return new AuditVerificationResponse(
                 invalid.isEmpty() && headValid,

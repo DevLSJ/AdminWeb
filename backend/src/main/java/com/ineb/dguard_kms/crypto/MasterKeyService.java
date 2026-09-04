@@ -57,14 +57,16 @@ public class MasterKeyService {
     @PostConstruct
     void initialize() {
         String configuredPassphrase = environment.getRequiredProperty("kms.master.passphrase");
+        byte[] passphraseBytes = configuredPassphrase.getBytes(StandardCharsets.UTF_8);
         char[] passphrase = configuredPassphrase.toCharArray();
         configuredPassphrase = null;
         try {
-            if (passphrase.length < 20) {
-                throw new IllegalStateException("KMS master passphrase must contain at least 20 characters");
+            if (passphraseBytes.length < 32) {
+                throw new IllegalStateException("KMS master passphrase must contain at least 32 UTF-8 bytes");
             }
             transactionTemplate.executeWithoutResult(status -> initializeInTransaction(passphrase));
         } finally {
+            Arrays.fill(passphraseBytes, (byte) 0);
             Arrays.fill(passphrase, '\0');
         }
     }

@@ -106,6 +106,7 @@ function UserList() {
   const emailValid = form.email.length <= 254 && emailPattern.test(form.email.trim())
   const passwordValid = form.password.length >= 8 && form.password.length <= 128
   const formValid = nameValid && phoneValid && emailValid && (Boolean(formUser) || passwordValid)
+  const canAssignAdmin = sessionUser?.role === 'S.ADMIN'
 
   const pathParts = location.pathname.split('/').filter(Boolean)
   const detailKind = pathParts[1]
@@ -364,7 +365,7 @@ function UserList() {
           <DialogContent>
             {!formUser && <Alert severity="info" sx={{ mt: 1, mb: 2 }}>연락처는 마스터키 AES-256-GCM으로 암호화하고, 비밀번호는 사용자별 Salt로 PBKDF2 해시한 뒤 저장합니다. S.ADMIN 권한은 시스템 최고 관리자 계정에만 유지됩니다.</Alert>}
             <Stack spacing={2} sx={{ mt: formUser ? 1 : 0 }}>
-              <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as EditableRole }))}><MenuItem value="ADMIN">ADMIN</MenuItem><MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>
+              <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as EditableRole }))}>{canAssignAdmin && <MenuItem value="ADMIN">ADMIN</MenuItem>}<MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>
               <TextField required label="이름" value={form.name} error={Boolean(form.name) && !nameValid} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} slotProps={{ htmlInput: { maxLength: 64 } }} helperText="1~64자" />
               <TextField required label="연락처" placeholder="010-1234-5678" value={form.phone} error={Boolean(form.phone) && !phoneValid} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} slotProps={{ htmlInput: { maxLength: 20, pattern: '[0-9+()\\-\\s]{9,20}' } }} helperText={form.phone && !phoneValid ? '숫자 9~15자리의 연락처 형식을 확인하세요.' : '마스터키 AES-256-GCM 암호화 · HMAC 정확 검색'} />
               <TextField required type="email" label="이메일" value={form.email} error={Boolean(form.email) && !emailValid} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} slotProps={{ htmlInput: { maxLength: 254 } }} helperText={form.email && !emailValid ? '올바른 이메일 형식을 입력하세요.' : '마스터키 AES-256-GCM 암호화 저장'} />
@@ -377,7 +378,7 @@ function UserList() {
 
       <Dialog open={adminEditOpen} onClose={() => setAdminEditOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>사용자 상세 수정</DialogTitle>
-        <DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="이름" value={adminName} onChange={(event) => setAdminName(event.target.value)} slotProps={{ htmlInput: { maxLength: 64 } }} />{managedAdmin?.role === 'S.ADMIN' ? <Alert severity="info">S.ADMIN은 시스템 최고 관리자 전용 권한으로 변경할 수 없습니다.</Alert> : <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={adminRole} onChange={(event) => setAdminRole(event.target.value as EditableRole)}><MenuItem value="ADMIN">ADMIN</MenuItem><MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>}</Stack></DialogContent>
+        <DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="이름" value={adminName} onChange={(event) => setAdminName(event.target.value)} slotProps={{ htmlInput: { maxLength: 64 } }} />{managedAdmin?.role === 'S.ADMIN' ? <Alert severity="info">S.ADMIN은 시스템 최고 관리자 전용 권한으로 변경할 수 없습니다.</Alert> : <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={adminRole} onChange={(event) => setAdminRole(event.target.value as EditableRole)}>{canAssignAdmin && <MenuItem value="ADMIN">ADMIN</MenuItem>}<MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>}</Stack></DialogContent>
         <DialogActions><Button onClick={() => setAdminEditOpen(false)}>취소</Button><Button variant="contained" disabled={!adminName.trim()} onClick={() => void saveManagedAdmin()}>저장</Button></DialogActions>
       </Dialog>
 

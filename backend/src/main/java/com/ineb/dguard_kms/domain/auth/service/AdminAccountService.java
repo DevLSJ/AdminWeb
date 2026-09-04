@@ -16,6 +16,7 @@ import com.ineb.dguard_kms.domain.auth.dto.AdminAccountResponse;
 import com.ineb.dguard_kms.domain.auth.dto.AdminAccountUpdateRequest;
 import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
 import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
+import com.ineb.dguard_kms.domain.user.service.UserOperationException;
 import com.ineb.dguard_kms.security.PasswordService;
 
 @Service
@@ -50,6 +51,7 @@ public class AdminAccountService {
         if ("S.ADMIN".equals(target.getRole()) && request.role() != null) {
             throw new IllegalArgumentException("S.ADMIN 권한은 시스템 최고 관리자 계정에 고정되어 변경할 수 없습니다.");
         }
+        assertRoleAssignable(actor, role);
         target.updateProfile(request.name().trim(), role);
         resign(target);
         repository.saveAndFlush(target);
@@ -100,5 +102,6 @@ public class AdminAccountService {
     private AdminUser requiredForUpdate(UUID uid) { return repository.findForUpdateByUserUid(uid).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "관리 계정을 찾을 수 없습니다.")); }
     private AdminUser actor(String loginId) { return repository.findByLoginId(loginId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED)); }
     private void assertCanManage(AdminUser actor, AdminUser target) { if ("S.ADMIN".equals(actor.getRole())) return; if ("ADMIN".equals(actor.getRole()) && "CLIENT".equals(target.getRole())) return; throw forbidden(); }
-    private ResponseStatusException forbidden() { return new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 계정을 관리할 권한이 없습니다."); }
+    private void assertRoleAssignable(AdminUser actor, String role) { if (!"ADMIN".equals(role) || "S.ADMIN".equals(actor.getRole())) return; throw forbidden(); }
+    private UserOperationException forbidden() { return UserOperationException.forbidden("해당 계정을 관리할 권한이 없습니다."); }
 }

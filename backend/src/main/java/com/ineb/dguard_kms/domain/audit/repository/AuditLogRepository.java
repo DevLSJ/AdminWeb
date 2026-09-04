@@ -19,6 +19,10 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSp
 
     Optional<AuditLog> findTopByIdGreaterThanOrderByIdAsc(Long id);
 
+    Optional<AuditLog> findTopByCreatedAtLessThanOrderByCreatedAtDescIdDesc(Instant createdAt);
+
+    Optional<AuditLog> findTopByCreatedAtGreaterThanOrderByCreatedAtAscIdAsc(Instant createdAt);
+
     List<AuditLog> findAllByOrderByIdAsc();
 
     List<AuditLog> findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByIdAsc(
