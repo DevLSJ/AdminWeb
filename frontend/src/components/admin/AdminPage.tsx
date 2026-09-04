@@ -10,6 +10,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import { PAGE_SIZE_OPTIONS } from './pagination'
 
 interface PageHeaderProps {
   title: string
@@ -82,7 +83,7 @@ export function PaginationBar({
               aria-label="페이지당 행 수"
               sx={{ fontSize: 14 }}
             >
-              {[5, 10, 20].map((option) => (
+              {PAGE_SIZE_OPTIONS.map((option) => (
                 <MenuItem key={option} value={option}>
                   {option}개씩
                 </MenuItem>

@@ -36,6 +36,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { alpha } from '@mui/material/styles'
 import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { KeyLifecycleGuide } from '../../components/keys/KeyLifecycleGuide'
 import { useAuth } from '../../hooks/useAuth'
@@ -56,7 +57,7 @@ const defaultParams: KeyListParams = {
   category: 'ALL',
   expiringWithinDays: null,
   page: 0,
-  size: 20,
+  size: 10,
   sort: 'createdAt,desc',
 }
 
@@ -86,7 +87,7 @@ function initialParamsFrom(searchParams: URLSearchParams): KeyListParams {
     purpose: purposeOptions.includes(purpose as KeyListParams['purpose']) ? purpose as KeyListParams['purpose'] : 'ALL',
     expiringWithinDays: Number.isInteger(requestedDays) && requestedDays >= 1 && requestedDays <= 3650 ? requestedDays : null,
     page: Number.isInteger(requestedPage) && requestedPage >= 0 ? requestedPage : 0,
-    size: [20, 50, 100].includes(requestedSize) ? requestedSize : 20,
+    size: [10, 20, 30].includes(requestedSize) ? requestedSize : 10,
     sort: ['createdAt,desc', 'createdAt,asc', 'expireAt,asc', 'keyName,asc'].includes(requestedSort ?? '') ? requestedSort! : defaultParams.sort,
   }
 }
@@ -259,9 +260,9 @@ function KeyList() {
       </FilterCard>
 
       <Card sx={{ overflow: 'hidden' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack><FormControl size="small" sx={{ minWidth: 128 }}><Select value={params.size} onChange={(event) => updateParam('size', Number(event.target.value))} inputProps={{ 'aria-label': '키 목록 페이지당 개수' }}>{[20, 50, 100].map((size) => <MenuItem key={size} value={size}>{size}개씩 보기</MenuItem>)}</Select></FormControl></Box>
-        <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)', minHeight: 360 }}>
-          <Table stickyHeader size="small" sx={{ minWidth: 1180, '& .MuiTableCell-root': { px: 1.25, py: 0.72 }, '& .MuiTableCell-head': { py: 0.9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '0.02em' } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack></Box>
+        <TableContainer sx={paginatedTableContainerSx(params.size)}>
+          <Table stickyHeader size="small" sx={{ minWidth: 1180, '& .MuiTableCell-root': { px: 1.25, ...paginatedTableCellSx(params.size) }, '& .MuiTableCell-head': { py: 0.9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '0.02em' } }}>
             <TableHead><TableRow><TableCell>키 이름 / UID</TableCell><TableCell>알고리즘·모드</TableCell><TableCell>용도</TableCell><TableCell>상태</TableCell><TableCell>버전</TableCell><TableCell>자동 갱신</TableCell><TableCell>만료일</TableCell><TableCell>무결성</TableCell><TableCell align="right">관리</TableCell></TableRow></TableHead>
             <TableBody>
               {pageContent.map((key) => (
@@ -281,7 +282,7 @@ function KeyList() {
             </TableBody>
           </Table>
         </TableContainer>
-        <PaginationBar page={params.page} size={params.size} totalElements={totalElements} onPageChange={(page) => updateParam('page', page)} />
+        <PaginationBar page={params.page} size={params.size} totalElements={totalElements} onPageChange={(page) => updateParam('page', page)} onSizeChange={(size) => updateParam('size', size)} />
       </Card>
 
       <Dialog open={lifecycleOpen} onClose={() => setLifecycleOpen(false)} fullWidth maxWidth="md">

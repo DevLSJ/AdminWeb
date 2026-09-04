@@ -2277,6 +2277,16 @@
           "role": {
             "type": "string",
             "pattern": "ADMIN|CLIENT"
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "[0-9+()\\-\\s]{9,20}"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "minLength": 0
           }
         },
         "required": [
@@ -2294,6 +2304,12 @@
             "type": "string"
           },
           "name": {
+            "type": "string"
+          },
+          "phoneMasked": {
+            "type": "string"
+          },
+          "emailMasked": {
             "type": "string"
           },
           "role": {

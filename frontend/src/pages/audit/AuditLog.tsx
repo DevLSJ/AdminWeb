@@ -29,6 +29,7 @@ import {
 } from '@mui/material'
 import { exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogEntry, verifyAuditLogs } from '../../api/kms'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import type { AuditAction, AuditEntryVerification, AuditListParams, AuditLog as AuditLogType, AuditVerification, PageResponse } from '../../types/api'
 
@@ -213,8 +214,8 @@ function AuditLog() {
       </FilterCard>
 
       <Card>
-        <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
-          <Table stickyHeader size="small" sx={{ minWidth: 920, tableLayout: 'fixed', '& th, & td': { verticalAlign: 'middle' } }}>
+        <TableContainer sx={paginatedTableContainerSx(params.size, 390)}>
+          <Table stickyHeader size="small" sx={{ minWidth: 920, tableLayout: 'fixed', '& th, & td': { verticalAlign: 'middle', ...paginatedTableCellSx(params.size) }, '& th': { py: 0.9 } }}>
             <TableHead><TableRow><TableCell sx={{ width: '17%' }}>시각 (KST)</TableCell><TableCell sx={{ width: '11%' }}>행위자</TableCell><TableCell sx={{ width: '19%' }}>행위</TableCell><TableCell sx={{ width: '15%' }}>대상 유형</TableCell><TableCell sx={{ width: '28%' }}>설명</TableCell><TableCell align="center" sx={{ width: '10%' }}>행 HMAC</TableCell></TableRow></TableHead>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={6} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}

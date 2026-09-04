@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.ineb.dguard_kms.domain.audit.repository.AuditLogRepository;
+import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
 import com.ineb.dguard_kms.domain.user.repository.AppUserRepository;
 import com.ineb.dguard_kms.security.PasswordService;
 
@@ -45,6 +46,9 @@ class WeekThreeUserAuditIntegrationTests {
     private AppUserRepository userRepository;
 
     @Autowired
+    private AdminUserRepository adminUserRepository;
+
+    @Autowired
     private AuditLogRepository auditLogRepository;
 
     @Autowired
@@ -66,6 +70,21 @@ class WeekThreeUserAuditIntegrationTests {
         String clientAccountUid = findAccount(adminAccounts.path("data"), "client").path("userUid").asText();
         sendJson(client, "PUT", "/api/admin-accounts/" + clientAccountUid, adminToken,
                 "{\"name\":\"클라이언트 사용자\",\"role\":\"ADMIN\"}", 403);
+        String adminPhone = "010-5555-7777";
+        String adminEmail = "managed-client@example.com";
+        JsonNode updatedAdmin = sendJson(client, "PUT", "/api/admin-accounts/" + clientAccountUid, adminToken, """
+                {"name":"클라이언트 사용자","role":"CLIENT","phone":"%s","email":"%s"}
+                """.formatted(adminPhone, adminEmail), 200);
+        assertThat(updatedAdmin.path("data").path("phoneMasked").asText()).isEqualTo("010-****-7777");
+        assertThat(updatedAdmin.path("data").path("emailMasked").asText()).isEqualTo("ma***@example.com");
+        assertThat(updatedAdmin.path("data").has("phone")).isFalse();
+        assertThat(updatedAdmin.path("data").has("email")).isFalse();
+        var storedAdmin = adminUserRepository.findByUserUid(UUID.fromString(clientAccountUid)).orElseThrow();
+        assertThat(storedAdmin.getPhoneIv()).hasSize(12);
+        assertThat(storedAdmin.getEmailIv()).hasSize(12);
+        assertThat(new String(storedAdmin.getPhoneCiphertext(), StandardCharsets.UTF_8)).doesNotContain(adminPhone);
+        assertThat(new String(storedAdmin.getEmailCiphertext(), StandardCharsets.UTF_8)).doesNotContain(adminEmail);
+        assertThat(storedAdmin.getIntegrityHash()).isNotBlank();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         String email = "week3-" + suffix + "@example.com";
         String phone = "010-" + suffix.substring(0, 4).replaceAll("[^0-9]", "1")
@@ -127,6 +146,8 @@ class WeekThreeUserAuditIntegrationTests {
                 .anySatisfy(account -> {
                     assertThat(account.path("loginId").asText()).isEqualTo("client");
                     assertThat(account.path("role").asText()).isEqualTo("CLIENT");
+                    assertThat(account.path("phoneMasked").asText()).isEqualTo("010-****-7777");
+                    assertThat(account.path("emailMasked").asText()).isEqualTo("ma***@example.com");
                 })
                 .anySatisfy(account -> {
                     assertThat(account.path("loginId").asText()).isEqualTo("dguard");

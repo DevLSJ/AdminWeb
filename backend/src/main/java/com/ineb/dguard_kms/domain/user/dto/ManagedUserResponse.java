@@ -21,7 +21,8 @@ public record ManagedUserResponse(
 ) {
     public static ManagedUserResponse from(AdminAccountResponse account) {
         return new ManagedUserResponse(
-                "ADMIN_ACCOUNT", account.userUid(), account.loginId(), account.name(), null, null,
+                "ADMIN_ACCOUNT", account.userUid(), account.loginId(), account.name(),
+                account.phoneMasked(), account.emailMasked(),
                 account.role(), account.status(), account.integrityValid(), account.createdAt(),
                 account.updatedAt(), account.lastLoginAt()
         );

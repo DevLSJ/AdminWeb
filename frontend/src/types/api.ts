@@ -192,6 +192,8 @@ export interface AdminAccount {
   userUid: string
   loginId: string
   name: string
+  phoneMasked: string | null
+  emailMasked: string | null
   role: UserRole
   status: UserStatus
   integrityValid: boolean

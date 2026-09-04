@@ -1,6 +1,7 @@
 package com.ineb.dguard_kms.domain.auth.entity;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -40,6 +41,27 @@ public class AdminUser {
 
     @Column(nullable = false, length = 64)
     private String name;
+
+    @Column(name = "phone_ciphertext", columnDefinition = "bytea")
+    private byte[] phoneCiphertext;
+
+    @Column(name = "phone_iv", columnDefinition = "bytea")
+    private byte[] phoneIv;
+
+    @Column(name = "phone_masked", length = 32)
+    private String phoneMasked;
+
+    @Column(name = "email_ciphertext", columnDefinition = "bytea")
+    private byte[] emailCiphertext;
+
+    @Column(name = "email_iv", columnDefinition = "bytea")
+    private byte[] emailIv;
+
+    @Column(name = "email_masked", length = 256)
+    private String emailMasked;
+
+    @Column(name = "contact_enc_ver")
+    private Integer contactEncryptionVersion;
 
     @Column(nullable = false, length = 32)
     private String role;
@@ -123,6 +145,14 @@ public class AdminUser {
         return name;
     }
 
+    public byte[] getPhoneCiphertext() { return copy(phoneCiphertext); }
+    public byte[] getPhoneIv() { return copy(phoneIv); }
+    public String getPhoneMasked() { return phoneMasked; }
+    public byte[] getEmailCiphertext() { return copy(emailCiphertext); }
+    public byte[] getEmailIv() { return copy(emailIv); }
+    public String getEmailMasked() { return emailMasked; }
+    public Integer getContactEncryptionVersion() { return contactEncryptionVersion; }
+
     public String getRole() {
         return role;
     }
@@ -140,6 +170,18 @@ public class AdminUser {
     }
 
     public void updateProfile(String name, String role) { this.name = name; this.role = role; }
+    public void replacePhone(byte[] ciphertext, byte[] iv, String masked) {
+        this.phoneCiphertext = copy(ciphertext);
+        this.phoneIv = copy(iv);
+        this.phoneMasked = masked;
+        this.contactEncryptionVersion = 1;
+    }
+    public void replaceEmail(byte[] ciphertext, byte[] iv, String masked) {
+        this.emailCiphertext = copy(ciphertext);
+        this.emailIv = copy(iv);
+        this.emailMasked = masked;
+        this.contactEncryptionVersion = 1;
+    }
     public void changeStatus(String status) { this.status = status; }
     public void replacePassword(String hash, String salt, String algorithm, int iterations) {
         this.passwordHash = hash;
@@ -154,4 +196,8 @@ public class AdminUser {
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getLastLoginAt() { return lastLoginAt; }
     public String getIntegrityHash() { return integrityHash; }
+
+    private byte[] copy(byte[] value) {
+        return value == null ? null : Arrays.copyOf(value, value.length);
+    }
 }

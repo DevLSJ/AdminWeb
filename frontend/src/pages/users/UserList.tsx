@@ -96,6 +96,8 @@ function UserList() {
   const [managedAppUser, setManagedAppUser] = useState<AppUser | null>(null)
   const [adminName, setAdminName] = useState('')
   const [adminRole, setAdminRole] = useState<EditableRole>('CLIENT')
+  const [adminPhone, setAdminPhone] = useState('')
+  const [adminEmail, setAdminEmail] = useState('')
   const [adminEditOpen, setAdminEditOpen] = useState(false)
   const [adminPasswordOpen, setAdminPasswordOpen] = useState(false)
   const [managedPassword, setManagedPassword] = useState('')
@@ -107,6 +109,9 @@ function UserList() {
   const passwordValid = form.password.length >= 8 && form.password.length <= 128
   const formValid = nameValid && phoneValid && emailValid && (Boolean(formUser) || passwordValid)
   const canAssignAdmin = sessionUser?.role === 'S.ADMIN'
+  const adminPhoneDigits = adminPhone.replace(/\D/g, '')
+  const adminPhoneValid = !adminPhone || (phonePattern.test(adminPhone) && adminPhoneDigits.length >= 9 && adminPhoneDigits.length <= 15)
+  const adminEmailValid = !adminEmail || (adminEmail.length <= 254 && emailPattern.test(adminEmail.trim()))
 
   const pathParts = location.pathname.split('/').filter(Boolean)
   const detailKind = pathParts[1]
@@ -227,6 +232,8 @@ function UserList() {
   const openAdminEdit = () => {
     if (!managedAdmin) return
     setAdminName(managedAdmin.name)
+    setAdminPhone('')
+    setAdminEmail('')
     if (managedAdmin.role !== 'S.ADMIN') setAdminRole(managedAdmin.role)
     setAdminEditOpen(true)
   }
@@ -234,10 +241,15 @@ function UserList() {
   const saveManagedAdmin = async () => {
     if (!managedAdmin || !canManageAdmin(managedAdmin)) return
     try {
-      const updated = await updateAdminAccount(managedAdmin.userUid, { name: adminName.trim(), role: managedAdmin.role === 'S.ADMIN' ? null : adminRole })
+      const updated = await updateAdminAccount(managedAdmin.userUid, {
+        name: adminName.trim(),
+        role: managedAdmin.role === 'S.ADMIN' ? null : adminRole,
+        phone: adminPhone.trim() || null,
+        email: adminEmail.trim() || null,
+      })
       setManagedAdmin(updated)
       setAdminEditOpen(false)
-      setMessage('관리 계정 이름과 권한을 서버 DB에 반영했습니다.')
+      setMessage('관리 계정 정보와 AES-256-GCM 암호화 연락처를 서버 DB에 반영했습니다.')
       await loadUsers(params)
     } catch (requestError) { setError(getApiErrorMessage(requestError, '관리 계정을 수정하지 못했습니다.')) }
   }
@@ -285,7 +297,7 @@ function UserList() {
         {managedAdmin && !loading && (
           <Card className="section-card">
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">사용자 정보 및 제어</Typography><StatusBadge dot label={managedAdmin.integrityValid ? '정상' : '비정상'} tone={managedAdmin.integrityValid ? 'positive' : 'danger'} minWidth={0} /></Box>
-            <Box sx={{ p: 2.5 }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))' }, columnGap: 3 }}><InfoRow label="이름" value={managedAdmin.name} /><InfoRow label="로그인 ID" value={managedAdmin.loginId} /><InfoRow label="권한" value={managedAdmin.role} /><InfoRow label="상태" value={<StatusBadge dot status={managedAdmin.status} minWidth={0} />} /><InfoRow label="등록일" value={formatKst(managedAdmin.createdAt)} /><InfoRow label="최근 접속일" value={managedAdmin.lastLoginAt ? formatKst(managedAdmin.lastLoginAt) : '접속 이력 없음'} /></Box>{!accountManageable && <Alert severity="info" sx={{ mt: 2 }}>ADMIN은 CLIENT 계정만 수정할 수 있으며 S.ADMIN은 모든 계정을 관리할 수 있습니다.</Alert>}<Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)' }, gap: 1, mt: 2 }}><Button variant="contained" startIcon={<EditRounded />} disabled={!managedAdmin.integrityValid || !accountManageable} onClick={openAdminEdit}>상세 수정</Button><Button variant="outlined" startIcon={<VisibilityRounded />} disabled>개인정보 원문 조회</Button><Button variant="outlined" startIcon={<LockResetRounded />} disabled={!managedAdmin.integrityValid || !accountManageable} onClick={() => { setManagedPassword(''); setAdminPasswordOpen(true) }}>비밀번호 재설정</Button><Button variant="outlined" color={managedAdmin.status === 'ACTIVE' ? 'error' : 'primary'} disabled={!managedAdmin.integrityValid || !accountManageable || sessionUser?.loginId === managedAdmin.loginId} onClick={() => void toggleManagedAdminStatus()}>{managedAdmin.status === 'ACTIVE' ? '사용자 정지' : '사용자 활성화'}</Button></Box></Box>
+            <Box sx={{ p: 2.5 }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))' }, columnGap: 3 }}><InfoRow label="이름" value={managedAdmin.name} /><InfoRow label="로그인 ID" value={managedAdmin.loginId} /><InfoRow label="권한" value={managedAdmin.role} /><InfoRow label="상태" value={<StatusBadge dot status={managedAdmin.status} minWidth={0} />} /><InfoRow label="연락처" value={managedAdmin.phoneMasked ?? '미등록'} /><InfoRow label="이메일" value={managedAdmin.emailMasked ?? '미등록'} /><InfoRow label="등록일" value={formatKst(managedAdmin.createdAt)} /><InfoRow label="최근 접속일" value={managedAdmin.lastLoginAt ? formatKst(managedAdmin.lastLoginAt) : '접속 이력 없음'} /></Box>{!accountManageable && <Alert severity="info" sx={{ mt: 2 }}>ADMIN은 CLIENT 계정만 수정할 수 있으며 S.ADMIN은 모든 계정을 관리할 수 있습니다.</Alert>}<Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)' }, gap: 1, mt: 2 }}><Button variant="contained" startIcon={<EditRounded />} disabled={!managedAdmin.integrityValid || !accountManageable} onClick={openAdminEdit}>상세 수정</Button><Button variant="outlined" startIcon={<VisibilityRounded />} disabled>개인정보 원문 조회</Button><Button variant="outlined" startIcon={<LockResetRounded />} disabled={!managedAdmin.integrityValid || !accountManageable} onClick={() => { setManagedPassword(''); setAdminPasswordOpen(true) }}>비밀번호 재설정</Button><Button variant="outlined" color={managedAdmin.status === 'ACTIVE' ? 'error' : 'primary'} disabled={!managedAdmin.integrityValid || !accountManageable || sessionUser?.loginId === managedAdmin.loginId} onClick={() => void toggleManagedAdminStatus()}>{managedAdmin.status === 'ACTIVE' ? '사용자 정지' : '사용자 활성화'}</Button></Box></Box>
           </Card>
         )}
         {managedAppUser && !loading && (
@@ -376,10 +388,10 @@ function UserList() {
         </Box>
       </Dialog>
 
-      <Dialog open={adminEditOpen} onClose={() => setAdminEditOpen(false)} fullWidth maxWidth="xs">
+      <Dialog open={adminEditOpen} onClose={() => setAdminEditOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>사용자 상세 수정</DialogTitle>
-        <DialogContent><Stack spacing={2} sx={{ mt: 1 }}><TextField required label="이름" value={adminName} onChange={(event) => setAdminName(event.target.value)} slotProps={{ htmlInput: { maxLength: 64 } }} />{managedAdmin?.role === 'S.ADMIN' ? <Alert severity="info">S.ADMIN은 시스템 최고 관리자 전용 권한으로 변경할 수 없습니다.</Alert> : <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={adminRole} onChange={(event) => setAdminRole(event.target.value as EditableRole)}>{canAssignAdmin && <MenuItem value="ADMIN">ADMIN</MenuItem>}<MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>}</Stack></DialogContent>
-        <DialogActions><Button onClick={() => setAdminEditOpen(false)}>취소</Button><Button variant="contained" disabled={!adminName.trim()} onClick={() => void saveManagedAdmin()}>저장</Button></DialogActions>
+        <DialogContent><Alert severity="info" sx={{ mt: 1, mb: 2 }}>새 연락처·이메일을 입력하면 AES-256-GCM으로 암호화됩니다. 비워 두면 기존 값을 유지합니다.</Alert><Stack spacing={2}><TextField required label="이름" value={adminName} onChange={(event) => setAdminName(event.target.value)} slotProps={{ htmlInput: { maxLength: 64 } }} />{managedAdmin?.role === 'S.ADMIN' ? <Alert severity="info">S.ADMIN은 시스템 최고 관리자 전용 권한으로 변경할 수 없습니다.</Alert> : <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={adminRole} onChange={(event) => setAdminRole(event.target.value as EditableRole)}>{canAssignAdmin && <MenuItem value="ADMIN">ADMIN</MenuItem>}<MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>}<TextField label="새 연락처" placeholder={managedAdmin?.phoneMasked ?? '010-1234-5678'} value={adminPhone} error={!adminPhoneValid} onChange={(event) => setAdminPhone(event.target.value)} slotProps={{ htmlInput: { maxLength: 20 } }} helperText={adminPhone && !adminPhoneValid ? '숫자 9~15자리의 연락처 형식을 확인하세요.' : `현재 ${managedAdmin?.phoneMasked ?? '미등록'} · 비우면 유지`} /><TextField type="email" label="새 이메일" placeholder={managedAdmin?.emailMasked ?? 'user@example.com'} value={adminEmail} error={!adminEmailValid} onChange={(event) => setAdminEmail(event.target.value)} slotProps={{ htmlInput: { maxLength: 254 } }} helperText={adminEmail && !adminEmailValid ? '올바른 이메일 형식을 입력하세요.' : `현재 ${managedAdmin?.emailMasked ?? '미등록'} · 비우면 유지`} /></Stack></DialogContent>
+        <DialogActions><Button onClick={() => setAdminEditOpen(false)}>취소</Button><Button variant="contained" disabled={!adminName.trim() || !adminPhoneValid || !adminEmailValid} onClick={() => void saveManagedAdmin()}>암호화 저장</Button></DialogActions>
       </Dialog>
 
       <Dialog open={adminPasswordOpen} onClose={() => setAdminPasswordOpen(false)} fullWidth maxWidth="xs">

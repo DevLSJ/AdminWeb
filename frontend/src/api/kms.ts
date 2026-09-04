@@ -193,7 +193,7 @@ export async function fetchAdminAccount(userUid: string) {
   return unwrap(await apiClient.get<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.detail(userUid)))
 }
 
-export async function updateAdminAccount(userUid: string, request: { name: string; role: 'ADMIN' | 'CLIENT' | null }) {
+export async function updateAdminAccount(userUid: string, request: { name: string; role: 'ADMIN' | 'CLIENT' | null; phone: string | null; email: string | null }) {
   return unwrap(await apiClient.put<ApiResponse<AdminAccount>>(apiEndpoints.adminAccounts.update(userUid), request))
 }
 

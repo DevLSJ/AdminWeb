@@ -38,13 +38,14 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TablePagination,
   TableRow,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
+import { PaginationBar } from '../../src/components/admin/AdminPage'
+import { paginatedTableCellSx, paginatedTableContainerSx } from '../../src/components/admin/pagination'
 import { StatusBadge } from '../../src/components/common/StatusBadge'
 import { apiRecentActivitySource } from './apiData'
 import type {
@@ -291,8 +292,8 @@ export function RecentActivityPage({
 
       <Card sx={{ mt: 2, overflow: 'hidden' }}>
         <Box sx={{ px: 1.75, py: .8, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>최근 활동 {data.totalElements.toLocaleString()}건</Typography></Box>
-        <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)', minHeight: 360 }}>
-          <Table stickyHeader size="small" aria-label="내 최근 활동 목록" className="dense-data-table" sx={{ minWidth: 920, '& .MuiTableCell-root': { px: 1.25, py: .72 }, '& .MuiTableCell-head': { py: .9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '.02em' } }}>
+        <TableContainer sx={paginatedTableContainerSx(rowsPerPage)}>
+          <Table stickyHeader size="small" aria-label="내 최근 활동 목록" className="dense-data-table" sx={{ minWidth: 920, '& .MuiTableCell-root': { px: 1.25, ...paginatedTableCellSx(rowsPerPage) }, '& .MuiTableCell-head': { py: .9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '.02em' } }}>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f7f8fb' }}>
                 <TableCell>일시</TableCell>
@@ -352,20 +353,12 @@ export function RecentActivityPage({
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={data.totalElements}
+        <PaginationBar
           page={page}
-          rowsPerPage={rowsPerPage}
-          rowsPerPageOptions={[5, 10, 20]}
-          labelRowsPerPage="페이지당 행"
-          labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}건`}
-          onPageChange={(_event, nextPage) => setPage(nextPage)}
-          onRowsPerPageChange={(event) => {
-            setRowsPerPage(Number(event.target.value))
-            setPage(0)
-          }}
-          sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+          size={rowsPerPage}
+          totalElements={data.totalElements}
+          onPageChange={setPage}
+          onSizeChange={(size) => { setRowsPerPage(size); setPage(0) }}
         />
       </Card>
     </Box>
