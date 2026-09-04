@@ -332,7 +332,7 @@ function UserList() {
         <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {pageData.totalElements.toLocaleString()}명</Typography></Box>
         <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
           <Table stickyHeader size="small" sx={{ minWidth: 1080, tableLayout: 'fixed' }}>
-            <TableHead><TableRow><TableCell sx={{ width: '17%' }}>사용자</TableCell><TableCell sx={{ width: '13%' }}>연락처</TableCell><TableCell sx={{ width: '18%' }}>이메일</TableCell><TableCell sx={{ width: '9%' }}>권한</TableCell><TableCell sx={{ width: '9%' }}>상태</TableCell><TableCell sx={{ width: '10%' }}>무결성</TableCell><TableCell sx={{ width: '11%' }}>등록일</TableCell><TableCell align="right" sx={{ width: '13%' }}>최근 접속일</TableCell></TableRow></TableHead>
+            <TableHead><TableRow><TableCell sx={{ width: '17%' }}>사용자</TableCell><TableCell sx={{ width: '13%' }}>연락처</TableCell><TableCell sx={{ width: '18%' }}>이메일</TableCell><TableCell sx={{ width: '9%' }}>권한</TableCell><TableCell sx={{ width: '9%' }}>상태</TableCell><TableCell sx={{ width: '10%' }}>무결성</TableCell><TableCell sx={{ width: '11%' }}>등록일</TableCell><TableCell align="center" sx={{ width: '13%' }}>최근 접속일</TableCell></TableRow></TableHead>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={8} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
               {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={8} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
@@ -347,7 +347,7 @@ function UserList() {
                     <TableCell><StatusBadge dot status={user.status} /></TableCell>
                     <TableCell><StatusBadge dot label={user.integrityValid ? '정상' : '비정상'} tone={user.integrityValid ? 'positive' : 'danger'} minWidth={0} /></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatKst(user.createdAt).slice(0, 13)}</TableCell>
-                    <TableCell align="right" sx={{ color: user.lastLoginAt ? 'text.secondary' : 'text.disabled' }}>{user.lastLoginAt ? formatKst(user.lastLoginAt) : '—'}</TableCell>
+                    <TableCell align="center" sx={{ color: user.lastLoginAt ? 'text.secondary' : 'text.disabled' }}>{user.lastLoginAt ? formatKst(user.lastLoginAt) : '—'}</TableCell>
                   </TableRow>
                 )
               })}

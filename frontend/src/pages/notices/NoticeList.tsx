@@ -144,16 +144,16 @@ function NoticeList() {
       <Card className="section-card" sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden', borderRadius: '2px !important' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: .8, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>공지사항 {totalElements.toLocaleString()}건</Typography></Box>
         <TableContainer sx={{ width: '100%', maxWidth: '100%', overflowX: 'auto', ...paginatedTableContainerSx(params.size) }}>
-          <Table stickyHeader size="small" className="dense-data-table" sx={{ width: '100%', minWidth: 820, tableLayout: 'fixed', '& .MuiTableCell-root': { px: 1.25, overflow: 'hidden', ...paginatedTableCellSx(params.size) }, '& .MuiTableCell-head': { py: .9, bgcolor: 'background.paper', fontSize: 12 } }}>
-            <TableHead><TableRow><TableCell sx={{ width: '38%' }}>제목</TableCell><TableCell sx={{ width: 90 }}>첨부</TableCell><TableCell sx={{ width: 90 }}>노출</TableCell><TableCell sx={{ width: 150 }}>작성자</TableCell><TableCell sx={{ width: 110 }}>등록일</TableCell><TableCell sx={{ width: 80 }} align="right">조회수</TableCell></TableRow></TableHead>
+          <Table stickyHeader size="small" className="dense-data-table" sx={{ width: '100%', minWidth: 960, tableLayout: 'fixed', '& .MuiTableCell-root': { px: 1.5, overflow: 'hidden', fontSize: 13.25, ...paginatedTableCellSx(params.size) }, '& .MuiTableCell-head': { py: 1, bgcolor: 'background.paper', fontSize: 13, fontWeight: 800 } }}>
+            <TableHead><TableRow><TableCell sx={{ width: '42%' }}>제목</TableCell><TableCell sx={{ width: 105 }}>첨부</TableCell><TableCell sx={{ width: 105 }}>노출</TableCell><TableCell sx={{ width: 170 }}>작성자</TableCell><TableCell sx={{ width: 130 }}>등록일</TableCell><TableCell sx={{ width: 100 }} align="center">조회수</TableCell></TableRow></TableHead>
             <TableBody>{notices.map((notice) => (
               <TableRow key={notice.noticeUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer' }} onClick={() => openDetail(notice)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(notice) }}>
-                <TableCell><Typography sx={{ fontWeight: 750, fontSize: 12.75 }}>{notice.title}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.5 }}>{notice.noticeUid}</Typography></TableCell>
+                <TableCell><Typography sx={{ fontWeight: 750, fontSize: 13.5 }}>{notice.title}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 11 }}>{notice.noticeUid}</Typography></TableCell>
                 <TableCell><Stack direction="row" spacing={.65} sx={{ alignItems: 'center', color: notice.files.length ? 'primary.main' : 'text.disabled' }}><AttachFileRounded sx={{ fontSize: 17 }} /><Typography sx={{ fontSize: 12.5, fontWeight: 750 }}>{notice.files.length}개</Typography></Stack></TableCell>
                 <TableCell><StatusBadge dot status={notice.exposeYn} label={notice.exposeYn === 'Y' ? '노출' : '숨김'} minWidth={0} /></TableCell>
-                <TableCell><Stack direction="row" spacing={.8} sx={{ alignItems: 'center' }}><Avatar sx={{ width: 27, height: 27, bgcolor: '#e8efff', color: '#1f5ed7', fontSize: 11.5, fontWeight: 850 }}>{notice.createdBy.slice(0, 1).toUpperCase()}</Avatar><Typography sx={{ fontSize: 12.5, fontWeight: 650 }}>{notice.createdBy}</Typography></Stack></TableCell>
-                <TableCell><Typography sx={{ color: 'text.secondary', fontSize: 11.25 }}>{notice.createdAt.split('T')[0]}</Typography></TableCell>
-                <TableCell align="right" sx={{ fontWeight: 800 }}>{notice.viewCount.toLocaleString()}</TableCell>
+                <TableCell><Stack direction="row" spacing={.8} sx={{ alignItems: 'center' }}><Avatar sx={{ width: 29, height: 29, bgcolor: '#e8efff', color: '#1f5ed7', fontSize: 12, fontWeight: 850 }}>{notice.createdBy.slice(0, 1).toUpperCase()}</Avatar><Typography sx={{ fontSize: 13.25, fontWeight: 650 }}>{notice.createdBy}</Typography></Stack></TableCell>
+                <TableCell><Typography sx={{ color: 'text.secondary', fontSize: 12.25 }}>{notice.createdAt.split('T')[0]}</Typography></TableCell>
+                <TableCell align="center" sx={{ fontSize: 13.5, fontWeight: 800 }}>{notice.viewCount.toLocaleString()}</TableCell>
               </TableRow>
             ))}</TableBody>
           </Table>

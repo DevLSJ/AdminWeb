@@ -293,14 +293,14 @@ export function RecentActivityPage({
       <Card sx={{ mt: 2, overflow: 'hidden' }}>
         <Box sx={{ px: 1.75, py: .8, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>최근 활동 {data.totalElements.toLocaleString()}건</Typography></Box>
         <TableContainer sx={paginatedTableContainerSx(rowsPerPage)}>
-          <Table stickyHeader size="small" aria-label="내 최근 활동 목록" className="dense-data-table" sx={{ minWidth: 920, '& .MuiTableCell-root': { px: 1.25, ...paginatedTableCellSx(rowsPerPage) }, '& .MuiTableCell-head': { py: .9, bgcolor: 'background.paper', fontSize: 12, letterSpacing: '.02em' } }}>
+          <Table stickyHeader size="small" aria-label="내 최근 활동 목록" className="dense-data-table" sx={{ width: '100%', minWidth: 960, tableLayout: 'fixed', '& .MuiTableCell-root': { px: 1.5, ...paginatedTableCellSx(rowsPerPage) }, '& .MuiTableCell-head': { py: 1, bgcolor: 'background.paper', fontSize: 13, letterSpacing: '.02em' } }}>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f7f8fb' }}>
-                <TableCell>일시</TableCell>
-                <TableCell>활동 유형</TableCell>
-                <TableCell>대상</TableCell>
+                <TableCell sx={{ width: 180 }}>일시</TableCell>
+                <TableCell sx={{ width: 190 }}>활동 유형</TableCell>
+                <TableCell sx={{ width: 230 }}>대상</TableCell>
                 <TableCell>상세 내용</TableCell>
-                <TableCell align="center">결과</TableCell>
+                <TableCell align="center" sx={{ width: 110 }}>결과</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -344,8 +344,8 @@ export function RecentActivityPage({
                     <TableCell sx={{ maxWidth: 350 }}>
                       <Tooltip title={activity.description} placement="bottom-start"><Typography noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12.5, lineHeight: 1.45 }}>{activity.description}</Typography></Tooltip>
                     </TableCell>
-                    <TableCell align="center">
-                      <StatusBadge dot status={activity.status} />
+                    <TableCell align="center" sx={{ width: 110 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'center' }}><StatusBadge dot status={activity.status} minWidth={0} /></Box>
                     </TableCell>
                   </TableRow>
                 )
