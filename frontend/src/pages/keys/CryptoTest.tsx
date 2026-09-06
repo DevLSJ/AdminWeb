@@ -7,6 +7,7 @@ import {
   Card,
   CardContent,
   FormControl,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -18,6 +19,7 @@ import {
 } from '@mui/material'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KeyLifecycleTimeline } from '../../components/keys/KeyLifecycleTimeline'
+import { StatusBadge } from '../../components/common/StatusBadge'
 import { useKmsMock } from '../../hooks/useKmsMock'
 import { getStatusLabel } from '../../utils/status'
 import { canDecryptWithStatus, canEncryptWithStatus } from '../../utils/keyLifecycle'
@@ -39,6 +41,11 @@ function CryptoTest() {
   const [running, setRunning] = useState(false)
 
   const selectedKey = useMemo(() => keys.find((key) => key.keyUid === keyUid), [keyUid, keys])
+  const orderedKeys = useMemo(() => [...keys].sort((left, right) => {
+    const leftUsable = left.integrityValid && (canEncryptWithStatus(left.status) || canDecryptWithStatus(left.status))
+    const rightUsable = right.integrityValid && (canEncryptWithStatus(right.status) || canDecryptWithStatus(right.status))
+    return Number(rightUsable) - Number(leftUsable) || left.keyName.localeCompare(right.keyName)
+  }), [keys])
   const histories = selectedKey ? keyHistories[selectedKey.keyUid] ?? [] : []
   const canEncrypt = Boolean(selectedKey?.integrityValid && selectedKey && canEncryptWithStatus(selectedKey.status))
   const canDecrypt = Boolean(selectedKey?.integrityValid && selectedKey && canDecryptWithStatus(selectedKey.status))
@@ -101,7 +108,7 @@ function CryptoTest() {
         <Card className="section-card">
           <Tabs value={mode} onChange={(_event, value: 'encrypt' | 'decrypt') => { setMode(value); setResult(''); setError('') }} sx={{ px: 2.5, borderBottom: 1, borderColor: 'divider' }}><Tab icon={<LockRounded />} iconPosition="start" label="암호화" value="encrypt" /><Tab icon={<LockOpenRounded />} iconPosition="start" label="복호화" value="decrypt" /></Tabs>
           <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-            <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>관리 키 선택</InputLabel><Select label="관리 키 선택" value={keyUid} onChange={(event) => { const nextKeyUid = event.target.value; setKeyUid(nextKeyUid); setKeyVersion(keys.find((key) => key.keyUid === nextKeyUid)?.version ?? ''); setResult(''); setError('') }}>{keys.map((key) => <MenuItem key={key.keyUid} value={key.keyUid} disabled={!key.integrityValid || (!canEncryptWithStatus(key.status) && !canDecryptWithStatus(key.status))}>{key.keyName} · {getKeyAlgorithmLabel(key)} · {getStatusLabel(key.status)}{!key.integrityValid ? ' · 무결성 위반' : ''}</MenuItem>)}</Select></FormControl>
+            <FormControl fullWidth sx={{ mb: 2 }}><InputLabel>관리 키 선택</InputLabel><Select label="관리 키 선택" value={keyUid} renderValue={(value) => { const key = keys.find((item) => item.keyUid === value); if (!key) return '관리 키를 선택하세요'; const usable = key.integrityValid && (canEncryptWithStatus(key.status) || canDecryptWithStatus(key.status)); return <Box sx={{ display: 'flex', minWidth: 0, alignItems: 'center', justifyContent: 'space-between', gap: 1 }}><Box sx={{ minWidth: 0 }}><Typography noWrap sx={{ fontSize: 14, fontWeight: 800 }}>{key.keyName}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontSize: 11.5 }}>{getKeyAlgorithmLabel(key)}</Typography></Box><StatusBadge label={usable ? getStatusLabel(key.status) : key.integrityValid ? '사용 불가' : '무결성 위반'} tone={usable ? 'positive' : key.integrityValid ? 'neutral' : 'danger'} minWidth={0} /></Box> }} MenuProps={{ slotProps: { paper: { sx: { mt: .75, maxHeight: 420, p: .75 } } } }} sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? '#f8fbff' : 'rgba(33,106,214,.08)', '& .MuiOutlinedInput-notchedOutline': { borderWidth: 2 }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' } }} onChange={(event) => { const nextKeyUid = event.target.value; setKeyUid(nextKeyUid); setKeyVersion(keys.find((key) => key.keyUid === nextKeyUid)?.version ?? ''); setResult(''); setError('') }}>{orderedKeys.map((key) => { const usable = key.integrityValid && (canEncryptWithStatus(key.status) || canDecryptWithStatus(key.status)); const tone = usable ? 'positive' : key.integrityValid ? 'neutral' : 'danger'; const accent = usable ? '#22a06b' : key.integrityValid ? '#98a2b3' : '#d92d20'; return <MenuItem key={key.keyUid} value={key.keyUid} disabled={!usable} sx={{ minHeight: 62, mb: .5, px: 1.5, border: '1px solid', borderColor: usable ? '#bde7d6' : key.integrityValid ? 'divider' : '#f4c4ce', borderLeft: `4px solid ${accent}`, borderRadius: 1.5, bgcolor: usable ? 'rgba(34,160,107,.055)' : key.integrityValid ? 'action.hover' : 'rgba(217,45,32,.055)', opacity: '1 !important', '&:last-of-type': { mb: 0 }, '&:hover, &.Mui-selected, &.Mui-selected:hover': { bgcolor: usable ? 'rgba(34,160,107,.12)' : key.integrityValid ? 'action.selected' : 'rgba(217,45,32,.10)' } }}><Box sx={{ display: 'flex', width: '100%', minWidth: 0, alignItems: 'center', justifyContent: 'space-between', gap: 1.25 }}><Box sx={{ minWidth: 0 }}><Typography noWrap sx={{ color: usable ? 'text.primary' : 'text.secondary', fontSize: 14, fontWeight: 800 }}>{key.keyName}</Typography><Stack direction="row" spacing={.65} sx={{ mt: .45, alignItems: 'center' }}><Typography component="span" sx={{ px: .7, py: .15, borderRadius: 1, bgcolor: 'rgba(23,105,232,.10)', color: 'primary.main', fontSize: 10.5, fontWeight: 750 }}>{getKeyAlgorithmLabel(key)}</Typography><Typography component="span" sx={{ color: 'text.secondary', fontSize: 10.5 }}>v{key.version}</Typography></Stack></Box><StatusBadge label={!key.integrityValid ? '무결성 위반' : usable ? getStatusLabel(key.status) : `${getStatusLabel(key.status)} · 사용 불가`} tone={tone} minWidth={0} /></Box></MenuItem> })}</Select><FormHelperText sx={{ mx: .25, mt: .75 }}>초록색은 사용 가능, 회색·빨간색은 현재 암복호화에 사용할 수 없는 키입니다.</FormHelperText></FormControl>
             {selectedKey && <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1, mb: 2 }}><Alert severity={canEncrypt ? 'success' : 'error'} icon={<LockRounded />} sx={{ py: 0.15, '& .MuiAlert-message': { fontSize: 12.5, fontWeight: 700 } }}>암호화 {canEncrypt ? '허용' : '차단'}</Alert><Alert severity={canDecrypt ? 'success' : 'error'} icon={<LockOpenRounded />} sx={{ py: 0.15, '& .MuiAlert-message': { fontSize: 12.5, fontWeight: 700 } }}>복호화 {canDecrypt ? '허용' : '차단'}</Alert></Box>}
             {selectedKey && !selectedKey.integrityValid && <Alert severity="error" sx={{ mb: 2 }}>무결성 위반 키는 모든 암호 연산이 즉시 차단됩니다.</Alert>}
             {selectedKey && selectedKey.integrityValid && !executable && <Alert severity="warning" sx={{ mb: 2 }}>{getStatusLabel(selectedKey.status)} 상태에서는 {mode === 'encrypt' ? '암호화' : '복호화'}를 실행할 수 없습니다.</Alert>}

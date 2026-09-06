@@ -1,7 +1,7 @@
 export const PAGE_SIZE_OPTIONS = [10, 20, 30] as const
 
 export function paginatedTableContainerSx(size: number, viewportOffset = 350) {
-  const rowHeight = size >= 30 ? 34 : size >= 20 ? 38 : 46
+  const rowHeight = size >= 30 ? 34 : size >= 20 ? 38 : size <= 5 ? 54 : 46
   const tableHeight = 42 + rowHeight * size
   return {
     maxHeight: `min(${tableHeight}px, max(280px, calc(100vh - ${viewportOffset}px)))`,

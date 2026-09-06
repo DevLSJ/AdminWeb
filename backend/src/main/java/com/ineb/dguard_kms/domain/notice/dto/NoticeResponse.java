@@ -11,6 +11,7 @@ public record NoticeResponse(
         UUID noticeUid,
         String title,
         String content,
+        String category,
         String exposeYn,
         long viewCount,
         String createdBy,
@@ -20,7 +21,7 @@ public record NoticeResponse(
 ) {
     public static NoticeResponse from(Notice notice, List<NoticeFile> files) {
         return new NoticeResponse(
-                notice.getNoticeUid(), notice.getTitle(), notice.getContent(), notice.getExposeYn(),
+                notice.getNoticeUid(), notice.getTitle(), notice.getContent(), notice.getCategory(), notice.getExposeYn(),
                 notice.getViewCount(), notice.getCreatedBy(), notice.getCreatedAt(), notice.getUpdatedAt(),
                 files.stream().map(NoticeFileResponse::from).toList()
         );

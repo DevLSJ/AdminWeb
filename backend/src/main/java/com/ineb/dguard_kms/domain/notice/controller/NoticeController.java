@@ -41,29 +41,29 @@ public class NoticeController {
     public NoticeController(NoticeService service) { this.service = service; }
 
     @GetMapping("/notices")
-    public ApiResponse<PageResponse<NoticeResponse>> list(@RequestParam(required = false) String title, @RequestParam(required = false) String exposeYn, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size, @AuthenticationPrincipal AdminUserDetails actor) {
-        return ApiResponse.success(service.search(title, exposeYn, page, size, actor.getUsername(), actor.getRole()), "공지 목록을 조회했습니다.");
+    public ApiResponse<PageResponse<NoticeResponse>> list(@RequestParam(required = false) String title, @RequestParam(required = false) String category, @RequestParam(required = false) String exposeYn, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size, @AuthenticationPrincipal AdminUserDetails actor) {
+        return ApiResponse.success(service.search(title, category, exposeYn, page, size, actor.getUsername(), actor.getRole()), "게시글 목록을 조회했습니다.");
     }
 
     @GetMapping("/notices/{noticeUid}")
     public ApiResponse<NoticeResponse> get(@PathVariable UUID noticeUid, @AuthenticationPrincipal AdminUserDetails actor) {
-        return ApiResponse.success(service.get(noticeUid, actor.getUsername(), actor.getRole()), "공지를 조회하고 조회수를 증가했습니다.");
+        return ApiResponse.success(service.get(noticeUid, actor.getUsername(), actor.getRole()), "게시글을 조회하고 조회수를 증가했습니다.");
     }
 
     @PostMapping(value = "/notices", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<NoticeResponse> create(@Valid @RequestPart("metadata") NoticeCreateRequest request, @RequestPart(value = "files", required = false) List<MultipartFile> files, @AuthenticationPrincipal AdminUserDetails actor) {
-        return ApiResponse.success(service.create(request, files, actor.getUsername()), "공지를 등록했습니다.");
+        return ApiResponse.success(service.create(request, files, actor.getUsername(), actor.getRole()), "게시글을 등록했습니다.");
     }
 
     @PutMapping(value = "/notices/{noticeUid}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<NoticeResponse> update(@PathVariable UUID noticeUid, @Valid @RequestPart("metadata") NoticeUpdateRequest request, @RequestPart(value = "files", required = false) List<MultipartFile> files, @AuthenticationPrincipal AdminUserDetails actor) {
-        return ApiResponse.success(service.update(noticeUid, request, files, actor.getUsername(), actor.getRole()), "공지를 수정했습니다.");
+        return ApiResponse.success(service.update(noticeUid, request, files, actor.getUsername(), actor.getRole()), "게시글을 수정했습니다.");
     }
 
     @DeleteMapping("/notices/{noticeUid}")
     public ApiResponse<Void> delete(@PathVariable UUID noticeUid, @AuthenticationPrincipal AdminUserDetails actor) {
         service.delete(noticeUid, actor.getUsername(), actor.getRole());
-        return ApiResponse.success(null, "공지를 삭제했습니다.");
+        return ApiResponse.success(null, "게시글을 삭제했습니다.");
     }
 
     @GetMapping("/files/{fileUid}/download")

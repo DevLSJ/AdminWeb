@@ -291,25 +291,25 @@ export async function resetUserPassword(userUid: string, password: string) {
 }
 
 export async function fetchNoticePage(params: NoticeListParams) {
-  return unwrap(await apiClient.get<ApiResponse<PageResponse<Notice>>>(apiEndpoints.notices.list, { params: { title: params.title.trim() || undefined, exposeYn: params.exposeYn === 'ALL' ? undefined : params.exposeYn, page: params.page, size: params.size } }))
+  return unwrap(await apiClient.get<ApiResponse<PageResponse<Notice>>>(apiEndpoints.notices.list, { params: { title: params.title.trim() || undefined, category: params.category === 'ALL' ? undefined : params.category, exposeYn: params.exposeYn === 'ALL' ? undefined : params.exposeYn, page: params.page, size: params.size } }))
 }
 
 export async function fetchNotice(noticeUid: string) {
   return unwrap(await apiClient.get<ApiResponse<Notice>>(apiEndpoints.notices.detail(noticeUid)))
 }
 
-function noticeFormData(metadata: Pick<Notice, 'title' | 'content' | 'exposeYn'>, files: File[]) {
+function noticeFormData(metadata: Pick<Notice, 'title' | 'content' | 'category' | 'exposeYn'>, files: File[]) {
   const data = new FormData()
   data.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
   files.forEach((file) => data.append('files', file))
   return data
 }
 
-export async function createNotice(metadata: Pick<Notice, 'title' | 'content' | 'exposeYn'>, files: File[]) {
+export async function createNotice(metadata: Pick<Notice, 'title' | 'content' | 'category' | 'exposeYn'>, files: File[]) {
   return unwrap(await apiClient.post<ApiResponse<Notice>>(apiEndpoints.notices.create, noticeFormData(metadata, files)))
 }
 
-export async function updateNotice(noticeUid: string, metadata: Pick<Notice, 'title' | 'content' | 'exposeYn'>, files: File[]) {
+export async function updateNotice(noticeUid: string, metadata: Pick<Notice, 'title' | 'content' | 'category' | 'exposeYn'>, files: File[]) {
   return unwrap(await apiClient.put<ApiResponse<Notice>>(apiEndpoints.notices.update(noticeUid), noticeFormData(metadata, files)))
 }
 

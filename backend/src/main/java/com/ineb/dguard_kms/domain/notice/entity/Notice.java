@@ -12,6 +12,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.ColumnDefault;
+
 @Entity
 @Table(name = "notice")
 public class Notice {
@@ -23,6 +25,9 @@ public class Notice {
     private String title;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
+    @ColumnDefault("'NOTICE'")
+    @Column(nullable = false, length = 16)
+    private String category;
     @Column(name = "expose_yn", nullable = false, length = 1)
     private String exposeYn;
     @Column(name = "view_count", nullable = false)
@@ -36,10 +41,11 @@ public class Notice {
 
     protected Notice() {}
 
-    public Notice(String title, String content, String exposeYn, String createdBy) {
+    public Notice(String title, String content, String category, String exposeYn, String createdBy) {
         this.noticeUid = UUID.randomUUID();
         this.title = title;
         this.content = content;
+        this.category = category;
         this.exposeYn = exposeYn;
         this.createdBy = createdBy;
     }
@@ -47,12 +53,13 @@ public class Notice {
     @PrePersist void onCreate() { Instant now = Instant.now(); if (noticeUid == null) noticeUid = UUID.randomUUID(); createdAt = now; updatedAt = now; }
     @PreUpdate void onUpdate() { updatedAt = Instant.now(); }
 
-    public void update(String title, String content, String exposeYn) { this.title = title; this.content = content; this.exposeYn = exposeYn; }
+    public void update(String title, String content, String category, String exposeYn) { this.title = title; this.content = content; this.category = category; this.exposeYn = exposeYn; }
     public void incrementViewCount() { viewCount++; }
     public Long getId() { return id; }
     public UUID getNoticeUid() { return noticeUid; }
     public String getTitle() { return title; }
     public String getContent() { return content; }
+    public String getCategory() { return category; }
     public String getExposeYn() { return exposeYn; }
     public long getViewCount() { return viewCount; }
     public String getCreatedBy() { return createdBy; }

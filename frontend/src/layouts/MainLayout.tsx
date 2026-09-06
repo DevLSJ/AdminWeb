@@ -83,8 +83,8 @@ const menuGroups: MenuGroup[] = [
   { id: 'audit', label: '감사 로그', path: '/audit-logs', icon: <SecurityRounded />, roles: ['S.ADMIN', 'ADMIN'] },
   {
     id: 'notices', label: '게시판', icon: <DescriptionRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'], children: [
-      { label: '공지사항 목록', path: '/notices', icon: <ListAltRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
-      { label: '공지사항 등록', path: '/notices/new', icon: <AddBoxRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
+      { label: '게시글 목록', path: '/notices', icon: <ListAltRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
+      { label: '게시글 작성', path: '/notices/new', icon: <AddBoxRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
     ],
   },
 ]

@@ -290,6 +290,7 @@ export interface AuditEntryVerification {
 
 export interface NoticeListParams {
   title: string
+  category: 'NOTICE' | 'GENERAL' | 'ALL'
   exposeYn: 'Y' | 'N' | 'ALL'
   page: number
   size: number
@@ -306,6 +307,7 @@ export interface Notice {
   noticeUid: string
   title: string
   content: string
+  category: 'NOTICE' | 'GENERAL'
   exposeYn: 'Y' | 'N'
   viewCount: number
   createdBy: string

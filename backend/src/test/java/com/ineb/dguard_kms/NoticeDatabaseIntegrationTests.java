@@ -45,7 +45,7 @@ class NoticeDatabaseIntegrationTests {
         byte[] original = ("confidential-attachment-" + suffix).getBytes(StandardCharsets.UTF_8);
         byte[] expectedDownload = original.clone();
         MockMultipartFile metadata = new MockMultipartFile("metadata", "metadata.json", MediaType.APPLICATION_JSON_VALUE,
-                ("{\"title\":\"DB 공지 " + suffix + "\",\"content\":\"서버 연동 공지 본문\",\"exposeYn\":\"Y\"}").getBytes(StandardCharsets.UTF_8));
+                ("{\"title\":\"DB 공지 " + suffix + "\",\"content\":\"서버 연동 공지 본문\",\"category\":\"NOTICE\",\"exposeYn\":\"Y\"}").getBytes(StandardCharsets.UTF_8));
         MockMultipartFile file = new MockMultipartFile("files", "evidence.txt", MediaType.TEXT_PLAIN_VALUE, original);
 
         String body = mvc.perform(multipart("/api/notices").file(metadata).file(file).header("Authorization", "Bearer " + token))
@@ -53,6 +53,7 @@ class NoticeDatabaseIntegrationTests {
         JsonNode created = objectMapper.readTree(body).path("data");
         UUID noticeUid = UUID.fromString(created.path("noticeUid").asText());
         UUID fileUid = UUID.fromString(created.path("files").get(0).path("fileUid").asText());
+        assertThat(created.path("category").asText()).isEqualTo("NOTICE");
 
         var storedNotice = noticeRepository.findByNoticeUid(noticeUid).orElseThrow();
         var storedFile = fileRepository.findByFileUid(fileUid).orElseThrow();
@@ -73,6 +74,37 @@ class NoticeDatabaseIntegrationTests {
         String verifyBody = mvc.perform(get("/api/audit-logs/verify").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertThat(objectMapper.readTree(verifyBody).path("data").path("valid").asBoolean()).isTrue();
+    }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
+    void boardPinsAdminNoticesAndRejectsClientNoticeCreation() throws Exception {
+        String adminToken = login("admin", "admin");
+        String clientToken = login("client", "client");
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        MockMultipartFile general = new MockMultipartFile("metadata", "metadata.json", MediaType.APPLICATION_JSON_VALUE,
+                ("{\"title\":\"일반 게시글 " + suffix + "\",\"content\":\"일반 본문\",\"category\":\"GENERAL\",\"exposeYn\":\"Y\"}").getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile notice = new MockMultipartFile("metadata", "metadata.json", MediaType.APPLICATION_JSON_VALUE,
+                ("{\"title\":\"관리자 공지 " + suffix + "\",\"content\":\"공지 본문\",\"category\":\"NOTICE\",\"exposeYn\":\"Y\"}").getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile forbiddenNotice = new MockMultipartFile("metadata", "metadata.json", MediaType.APPLICATION_JSON_VALUE,
+                ("{\"title\":\"권한 없는 공지 " + suffix + "\",\"content\":\"공지 본문\",\"category\":\"NOTICE\",\"exposeYn\":\"Y\"}").getBytes(StandardCharsets.UTF_8));
+
+        mvc.perform(multipart("/api/notices").file(general).header("Authorization", "Bearer " + clientToken))
+                .andExpect(status().isOk());
+        mvc.perform(multipart("/api/notices").file(notice).header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+        mvc.perform(multipart("/api/notices").file(forbiddenNotice).header("Authorization", "Bearer " + clientToken))
+                .andExpect(status().isForbidden());
+
+        String listBody = mvc.perform(get("/api/notices").param("page", "0").param("size", "100")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode content = objectMapper.readTree(listBody).path("data").path("content");
+        boolean reachedGeneral = false;
+        for (JsonNode item : content) {
+            if ("GENERAL".equals(item.path("category").asText())) reachedGeneral = true;
+            if (reachedGeneral) assertThat(item.path("category").asText()).isEqualTo("GENERAL");
+        }
     }
 
     @Test

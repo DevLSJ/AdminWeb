@@ -45,61 +45,67 @@ public class NoticeService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<NoticeResponse> search(String title, String exposeYn, int page, int size, String actor, String role) {
+    public PageResponse<NoticeResponse> search(String title, String category, String exposeYn, int page, int size, String actor, String role) {
         Specification<Notice> spec = (root, query, builder) -> {
             var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
             if (title != null && !title.isBlank()) predicates.add(builder.like(builder.lower(root.get("title")), "%" + title.trim().toLowerCase() + "%"));
+            if (category != null && !category.isBlank() && !"ALL".equalsIgnoreCase(category)) predicates.add(builder.equal(root.get("category"), normalizeCategory(category)));
             if (exposeYn != null && !exposeYn.isBlank() && !"ALL".equalsIgnoreCase(exposeYn)) predicates.add(builder.equal(root.get("exposeYn"), normalizeExpose(exposeYn)));
             if ("CLIENT".equals(role)) predicates.add(builder.or(builder.equal(root.get("exposeYn"), "Y"), builder.equal(root.get("createdBy"), actor)));
             return builder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
-        var result = noticeRepository.findAll(spec, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), Sort.by(Sort.Direction.DESC, "createdAt")))
+        Sort pinnedFirst = Sort.by(Sort.Order.desc("category"), Sort.Order.desc("createdAt"));
+        var result = noticeRepository.findAll(spec, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), pinnedFirst))
                 .map(this::response);
         return PageResponse.from(result);
     }
 
     @Transactional
     public NoticeResponse get(UUID noticeUid, String actor, String role) {
-        Notice notice = noticeRepository.findForUpdateByNoticeUid(noticeUid).orElseThrow(() -> notFound("공지"));
+        Notice notice = noticeRepository.findForUpdateByNoticeUid(noticeUid).orElseThrow(() -> notFound("게시글"));
         assertReadable(notice, actor, role);
         notice.incrementViewCount();
         noticeRepository.saveAndFlush(notice);
-        auditLogService.append(actor, "NOTICE_VIEW", "NOTICE", noticeUid.toString(), "공지 상세 조회 및 조회수 증가");
+        auditLogService.append(actor, "NOTICE_VIEW", "NOTICE", noticeUid.toString(), "게시글 상세 조회 및 조회수 증가");
         return response(notice);
     }
 
     @Transactional
-    public NoticeResponse create(NoticeCreateRequest request, List<MultipartFile> files, String actor) {
-        Notice notice = noticeRepository.saveAndFlush(new Notice(request.title().trim(), request.content().trim(), normalizeExpose(request.exposeYn()), actor));
+    public NoticeResponse create(NoticeCreateRequest request, List<MultipartFile> files, String actor, String role) {
+        String category = normalizeCategory(request.category());
+        assertCategoryWritable(category, role);
+        Notice notice = noticeRepository.saveAndFlush(new Notice(request.title().trim(), request.content().trim(), category, normalizeExpose(request.exposeYn()), actor));
         saveFiles(notice, files);
-        auditLogService.append(actor, "NOTICE_CREATE", "NOTICE", notice.getNoticeUid().toString(), "공지 등록 및 첨부파일 암호화 저장");
+        auditLogService.append(actor, "NOTICE_CREATE", "NOTICE", notice.getNoticeUid().toString(), "게시글 등록 및 첨부파일 암호화 저장");
         return response(notice);
     }
 
     @Transactional
     public NoticeResponse update(UUID noticeUid, NoticeUpdateRequest request, List<MultipartFile> files, String actor, String role) {
-        Notice notice = noticeRepository.findForUpdateByNoticeUid(noticeUid).orElseThrow(() -> notFound("공지"));
+        Notice notice = noticeRepository.findForUpdateByNoticeUid(noticeUid).orElseThrow(() -> notFound("게시글"));
         assertManageable(notice, actor, role);
-        notice.update(request.title().trim(), request.content().trim(), normalizeExpose(request.exposeYn()));
+        String category = normalizeCategory(request.category());
+        assertCategoryWritable(category, role);
+        notice.update(request.title().trim(), request.content().trim(), category, normalizeExpose(request.exposeYn()));
         noticeRepository.saveAndFlush(notice);
         saveFiles(notice, files);
-        auditLogService.append(actor, "NOTICE_UPDATE", "NOTICE", noticeUid.toString(), "공지 수정 및 신규 첨부파일 암호화 저장");
+        auditLogService.append(actor, "NOTICE_UPDATE", "NOTICE", noticeUid.toString(), "게시글 수정 및 신규 첨부파일 암호화 저장");
         return response(notice);
     }
 
     @Transactional
     public void delete(UUID noticeUid, String actor, String role) {
-        Notice notice = noticeRepository.findForUpdateByNoticeUid(noticeUid).orElseThrow(() -> notFound("공지"));
+        Notice notice = noticeRepository.findForUpdateByNoticeUid(noticeUid).orElseThrow(() -> notFound("게시글"));
         assertManageable(notice, actor, role);
         fileRepository.deleteAllByNoticeId(notice.getId());
         noticeRepository.delete(notice);
-        auditLogService.append(actor, "NOTICE_DELETE", "NOTICE", noticeUid.toString(), "공지 및 암호화 첨부파일 삭제");
+        auditLogService.append(actor, "NOTICE_DELETE", "NOTICE", noticeUid.toString(), "게시글 및 암호화 첨부파일 삭제");
     }
 
     @Transactional
     public NoticeFileDownload downloadFile(UUID fileUid, String actor, String role) {
         NoticeFile file = fileRepository.findByFileUid(fileUid).orElseThrow(() -> notFound("첨부파일"));
-        Notice notice = noticeRepository.findById(file.getNoticeId()).orElseThrow(() -> notFound("공지"));
+        Notice notice = noticeRepository.findById(file.getNoticeId()).orElseThrow(() -> notFound("게시글"));
         assertReadable(notice, actor, role);
         byte[] ciphertext = file.getEncryptedContent();
         if (ciphertext == null) throw new ResponseStatusException(HttpStatus.GONE, "기존 첨부파일 본문이 없습니다.");
@@ -112,7 +118,7 @@ public class NoticeService {
     @Transactional
     public void deleteFile(UUID fileUid, String actor, String role) {
         NoticeFile file = fileRepository.findByFileUid(fileUid).orElseThrow(() -> notFound("첨부파일"));
-        Notice notice = noticeRepository.findById(file.getNoticeId()).orElseThrow(() -> notFound("공지"));
+        Notice notice = noticeRepository.findById(file.getNoticeId()).orElseThrow(() -> notFound("게시글"));
         assertManageable(notice, actor, role);
         fileRepository.delete(file);
         auditLogService.append(actor, "FILE_DELETE", "NOTICE_FILE", fileUid.toString(), "암호화 첨부파일 삭제");
@@ -146,8 +152,11 @@ public class NoticeService {
     }
 
     private NoticeResponse response(Notice notice) { return NoticeResponse.from(notice, fileRepository.findAllByNoticeIdOrderByCreatedAtAsc(notice.getId())); }
+    private String normalizeCategory(String value) { return value == null || value.isBlank() ? "GENERAL" : switch (value.trim().toUpperCase()) { case "NOTICE" -> "NOTICE"; case "GENERAL" -> "GENERAL"; default -> throw new IllegalArgumentException("게시글 구분은 NOTICE 또는 GENERAL이어야 합니다."); }; }
     private String normalizeExpose(String value) { return value == null || value.isBlank() ? "Y" : switch (value.trim().toUpperCase()) { case "Y" -> "Y"; case "N" -> "N"; default -> throw new IllegalArgumentException("노출 상태는 Y 또는 N이어야 합니다."); }; }
-    private void assertReadable(Notice notice, String actor, String role) { if ("CLIENT".equals(role) && !"Y".equals(notice.getExposeYn()) && !notice.getCreatedBy().equals(actor)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "숨김 공지를 조회할 권한이 없습니다."); }
-    private void assertManageable(Notice notice, String actor, String role) { if (!"S.ADMIN".equals(role) && !"ADMIN".equals(role) && !notice.getCreatedBy().equals(actor)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "공지를 관리할 권한이 없습니다."); }
+    private void assertCategoryWritable(String category, String role) { if ("NOTICE".equals(category) && !isAdmin(role)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "공지사항은 관리자만 작성할 수 있습니다."); }
+    private void assertReadable(Notice notice, String actor, String role) { if ("CLIENT".equals(role) && !"Y".equals(notice.getExposeYn()) && !notice.getCreatedBy().equals(actor)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "숨김 게시글을 조회할 권한이 없습니다."); }
+    private void assertManageable(Notice notice, String actor, String role) { if (("NOTICE".equals(notice.getCategory()) && !isAdmin(role)) || (!isAdmin(role) && !notice.getCreatedBy().equals(actor))) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "게시글을 관리할 권한이 없습니다."); }
+    private boolean isAdmin(String role) { return "S.ADMIN".equals(role) || "ADMIN".equals(role); }
     private ResponseStatusException notFound(String target) { return new ResponseStatusException(HttpStatus.NOT_FOUND, target + "을 찾을 수 없습니다."); }
 }
