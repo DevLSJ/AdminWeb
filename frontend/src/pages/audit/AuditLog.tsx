@@ -180,7 +180,7 @@ function AuditLog() {
       <PageHeader
         title="감사 로그"
         description="서버의 append-only 감사 이벤트를 검색하고 선택 기간의 행 HMAC·prev_hash 경계 연결을 검증합니다."
-        action={<Stack direction="row" spacing={1}><Button data-testid="audit-verify-button" variant="outlined" startIcon={<FactCheckRounded />} onClick={openVerification}>기간 해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={() => void exportCsv()}>서명 CSV 내려받기</Button></Stack>}
+        action={<Stack direction="row" spacing={1}><Button data-testid="audit-verify-button" variant="outlined" startIcon={<FactCheckRounded />} onClick={openVerification}>기간 해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={() => void exportCsv()}>CSV 내려받기</Button></Stack>}
       />
       {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity={verification.checkedCount === 0 ? 'info' : 'success'} onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}{verification.checkedCount === 0 ? '선택 기간에 검증할 감사 로그가 없습니다.' : `총 ${verification.checkedCount.toLocaleString()}건의 행 HMAC과 기간 경계 연결이 정상입니다.`} · {formatKst(verification.verifiedAt)} KST</Alert>}
       {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '기간 경계'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
