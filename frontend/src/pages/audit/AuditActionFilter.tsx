@@ -1,4 +1,5 @@
 import { FormControl, InputLabel, ListSubheader, MenuItem, Select } from '@mui/material'
+import { categoryMenuProps } from '../../components/admin/categoryMenu'
 import type { AuditAction, AuditListParams } from '../../types/api'
 import { auditActionLabels } from '../../utils/auditPresentation'
 
@@ -39,10 +40,7 @@ export function AuditActionFilter({ value, onChange }: {
         value={value}
         onChange={(event) => onChange(event.target.value as AuditListParams['action'])}
         renderValue={(selected) => options.find((option) => option.value === selected)?.label ?? '전체 행위'}
-        MenuProps={{ slotProps: {
-          paper: { sx: { mt: .75, maxHeight: 400, border: '1px solid', borderColor: 'divider', borderRadius: 2 } },
-          list: { sx: { p: .75, '& .MuiMenuItem-root': { minHeight: 40, borderRadius: 1, fontSize: 14, whiteSpace: 'normal' } } },
-        } }}
+        MenuProps={categoryMenuProps}
       >
         <MenuItem value="ALL">전체 행위</MenuItem>
         {groups.flatMap((group) => [
