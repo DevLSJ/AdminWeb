@@ -90,7 +90,9 @@ public class AuditLogService {
         if (logs.size() > 10_000) {
             throw new IllegalArgumentException("감사 로그 CSV는 한 번에 10,000건까지 내려받을 수 있습니다.");
         }
-        StringBuilder csv = new StringBuilder("\uFEFFlogUid,actor,action,targetType,targetId,detail,createdAt,previousHash,rowHash,rowValid\r\n");
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        appendCsvGuide(csv);
+        csv.append("logUid,actor,action,targetType,targetId,detail,createdAt,previousHash,rowHash,rowValid\r\n");
         for (AuditLog log : logs) {
             csv.append(csv(log.getLogUid()))
                     .append(',').append(csv(log.getActor()))
@@ -229,6 +231,34 @@ public class AuditLogService {
             if (actionFilter != null) predicates.add(criteriaBuilder.equal(root.get("action"), actionFilter));
             return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
         };
+    }
+
+    private void appendCsvGuide(StringBuilder output) {
+        // CSV에는 표준 주석 문법이 없으므로 첫 셀이 #으로 시작하는 안내 행을 사용한다.
+        // 모든 안내 행도 데이터와 같은 10열로 맞춰 표 형태로 열 수 있게 한다.
+        String[][] guide = {
+                {"# 감사 로그 CSV 읽는 법", "", "#으로 시작하는 안내 행 다음의 logUid 헤더부터 실제 로그 데이터입니다.", ""},
+                {"# 열 이름", "한글 의미", "설명", "예시"},
+                {"# logUid", "로그 고유 ID", "감사 기록 한 건을 구분하는 UUID입니다. 개별 로그 검증에 사용합니다.", "9e33c0a4-8a4e-4461-afe9-c7427b6280d1"},
+                {"# actor", "행위자", "작업을 수행한 계정의 로그인 ID입니다.", "admin"},
+                {"# action", "수행한 행위", "기록된 작업의 코드입니다.", "LOGIN = 로그인 / LOGOUT = 로그아웃 / KEY_CREATE = 키 생성"},
+                {"# targetType", "대상 유형", "작업 대상의 종류입니다.", "ADMIN_USER = 관리 계정 / KEY = 키 / AUDIT_LOG = 감사 로그"},
+                {"# targetId", "대상 ID", "작업 대상의 식별자입니다. 대상 유형에 따라 로그인 ID 또는 UUID 등이 기록됩니다.", "admin"},
+                {"# detail", "상세 설명", "수행한 작업을 설명하는 내용입니다.", "로그인 성공"},
+                {"# createdAt", "기록 시각 (UTC)", "끝의 Z는 UTC를 뜻합니다. 한국 시간은 9시간을 더합니다.", "2026-09-07T00:35:11.112879Z = 한국 시간 2026-09-07 09:35:11.112879"},
+                {"# previousHash", "이전 로그의 무결성 값", "직전 로그의 rowHash입니다. 로그 사이의 연결 검증에 사용하며 최초 로그는 비어 있습니다.", "Base64 문자열"},
+                {"# rowHash", "현재 로그의 무결성 값", "이 로그의 내용과 이전 연결 값으로 계산한 HMAC입니다. 내용 변경 여부를 검사하는 데 사용합니다.", "Base64 문자열"},
+                {"# rowValid", "현재 행의 검사 결과", "내보내기 시점에 저장된 HMAC과 재계산한 값을 비교한 결과입니다.", "true = 일치 / false = 불일치 (확인 필요)"},
+                {"# 검증 범위 안내", "", "rowValid는 개별 행의 검사 결과이며 전체 체인이나 CSV 파일 자체의 서명 검증 결과가 아닙니다. 체인 연결은 기간 체인 검증 기능에서 확인하세요.", ""},
+                {"# 데이터 시작", "", "다음 행은 데이터 열 이름이며 이후 각 행이 감사 로그 한 건입니다. 자동 처리 시 위 안내 행을 건너뛰세요.", ""},
+        };
+        for (String[] row : guide) {
+            for (int column = 0; column < 10; column++) {
+                if (column > 0) output.append(',');
+                output.append(csv(column < row.length ? row[column] : ""));
+            }
+            output.append("\r\n");
+        }
     }
 
     private String csv(Object value) {

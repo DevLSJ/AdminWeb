@@ -297,6 +297,20 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(csv.statusCode()).isEqualTo(200);
         assertThat(csv.headers().firstValue("content-disposition").orElse("")).contains("attachment");
         assertThat(csv.body()).contains("USER_VIEW_PLAIN", userUid.toString(), "rowHash");
+        String dataHeader = "logUid,actor,action,targetType,targetId,detail,createdAt,previousHash,rowHash,rowValid\r\n";
+        assertThat(csv.body()).startsWith("\uFEFF\"# 감사 로그 CSV 읽는 법\"");
+        assertThat(csv.body()).contains("한글 의미", "한국 시간은 9시간을 더합니다", "true = 일치", "CSV 파일 자체의 서명 검증 결과가 아닙니다");
+        String[] exportedSections = csv.body().split(dataHeader, -1);
+        assertThat(exportedSections).hasSize(2);
+        for (String column : dataHeader.trim().split(",")) {
+            assertThat(exportedSections[0]).contains("\"# " + column + "\"");
+        }
+        assertThat(exportedSections[1]).contains("USER_VIEW_PLAIN", userUid.toString()).doesNotContain("# 데이터 시작");
+        HttpResponse<String> emptyCsv = send(client, "GET",
+                "/api/audit-logs/export?action=NO_MATCHING_ACTION", adminToken, "");
+        assertThat(emptyCsv.statusCode()).isEqualTo(200);
+        assertThat(emptyCsv.body()).startsWith("\uFEFF\"# 감사 로그 CSV 읽는 법\"").endsWith(dataHeader);
+
         JsonNode afterExport = sendJson(client, "GET", "/api/audit-logs/verify", adminToken, "", 200);
         assertThat(afterExport.path("data").path("valid").asBoolean()).isTrue();
     }
