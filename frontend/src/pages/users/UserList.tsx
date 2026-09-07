@@ -375,13 +375,13 @@ function UserList() {
         <Box component="form" onSubmit={saveUser}>
           <DialogTitle>{formUser ? '사용자 상세 수정' : '암호화 사용자 등록'}</DialogTitle>
           <DialogContent>
-            {!formUser && <Alert severity="info" sx={{ mt: 1, mb: 2 }}>연락처는 마스터키 AES-256-GCM으로 암호화하고, 비밀번호는 사용자별 Salt로 PBKDF2 해시한 뒤 저장합니다. S.ADMIN 권한은 시스템 최고 관리자 계정에만 유지됩니다.</Alert>}
+            {!formUser && <Alert severity="info" sx={{ mt: 1, mb: 2 }}>연락처 : AES-256-GCM 암호화 / 비밀번호 : 사용자별 Salt 적용 후 PBKDF2 저장</Alert>}
             <Stack spacing={2} sx={{ mt: formUser ? 1 : 0 }}>
               <FormControl fullWidth><InputLabel>권한</InputLabel><Select label="권한" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as EditableRole }))}>{canAssignAdmin && <MenuItem value="ADMIN">ADMIN</MenuItem>}<MenuItem value="CLIENT">CLIENT</MenuItem></Select></FormControl>
               <TextField required label="이름" value={form.name} error={Boolean(form.name) && !nameValid} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} slotProps={{ htmlInput: { maxLength: 64 } }} helperText="1~64자" />
               <TextField required label="연락처" placeholder="010-1234-5678" value={form.phone} error={Boolean(form.phone) && !phoneValid} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} slotProps={{ htmlInput: { maxLength: 20, pattern: '[0-9+()\\-\\s]{9,20}' } }} helperText={form.phone && !phoneValid ? '숫자 9~15자리의 연락처 형식을 확인하세요.' : '마스터키 AES-256-GCM 암호화 · HMAC 정확 검색'} />
               <TextField required type="email" label="이메일" value={form.email} error={Boolean(form.email) && !emailValid} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} slotProps={{ htmlInput: { maxLength: 254 } }} helperText={form.email && !emailValid ? '올바른 이메일 형식을 입력하세요.' : '마스터키 AES-256-GCM 암호화 저장'} />
-              {!formUser && <TextField required type="password" label="초기 비밀번호" value={form.password} error={Boolean(form.password) && !passwordValid} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · 사용자별 16바이트 Salt · PBKDF2-HMAC-SHA256 210,000회 이상" />}
+              {!formUser && <TextField required type="password" label="초기 비밀번호" value={form.password} error={Boolean(form.password) && !passwordValid} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · SHA-256 기반 PBKDF2 해시 저장" />}
             </Stack>
           </DialogContent>
           <DialogActions><Button onClick={() => setFormUser(undefined)}>취소</Button><Button data-testid="user-save-button" type="submit" variant="contained" disabled={!formValid}>암호화 저장</Button></DialogActions>
