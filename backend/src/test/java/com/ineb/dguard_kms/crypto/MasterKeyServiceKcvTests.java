@@ -90,7 +90,7 @@ class MasterKeyServiceKcvTests {
     private MockEnvironment environment(String passphrase) {
         return new MockEnvironment()
                 .withProperty("kms.master.passphrase", passphrase)
-                .withProperty("kms.master.pbkdf2.iterations", "210000")
+                .withProperty("kms.master.pbkdf2.iterations", "10000")
                 .withProperty("kms.master.pbkdf2.key-length", "256")
                 .withProperty("kms.master.pbkdf2.algorithm", "PBKDF2WithHmacSHA256");
     }

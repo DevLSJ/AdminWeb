@@ -75,7 +75,7 @@
 | Container | Docker, Docker Compose |
 | Web Server | Nginx 1.27 |
 | CI/CD | GitHub Actions, Docker Hub |
-| Key Derivation | PBKDF2-HMAC-SHA256, 210,000회 |
+| Key Derivation | PBKDF2-HMAC-SHA256, 10,000회 |
 | Encryption | AES-256-GCM |
 | Integrity | HMAC-SHA256 |
 | Encoding | Base64 |
@@ -232,8 +232,8 @@ docker start dguard-postgres
 | `KMS_MASTER_PASSPHRASE` | 마스터키 유도 패스프레이즈 | 필수, UTF-8 32바이트 이상 |
 | `INTEGRITY_HMAC_KEY` | 무결성 HMAC 키 | 필수 |
 | `JWT_SECRET` | JWT 서명 키 | 필수 |
-| `KMS_PBKDF2_ITERATIONS` | 마스터키 PBKDF2 반복 횟수 | `210000` |
-| `PASSWORD_PBKDF2_ITERATIONS` | 비밀번호 PBKDF2 반복 횟수 | `210000` |
+| `KMS_PBKDF2_ITERATIONS` | 마스터키 PBKDF2 반복 횟수 | `10000` |
+| `PASSWORD_PBKDF2_ITERATIONS` | 비밀번호 PBKDF2 반복 횟수 | `10000` |
 | `USER_PROVISIONING_ENABLED` | 일회성 계정 생성 활성화 | 기본 `false` |
 | `PROVISION_USER_LOGIN_ID` | 생성할 로그인 ID | 프로비저닝 시 필수 |
 | `PROVISION_USER_PASSWORD` | 생성할 계정 비밀번호 | 프로비저닝 시 필수 |

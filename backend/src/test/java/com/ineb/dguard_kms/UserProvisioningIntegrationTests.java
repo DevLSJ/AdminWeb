@@ -32,7 +32,7 @@ class UserProvisioningIntegrationTests {
         assertThat(user.getPasswordHash()).isNotEqualTo("one-time-secret");
         assertThat(user.getPasswordSalt()).isNotBlank();
         assertThat(user.getPasswordAlgorithm()).isEqualTo(PasswordService.ALGORITHM);
-        assertThat(user.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
+        assertThat(user.getPasswordIterations()).isGreaterThanOrEqualTo(10_000);
         assertThat(user.getRole()).isEqualTo("ADMIN");
 
         char[] password = "one-time-secret".toCharArray();

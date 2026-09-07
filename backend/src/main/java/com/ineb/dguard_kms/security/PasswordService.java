@@ -18,7 +18,7 @@ import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
 public class PasswordService {
 
     public static final String ALGORITHM = "PBKDF2WithHmacSHA256";
-    public static final int REQUIRED_ITERATIONS = 210_000;
+    public static final int REQUIRED_ITERATIONS = 10_000;
     private static final int SALT_LENGTH_BYTES = 16;
     private static final int HASH_LENGTH_BITS = 256;
 

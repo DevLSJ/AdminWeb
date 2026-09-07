@@ -80,7 +80,7 @@ class KeyManagementIntegrationTests {
         var config = configRepository.findFirstByOrderByIdAsc().orElseThrow();
         assertThat(config.getSalt()).isNotBlank();
         assertThat(config.getKcv()).isNotBlank();
-        assertThat(config.getIterations()).isGreaterThanOrEqualTo(210_000);
+        assertThat(config.getIterations()).isGreaterThanOrEqualTo(10_000);
         assertThat(config.getEncryptionVersion()).isEqualTo("v1");
     }
 

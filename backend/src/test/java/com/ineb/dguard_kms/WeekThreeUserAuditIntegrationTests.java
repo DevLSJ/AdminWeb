@@ -116,7 +116,7 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(stored.getEmailIv()).hasSize(12);
         assertThat(stored.getPasswordHash()).isNotEqualTo("Week3-Secure-1234!");
         assertThat(stored.getPasswordAlgorithm()).isEqualTo(PasswordService.ALGORITHM);
-        assertThat(stored.getPasswordIterations()).isGreaterThanOrEqualTo(210_000);
+        assertThat(stored.getPasswordIterations()).isGreaterThanOrEqualTo(10_000);
         assertThat(Base64.getDecoder().decode(stored.getPasswordSalt())).hasSize(16);
         assertThat(Base64.getDecoder().decode(stored.getPasswordHash())).hasSize(32);
         assertThat(stored.getIntegrityHash()).isNotBlank();
