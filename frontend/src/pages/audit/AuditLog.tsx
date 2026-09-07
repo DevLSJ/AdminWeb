@@ -24,8 +24,9 @@ import {
   Typography,
 } from '@mui/material'
 import { exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogEntry, verifyAuditLogs } from '../../api/kms'
-import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
+import { SearchFilterForm } from '../../components/admin/SearchFilterForm'
 import { AuditActionFilter } from './AuditActionFilter'
 import { auditActionLabels } from '../../utils/auditPresentation'
 import { StatusBadge } from '../../components/common/StatusBadge'
@@ -177,15 +178,12 @@ function AuditLog() {
       {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '기간 경계'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
-      <FilterCard>
-        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', xl: 'minmax(150px, 1fr) minmax(150px, 1fr) minmax(160px, 1fr) minmax(260px, 1.6fr) auto' }, gap: 1.25 }}>
+      <SearchFilterForm columns={4} onSearch={search} onReset={() => { setDraft(defaultParams); setParams(defaultParams) }}>
           <TextField size="small" type="date" label="시작일" value={draft.from} onChange={(event) => setDraft((current) => ({ ...current, from: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" type="date" label="종료일" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" label="행위자" value={draft.actor} onChange={(event) => setDraft((current) => ({ ...current, actor: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
           <AuditActionFilter value={draft.action} onChange={(action) => setDraft((current) => ({ ...current, action }))} />
-          <Stack direction="row" spacing={1} sx={{ gridColumn: { sm: '1 / -1', xl: 'auto' }, alignItems: 'stretch', justifyContent: 'flex-end', '& > button': { flex: { xs: 1, sm: 'initial' }, minWidth: 76 } }}><Button type="submit" variant="contained">검색</Button><Button color="inherit" onClick={() => { setDraft(defaultParams); setParams(defaultParams) }}>초기화</Button></Stack>
-        </Box>
-      </FilterCard>
+      </SearchFilterForm>
 
       <Card>
         <TableContainer sx={paginatedTableContainerSx(params.size, 390)}>

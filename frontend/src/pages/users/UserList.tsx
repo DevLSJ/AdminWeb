@@ -5,7 +5,6 @@ import {
   CloseRounded,
   EditRounded,
   LockResetRounded,
-  RefreshRounded,
   SearchRounded,
   VisibilityRounded,
   WarningAmberRounded,
@@ -52,7 +51,8 @@ import {
   updateAdminAccount,
   updateUser,
 } from '../../api/kms'
-import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { SearchFilterForm } from '../../components/admin/SearchFilterForm'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
 import type { AdminAccount, AppUser, AppUserPlain, ManagedUser, PageResponse, UserListParams } from '../../types/api'
@@ -319,14 +319,10 @@ function UserList() {
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
-      <FilterCard>
-        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 180px auto' }, gap: 1.25 }}>
+      <SearchFilterForm onSearch={search} onReset={resetFilters}>
           <TextField size="small" label="이름 검색" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
           <TextField size="small" label="연락처 정확히 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
-          <FormControl size="small"><InputLabel>상태</InputLabel><Select label="상태" value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as UserListParams['status'] }))}><MenuItem value="ALL">전체</MenuItem><MenuItem value="ACTIVE">ACTIVE</MenuItem><MenuItem value="INACTIVE">INACTIVE</MenuItem></Select></FormControl>
-          <Stack direction="row" spacing={1}><Button type="submit" variant="contained">검색</Button><Button color="inherit" startIcon={<RefreshRounded />} onClick={resetFilters}>초기화</Button></Stack>
-        </Box>
-      </FilterCard>
+      </SearchFilterForm>
 
       <Card>
         <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {pageData.totalElements.toLocaleString()}명</Typography></Box>
