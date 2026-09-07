@@ -26,19 +26,10 @@ import {
 import { exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogEntry, verifyAuditLogs } from '../../api/kms'
 import { FilterCard, InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
+import { AuditActionFilter } from './AuditActionFilter'
+import { auditActionLabels } from '../../utils/auditPresentation'
 import { StatusBadge } from '../../components/common/StatusBadge'
-import type { AuditAction, AuditEntryVerification, AuditListParams, AuditLog as AuditLogType, AuditVerification, PageResponse } from '../../types/api'
-
-const auditActionLabels: Record<AuditAction, string> = {
-  LOGIN: '로그인', LOGOUT: '로그아웃', SESSION_REFRESH: '세션 연장',
-  KEY_CREATE: '키 생성', KEY_UPDATE: '키 수정', KEY_DELETE: '키 삭제', KEY_STATUS_CHANGE: '키 상태 변경',
-  KEY_DEPLOY: '키 배포', KEY_DEPLOY_ROLLBACK: '키 배포 롤백', KEY_ROTATE: '키 갱신',
-  KEY_AUTO_ROTATION_UPDATE: '자동 갱신 설정', KEY_TEST: '키 테스트', USER_CREATE: '사용자 생성',
-  USER_UPDATE: '사용자 수정', USER_VIEW_PLAIN: '개인정보 원문 조회', USER_STATUS_CHANGE: '사용자 상태 변경',
-  USER_PASSWORD_RESET: '비밀번호 재설정', AUDIT_EXPORT: '감사 CSV 내보내기', NOTICE_CREATE: '게시글 생성',
-  NOTICE_VIEW: '게시글 조회', NOTICE_UPDATE: '게시글 수정', NOTICE_DELETE: '게시글 삭제', FILE_DOWNLOAD: '파일 내려받기', FILE_DELETE: '파일 삭제',
-  ADMIN_ACCOUNT_UPDATE: '관리 계정 수정', ADMIN_ACCOUNT_STATUS_CHANGE: '관리 계정 상태 변경', ADMIN_ACCOUNT_PASSWORD_RESET: '관리 계정 비밀번호 재설정',
-}
+import type { AuditEntryVerification, AuditListParams, AuditLog as AuditLogType, AuditVerification, PageResponse } from '../../types/api'
 
 function isoDate(date: Date) {
   return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -187,11 +178,12 @@ function AuditLog() {
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
       <FilterCard>
-        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'minmax(160px, 1fr) minmax(160px, 1fr) minmax(200px, 1.4fr) auto' }, gap: 1.25 }}>
+        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', xl: 'minmax(150px, 1fr) minmax(150px, 1fr) minmax(160px, 1fr) minmax(260px, 1.6fr) auto' }, gap: 1.25 }}>
           <TextField size="small" type="date" label="시작일" value={draft.from} onChange={(event) => setDraft((current) => ({ ...current, from: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" type="date" label="종료일" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" label="행위자" value={draft.actor} onChange={(event) => setDraft((current) => ({ ...current, actor: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'stretch', justifyContent: 'flex-end', '& > button': { flex: { xs: 1, lg: 'initial' }, minWidth: 76 } }}><Button type="submit" variant="contained">검색</Button><Button color="inherit" onClick={() => { setDraft(defaultParams); setParams(defaultParams) }}>초기화</Button></Stack>
+          <AuditActionFilter value={draft.action} onChange={(action) => setDraft((current) => ({ ...current, action }))} />
+          <Stack direction="row" spacing={1} sx={{ gridColumn: { sm: '1 / -1', xl: 'auto' }, alignItems: 'stretch', justifyContent: 'flex-end', '& > button': { flex: { xs: 1, sm: 'initial' }, minWidth: 76 } }}><Button type="submit" variant="contained">검색</Button><Button color="inherit" onClick={() => { setDraft(defaultParams); setParams(defaultParams) }}>초기화</Button></Stack>
         </Box>
       </FilterCard>
 
