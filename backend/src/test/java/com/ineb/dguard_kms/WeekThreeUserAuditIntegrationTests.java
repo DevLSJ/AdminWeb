@@ -9,10 +9,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +22,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.ineb.dguard_kms.domain.audit.entity.AuditLog;
 import com.ineb.dguard_kms.domain.audit.repository.AuditLogRepository;
 import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
 import com.ineb.dguard_kms.domain.user.repository.AppUserRepository;
@@ -53,6 +57,24 @@ class WeekThreeUserAuditIntegrationTests {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Test
+    @Transactional
+    void dateRangeIncludesStartMidnightAndExcludesNextMidnight() {
+        var from = Instant.parse("2001-09-05T15:00:00Z");
+        var to = Instant.parse("2001-09-07T15:00:00Z");
+        var times = List.of(from.minusNanos(1000), from, to.minusNanos(1000), to);
+        var entries = times.stream().map(time -> auditLogRepository.saveAndFlush(
+                new AuditLog(UUID.randomUUID(), "admin",
+                        "TEST", "TEST", "boundary", "date boundary", null, "hash", time))).toList();
+
+        assertThat(auditLogRepository.findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByIdAsc(from, to))
+                .extracting(AuditLog::getLogUid)
+                .containsExactly(entries.get(1).getLogUid(), entries.get(2).getLogUid());
+        assertThat(auditLogRepository.findTopByCreatedAtGreaterThanEqualOrderByCreatedAtAscIdAsc(to))
+                .get().extracting(AuditLog::getLogUid)
+                .isEqualTo(entries.get(3).getLogUid());
+    }
 
     @Test
     void personalDataIsEncryptedMaskedAndPlainViewIsAudited() throws Exception {
@@ -239,26 +261,26 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(verification.path("data").path("valid").asBoolean()).isTrue();
         assertThat(verification.path("data").path("headValid").asBoolean()).isTrue();
         assertThat(verification.path("data").path("checkedCount").asLong()).isPositive();
-        String rangeFrom = Instant.now().minus(1, ChronoUnit.DAYS).toString();
-        String rangeTo = Instant.now().plus(1, ChronoUnit.MINUTES).toString();
+        String rangeFrom = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1).toString();
+        String rangeTo = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
         JsonNode rangedVerification = sendJson(client, "GET",
                 "/api/audit-logs/verify?from=" + URLEncoder.encode(rangeFrom, StandardCharsets.UTF_8)
                         + "&to=" + URLEncoder.encode(rangeTo, StandardCharsets.UTF_8),
                 adminToken, "", 200);
         assertThat(rangedVerification.path("data").path("valid").asBoolean()).isTrue();
         assertThat(rangedVerification.path("data").path("checkedCount").asLong()).isPositive();
-        assertThat(rangedVerification.path("data").path("rangeFrom").asText()).isEqualTo(rangeFrom);
-        assertThat(rangedVerification.path("data").path("rangeTo").asText()).isEqualTo(rangeTo);
+        assertThat(rangedVerification.path("data").path("rangeFrom").asText()).isEqualTo(LocalDate.parse(rangeFrom).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant().toString());
+        assertThat(rangedVerification.path("data").path("rangeTo").asText()).isEqualTo(LocalDate.parse(rangeTo).plusDays(1).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant().toString());
         String selectedLogUid = logs.path("data").path("content").get(0).path("logUid").asText();
         var selectedAuditLog = auditLogRepository.findByLogUid(UUID.fromString(selectedLogUid)).orElseThrow();
-        String narrowFrom = selectedAuditLog.getCreatedAt().minus(1, ChronoUnit.MICROS).toString();
-        String narrowTo = selectedAuditLog.getCreatedAt().plus(1, ChronoUnit.MICROS).toString();
+        String narrowFrom = selectedAuditLog.getCreatedAt().atZone(ZoneId.of("Asia/Seoul")).toLocalDate().toString();
+        String narrowTo = narrowFrom;
         JsonNode boundaryVerification = sendJson(client, "GET",
                 "/api/audit-logs/verify?from=" + URLEncoder.encode(narrowFrom, StandardCharsets.UTF_8)
                         + "&to=" + URLEncoder.encode(narrowTo, StandardCharsets.UTF_8),
                 adminToken, "", 200);
         assertThat(boundaryVerification.path("data").path("valid").asBoolean()).isTrue();
-        assertThat(boundaryVerification.path("data").path("checkedCount").asLong()).isEqualTo(1);
+        assertThat(boundaryVerification.path("data").path("checkedCount").asLong()).isPositive();
         assertThat(boundaryVerification.path("data").path("headValid").asBoolean()).isTrue();
         sendJson(client, "GET",
                 "/api/audit-logs/verify?from=" + URLEncoder.encode(rangeTo, StandardCharsets.UTF_8)

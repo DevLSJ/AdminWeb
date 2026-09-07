@@ -16,9 +16,9 @@ public record AuditVerificationResponse(
         List<UUID> invalidLogUids,
         @Schema(description = "기간 마지막 행의 다음 연결 또는 최종 체인 헤드 일치 여부")
         boolean headValid,
-        @Schema(description = "검증 범위 시작 시각(UTC). 전체 검증이면 null")
+        @Schema(description = "검증 범위 시작 시각(UTC, 포함). 전체 검증이면 null")
         Instant rangeFrom,
-        @Schema(description = "검증 범위 종료 시각(UTC). 전체 검증이면 null")
+        @Schema(description = "검증 범위 종료일 다음 날 0시(UTC, 미포함). 전체 검증이면 null")
         Instant rangeTo,
         @Schema(description = "검증 완료 시각(UTC)")
         Instant verifiedAt

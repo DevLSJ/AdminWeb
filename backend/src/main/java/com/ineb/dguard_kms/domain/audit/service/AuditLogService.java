@@ -114,20 +114,23 @@ public class AuditLogService {
     }
 
     @Transactional(readOnly = true)
-    public AuditVerificationResponse verifyChain(Instant from, Instant to) {
-        boolean ranged = from != null || to != null;
-        if (ranged && (from == null || to == null)) {
-            throw new IllegalArgumentException("시작일시와 종료일시를 모두 입력해야 합니다.");
+    public AuditVerificationResponse verifyChain(LocalDate fromDate, LocalDate toDate) {
+        boolean ranged = fromDate != null || toDate != null;
+        if (ranged && (fromDate == null || toDate == null)) {
+            throw new IllegalArgumentException("시작일과 종료일을 모두 입력해야 합니다.");
         }
-        if (ranged && !from.isBefore(to)) {
-            throw new IllegalArgumentException("종료일시는 시작일시보다 이후여야 합니다.");
+        if (ranged && fromDate.isAfter(toDate)) {
+            throw new IllegalArgumentException("종료일은 시작일과 같거나 이후여야 합니다.");
         }
-        if (ranged && from.plus(366, ChronoUnit.DAYS).isBefore(to)) {
+        if (ranged && ChronoUnit.DAYS.between(fromDate, toDate) >= 366) {
             throw new IllegalArgumentException("해시 체인 검증 기간은 최대 366일까지 선택할 수 있습니다.");
         }
+        Instant from = ranged ? fromDate.atStartOfDay(KST).toInstant() : null;
+        // 종료일 전체를 포함하되 다음 날 0시는 제외한다.
+        Instant to = ranged ? toDate.plusDays(1).atStartOfDay(KST).toInstant() : null;
 
         List<AuditLog> logs = ranged
-                ? repository.findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByIdAsc(from, to)
+                ? repository.findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByIdAsc(from, to)
                 : repository.findAllByOrderByIdAsc();
         List<UUID> invalid = new ArrayList<>();
         AuditLog previous = logs.isEmpty()
@@ -146,7 +149,7 @@ public class AuditLogService {
         AuditLog last = logs.isEmpty() ? previous : logs.get(logs.size() - 1);
         AuditLog next = logs.isEmpty()
                 ? ranged
-                        ? repository.findTopByCreatedAtGreaterThanOrderByCreatedAtAscIdAsc(to).orElse(null)
+                        ? repository.findTopByCreatedAtGreaterThanEqualOrderByCreatedAtAscIdAsc(to).orElse(null)
                         : null
                 : repository.findTopByIdGreaterThanOrderByIdAsc(last.getId()).orElse(null);
         String lastHash = last == null ? null : last.getRowHash();

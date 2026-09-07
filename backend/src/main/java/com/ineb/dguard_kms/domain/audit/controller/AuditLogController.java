@@ -2,7 +2,6 @@ package com.ineb.dguard_kms.domain.audit.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
@@ -60,10 +59,10 @@ public class AuditLogController {
     }
 
     @GetMapping("/verify")
-    @Operation(summary = "감사 로그 기간 체인 검증", description = "선택 기간의 행 HMAC과 범위 앞뒤 연결을 검증합니다. 기간을 생략하면 전체 체인을 검증합니다.")
+    @Operation(summary = "감사 로그 기간 체인 검증", description = "YYYY-MM-DD 형식의 시작일과 종료일을 받습니다. 한국 시간 시작일 0시 이상, 종료일 다음 날 0시 미만의 행 HMAC과 범위 앞뒤 연결을 검증합니다. 두 날짜를 생략하면 전체 체인을 검증합니다.")
     public ApiResponse<AuditVerificationResponse> verify(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return ApiResponse.success(service.verifyChain(from, to), "감사 로그 체인 검증을 완료했습니다.");
     }

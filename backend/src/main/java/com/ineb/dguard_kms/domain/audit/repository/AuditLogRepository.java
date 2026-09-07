@@ -21,11 +21,11 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSp
 
     Optional<AuditLog> findTopByCreatedAtLessThanOrderByCreatedAtDescIdDesc(Instant createdAt);
 
-    Optional<AuditLog> findTopByCreatedAtGreaterThanOrderByCreatedAtAscIdAsc(Instant createdAt);
+    Optional<AuditLog> findTopByCreatedAtGreaterThanEqualOrderByCreatedAtAscIdAsc(Instant createdAt);
 
     List<AuditLog> findAllByOrderByIdAsc();
 
-    List<AuditLog> findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByIdAsc(
+    List<AuditLog> findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByIdAsc(
             Instant from,
             Instant to
     );

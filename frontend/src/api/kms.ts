@@ -177,7 +177,7 @@ export async function fetchAuditLogs() {
 export async function verifyAuditLogs(from: string, to: string) {
   return unwrap(await apiClient.get<ApiResponse<AuditVerification>>(
     apiEndpoints.auditLogs.verify,
-    { params: { from: new Date(from).toISOString(), to: new Date(to).toISOString() } },
+    { params: { from, to } },
   ))
 }
 

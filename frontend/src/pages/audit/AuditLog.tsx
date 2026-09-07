@@ -11,12 +11,8 @@ import {
   DialogContent,
   DialogTitle,
   Drawer,
-  FormControl,
   InputAdornment,
-  InputLabel,
   IconButton,
-  MenuItem,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -33,17 +29,8 @@ import { paginatedTableCellSx, paginatedTableContainerSx } from '../../component
 import { StatusBadge } from '../../components/common/StatusBadge'
 import type { AuditAction, AuditEntryVerification, AuditListParams, AuditLog as AuditLogType, AuditVerification, PageResponse } from '../../types/api'
 
-const auditActions: Array<AuditAction | 'ALL'> = [
-  'ALL', 'LOGIN', 'LOGOUT', 'SESSION_REFRESH', 'KEY_CREATE', 'KEY_UPDATE', 'KEY_DELETE',
-  'KEY_STATUS_CHANGE', 'KEY_DEPLOY', 'KEY_DEPLOY_ROLLBACK', 'KEY_ROTATE',
-  'KEY_AUTO_ROTATION_UPDATE', 'KEY_TEST', 'USER_CREATE', 'USER_UPDATE',
-  'USER_VIEW_PLAIN', 'USER_STATUS_CHANGE', 'USER_PASSWORD_RESET', 'AUDIT_EXPORT',
-  'NOTICE_CREATE', 'NOTICE_VIEW', 'NOTICE_UPDATE', 'NOTICE_DELETE', 'FILE_DOWNLOAD', 'FILE_DELETE',
-  'ADMIN_ACCOUNT_UPDATE', 'ADMIN_ACCOUNT_STATUS_CHANGE', 'ADMIN_ACCOUNT_PASSWORD_RESET',
-]
-
-const auditActionLabels: Record<AuditAction | 'ALL', string> = {
-  ALL: '전체 행위', LOGIN: '로그인', LOGOUT: '로그아웃', SESSION_REFRESH: '세션 연장',
+const auditActionLabels: Record<AuditAction, string> = {
+  LOGIN: '로그인', LOGOUT: '로그아웃', SESSION_REFRESH: '세션 연장',
   KEY_CREATE: '키 생성', KEY_UPDATE: '키 수정', KEY_DELETE: '키 삭제', KEY_STATUS_CHANGE: '키 상태 변경',
   KEY_DEPLOY: '키 배포', KEY_DEPLOY_ROLLBACK: '키 배포 롤백', KEY_ROTATE: '키 갱신',
   KEY_AUTO_ROTATION_UPDATE: '자동 갱신 설정', KEY_TEST: '키 테스트', USER_CREATE: '사용자 생성',
@@ -54,7 +41,7 @@ const auditActionLabels: Record<AuditAction | 'ALL', string> = {
 }
 
 function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10)
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
 const today = new Date()
@@ -71,17 +58,13 @@ function formatKst(value: string) {
   }).format(new Date(value))
 }
 
-function localDateTimeValue(date: Date) {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return local.toISOString().slice(0, 16)
-}
-
 function defaultVerificationRange() {
   const to = new Date()
-  const from = new Date(to)
-  from.setDate(from.getDate() - 7)
-  from.setHours(0, 0, 0, 0)
-  return { from: localDateTimeValue(from), to: localDateTimeValue(to) }
+  return { from: isoDate(new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000)), to: isoDate(to) }
+}
+
+function formatVerificationRange(from: string, to: string) {
+  return `${isoDate(new Date(from))} ~ ${isoDate(new Date(new Date(to).getTime() - 1))} (한국 시간) · `
 }
 
 function AuditLog() {
@@ -138,14 +121,14 @@ function AuditLog() {
     const fromTime = new Date(verificationRange.from).getTime()
     const toTime = new Date(verificationRange.to).getTime()
     if (!verificationRange.from || !verificationRange.to || Number.isNaN(fromTime) || Number.isNaN(toTime)) {
-      setVerificationRangeError('시작일시와 종료일시를 모두 선택해 주세요.')
+      setVerificationRangeError('시작일과 종료일을 모두 선택해 주세요.')
       return
     }
-    if (fromTime >= toTime) {
-      setVerificationRangeError('종료일시는 시작일시보다 이후여야 합니다.')
+    if (fromTime > toTime) {
+      setVerificationRangeError('종료일은 시작일과 같거나 이후여야 합니다.')
       return
     }
-    if (toTime - fromTime > 366 * 24 * 60 * 60 * 1000) {
+    if (toTime - fromTime >= 366 * 24 * 60 * 60 * 1000) {
       setVerificationRangeError('검증 기간은 최대 366일까지 선택할 수 있습니다.')
       return
     }
@@ -199,17 +182,16 @@ function AuditLog() {
         description="서버의 append-only 감사 이벤트를 검색하고 선택 기간의 행 HMAC·prev_hash 경계 연결을 검증합니다."
         action={<Stack direction="row" spacing={1}><Button data-testid="audit-verify-button" variant="outlined" startIcon={<FactCheckRounded />} onClick={openVerification}>기간 해시 체인 검증</Button><Button variant="contained" startIcon={<DownloadRounded />} onClick={() => void exportCsv()}>서명 CSV 내려받기</Button></Stack>}
       />
-      {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity={verification.checkedCount === 0 ? 'info' : 'success'} onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? `${formatKst(verification.rangeFrom)} ~ ${formatKst(verification.rangeTo)} KST · ` : ''}{verification.checkedCount === 0 ? '선택 기간에 검증할 감사 로그가 없습니다.' : `총 ${verification.checkedCount.toLocaleString()}건의 행 HMAC과 기간 경계 연결이 정상입니다.`} · {formatKst(verification.verifiedAt)} KST</Alert>}
-      {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? `${formatKst(verification.rangeFrom)} ~ ${formatKst(verification.rangeTo)} KST · ` : ''}해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '기간 경계'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
+      {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity={verification.checkedCount === 0 ? 'info' : 'success'} onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}{verification.checkedCount === 0 ? '선택 기간에 검증할 감사 로그가 없습니다.' : `총 ${verification.checkedCount.toLocaleString()}건의 행 HMAC과 기간 경계 연결이 정상입니다.`} · {formatKst(verification.verifiedAt)} KST</Alert>}
+      {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '기간 경계'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
       <FilterCard>
-        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(150px, 0.75fr)) 1fr 1.25fr auto' }, gap: 1.25 }}>
-          <TextField size="small" type="date" label="from" value={draft.from} onChange={(event) => setDraft((current) => ({ ...current, from: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField size="small" type="date" label="to" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
+        <Box component="form" onSubmit={search} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'minmax(160px, 1fr) minmax(160px, 1fr) minmax(200px, 1.4fr) auto' }, gap: 1.25 }}>
+          <TextField size="small" type="date" label="시작일" value={draft.from} onChange={(event) => setDraft((current) => ({ ...current, from: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" type="date" label="종료일" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField size="small" label="행위자" value={draft.actor} onChange={(event) => setDraft((current) => ({ ...current, actor: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
-          <FormControl size="small"><InputLabel>행위</InputLabel><Select label="행위" value={draft.action} onChange={(event) => setDraft((current) => ({ ...current, action: event.target.value as AuditListParams['action'] }))}>{auditActions.map((action) => <MenuItem key={action} value={action}>{auditActionLabels[action]}</MenuItem>)}</Select></FormControl>
-          <Stack direction="row" spacing={1}><Button type="submit" variant="contained">검색</Button><Button color="inherit" onClick={() => { setDraft(defaultParams); setParams(defaultParams) }}>초기화</Button></Stack>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'stretch', justifyContent: 'flex-end', '& > button': { flex: { xs: 1, lg: 'initial' }, minWidth: 76 } }}><Button type="submit" variant="contained">검색</Button><Button color="inherit" onClick={() => { setDraft(defaultParams); setParams(defaultParams) }}>초기화</Button></Stack>
         </Box>
       </FilterCard>
 
@@ -232,7 +214,7 @@ function AuditLog() {
 
       <Dialog open={verificationOpen} onClose={() => { if (!verifyingRange) setVerificationOpen(false) }} fullWidth maxWidth="md" slotProps={{ paper: { sx: { overflow: 'hidden', borderRadius: 3 } } }}>
         <DialogTitle sx={{ pb: 1 }}>
-          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}><Box sx={{ display: 'grid', width: 38, height: 38, placeItems: 'center', borderRadius: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}><CalendarMonthRounded /></Box><Box><Typography variant="h6">검증 기간 선택</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>여정 구간을 고르듯 시작일시와 종료일시를 지정하세요.</Typography></Box></Stack>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}><Box sx={{ display: 'grid', width: 38, height: 38, placeItems: 'center', borderRadius: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}><CalendarMonthRounded /></Box><Box><Typography variant="h6">검증 기간 선택</Typography><Typography sx={{ color: 'text.secondary', fontSize: 13 }}>한국 시간 기준으로 시작일과 종료일을 선택하세요.</Typography></Box></Stack>
         </DialogTitle>
         <DialogContent sx={{ pt: '18px !important' }}>
           <Box sx={{ position: 'relative', mb: 2.5, px: { xs: 1, sm: 4 }, height: 62 }}>
@@ -245,17 +227,17 @@ function AuditLog() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr auto 1fr' }, alignItems: 'stretch', gap: 1.5 }}>
             <Box sx={{ p: 2.25, border: '1px solid', borderColor: 'primary.main', borderRadius: 2.5, bgcolor: 'rgba(54,112,246,.045)', transition: 'transform .2s ease, box-shadow .2s ease', '&:focus-within': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(54,112,246,.13)' } }}>
               <Typography sx={{ mb: .5, color: 'primary.main', fontWeight: 850, fontSize: 12, letterSpacing: '.08em' }}>START</Typography>
-              <Typography sx={{ mb: 1.5, fontWeight: 800 }}>시작일시</Typography>
-              <TextField data-testid="audit-verify-from" fullWidth type="datetime-local" value={verificationRange.from} onChange={(event) => setVerificationRange((current) => ({ ...current, from: event.target.value }))} slotProps={{ htmlInput: { max: verificationRange.to || localDateTimeValue(new Date()) } }} />
+              <Typography sx={{ mb: 1.5, fontWeight: 800 }}>시작일</Typography>
+              <TextField data-testid="audit-verify-from" fullWidth type="date" value={verificationRange.from} onChange={(event) => setVerificationRange((current) => ({ ...current, from: event.target.value }))} slotProps={{ htmlInput: { max: verificationRange.to || isoDate(new Date()) } }} />
             </Box>
             <Box sx={{ display: { xs: 'none', md: 'grid' }, placeItems: 'center', color: 'text.disabled', fontSize: 22 }}>→</Box>
             <Box sx={{ p: 2.25, border: '1px solid', borderColor: 'secondary.main', borderRadius: 2.5, bgcolor: 'rgba(89,200,183,.055)', transition: 'transform .2s ease, box-shadow .2s ease', '&:focus-within': { transform: 'translateY(-3px)', boxShadow: '0 12px 28px rgba(89,200,183,.14)' } }}>
               <Typography sx={{ mb: .5, color: 'secondary.dark', fontWeight: 850, fontSize: 12, letterSpacing: '.08em' }}>END</Typography>
-              <Typography sx={{ mb: 1.5, fontWeight: 800 }}>종료일시</Typography>
-              <TextField data-testid="audit-verify-to" fullWidth type="datetime-local" value={verificationRange.to} onChange={(event) => setVerificationRange((current) => ({ ...current, to: event.target.value }))} slotProps={{ htmlInput: { min: verificationRange.from, max: localDateTimeValue(new Date()) } }} />
+              <Typography sx={{ mb: 1.5, fontWeight: 800 }}>종료일</Typography>
+              <TextField data-testid="audit-verify-to" fullWidth type="date" value={verificationRange.to} onChange={(event) => setVerificationRange((current) => ({ ...current, to: event.target.value }))} slotProps={{ htmlInput: { min: verificationRange.from, max: isoDate(new Date()) } }} />
             </Box>
           </Box>
-          <Alert severity="info" sx={{ mt: 2 }}>선택 기간 내부의 모든 행 HMAC과 첫 행의 이전 연결, 마지막 행의 다음 연결 또는 최종 체인 헤드까지 검증합니다.</Alert>
+          <Alert severity="info" sx={{ mt: 2 }}>시작일과 종료일을 포함한 모든 로그와 앞뒤 로그의 연결을 검증합니다. 같은 날짜를 선택하면 하루 전체를 검증합니다.</Alert>
           {verificationRangeError && <Alert severity="error" sx={{ mt: 1.5 }}>{verificationRangeError}</Alert>}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}><Button color="inherit" disabled={verifyingRange} onClick={() => setVerificationOpen(false)}>취소</Button><Button data-testid="audit-verify-submit" variant="contained" disabled={verifyingRange} startIcon={verifyingRange ? <CircularProgress size={17} color="inherit" /> : <FactCheckRounded />} onClick={() => void verifyChain()}>{verifyingRange ? '검증 중' : '선택 기간 검증'}</Button></DialogActions>
