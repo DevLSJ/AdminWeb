@@ -99,7 +99,7 @@ public class AppUserService {
                 .stream().filter(user -> !filtered || (verifyIntegrity(user)
                         && contains(decrypt(user.getNameCiphertext(), user.getNameIv()), name)
                         && (isBlank(phone) || (!phone.replaceAll("\\D", "").isEmpty()
-                            && decrypt(user.getPhoneCiphertext(), user.getPhoneIv()).replaceAll("\\D", "").contains(phone.replaceAll("\\D", ""))))
+                            && decrypt(user.getPhoneCiphertext(), user.getPhoneIv()).replaceAll("\\D", "").equals(phone.replaceAll("\\D", ""))))
                         && contains(decrypt(user.getEmailCiphertext(), user.getEmailIv()), email)))
                 .map(this::response).toList();
     }

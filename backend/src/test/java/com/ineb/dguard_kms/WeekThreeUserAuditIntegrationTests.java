@@ -129,13 +129,26 @@ class WeekThreeUserAuditIntegrationTests {
                 """.formatted(phone, email), 409);
         assertThat(duplicate.path("errorCode").asText()).isEqualTo("USER_DUPLICATE");
 
-        for (String filter : new String[] {"name=" + URLEncoder.encode("홍", StandardCharsets.UTF_8), "phone=123", "email=" + URLEncoder.encode(email.substring(0, email.indexOf('@')), StandardCharsets.UTF_8)}) {
-            if (filter.equals("phone=123")) filter = "phone=" + phone.replaceAll("\\D", "").substring(3, 7);
+        for (String filter : new String[] {"name=" + URLEncoder.encode("홍", StandardCharsets.UTF_8), "email=" + URLEncoder.encode(email.substring(0, email.indexOf('@')), StandardCharsets.UTF_8)}) {
             JsonNode partial = sendJson(client, "GET", "/api/users/managed?size=100&" + filter, adminToken, "", 200);
             assertThat(findUser(partial.path("data").path("content"), userUid).path("nameDisplay").asText()).doesNotContain("홍길동");
         }
         sendJson(client, "POST", "/api/users", adminToken,
                 "{\"name\":\"규칙검사\",\"phone\":\"010-8888-8888\",\"email\":\"policy@example.com\",\"password\":\"abcdefgh\"}", 400);
+
+        // Exact phone matching applies to encrypted app users and admin accounts.
+        for (String[] contact : new String[][] {{phone, userUid.toString()}, {adminPhone, clientAccountUid}}) {
+            String digits = contact[0].replaceAll("\\D", "");
+            for (String query : new String[] {contact[0], digits}) {
+                JsonNode exact = sendJson(client, "GET", "/api/users/managed?size=100&phone=" + query, adminToken, "", 200);
+                assertThat(findUser(exact.path("data").path("content"), UUID.fromString(contact[1])).path("userUid").asText()).isEqualTo(contact[1]);
+            }
+            for (String query : new String[] {digits.substring(3, 7), digits.substring(0, 10), "---"}) {
+                JsonNode partial = sendJson(client, "GET", "/api/users/managed?size=100&phone=" + query, adminToken, "", 200);
+                assertThat(partial.path("data").path("content")).noneSatisfy(account ->
+                        assertThat(account.path("userUid").asText()).isEqualTo(contact[1]));
+            }
+        }
 
         var stored = userRepository.findByUserUid(userUid).orElseThrow();
         assertThat(new String(stored.getNameCiphertext(), StandardCharsets.UTF_8)).doesNotContain("홍길동");

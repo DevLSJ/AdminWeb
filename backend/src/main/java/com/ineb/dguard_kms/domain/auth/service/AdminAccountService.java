@@ -65,7 +65,7 @@ public class AdminAccountService {
             String value = new String(plain, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
             String filter = query.trim().toLowerCase(Locale.ROOT);
             if (phone) { value = value.replaceAll("\\D", ""); filter = filter.replaceAll("\\D", ""); }
-            return !filter.isEmpty() && value.contains(filter);
+            return !filter.isEmpty() && (phone ? value.equals(filter) : value.contains(filter));
         } finally { Arrays.fill(plain, (byte) 0); }
     }
 

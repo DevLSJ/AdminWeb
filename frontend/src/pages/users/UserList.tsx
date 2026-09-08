@@ -343,7 +343,7 @@ function UserList() {
 
       <SearchFilterForm columns={3} onSearch={search} onReset={resetFilters}>
           <TextField size="small" label="이름 검색" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
-          <TextField size="small" label="연락처 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
+          <TextField size="small" label="연락처 정확 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
           <TextField size="small" label="이메일 검색" value={draft.email ?? ''} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
       </SearchFilterForm>
 
