@@ -1,377 +1,203 @@
-# KMS 어드민 웹 
+# D'Guard KMS
 
-> D'Guard KMS 관리자 웹 — 1st Week
+> 암호키의 생성부터 갱신·폐기까지, 사용자 정보와 감사 이력을 함께 관리하는 통합 키 관리 웹 콘솔
 
-## 프로젝트 소개 (Overview)
+<p align="center">
+  <img src="https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge" alt="Java 21" />
+  <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot" />
+  <img src="https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+</p>
 
-`my-project`는 아이넵 통합키관리 시스템 **D'Guard KMS**의 관리자 웹 프로젝트입니다. 관리자는 웹 콘솔에서 로그인한 뒤 키 현황을 확인하고, 키를 등록·조회하거나 암복호화 동작을 시험할 수 있습니다. 사용자·공지사항·감사 로그 관리 화면도 동일한 관리 콘솔 안에서 제공합니다.
-다
-1주차 구현은 레이아웃 / API / 암복호화 초기 구현에 초점을 맞췄습니다. 백엔드는 관리자 비밀번호를 평문이 아닌 PBKDF2 해시와 개별 Salt로 저장하고 JWT 인증을 수행합니다. 또한 마스터 프레이즈로 키를 유도한 뒤 KCV(Key Check Value)를 검증하여, 잘못된 패스프레이즈로는 애플리케이션이 기동되지 않도록 보호합니다.
+---
 
-### 핵심 기능
+## 프로젝트 소개
 
-- 명시적 1회 계정 프로비저닝과 JWT 기반 인증
-- 각종 레이아웃(AppBar, Drawer, 콘텐츠 영역)
-- PBKDF2-HMAC-SHA256 기반 비밀번호 해시 및 Salt 저장
-- PBKDF2 기반 마스터키 유도와 KCV 기동 검증
-- AES-256-GCM 기반 데이터 암호화 및 HMAC-SHA256 무결성 검증
-- 키 관리, 사용자 관리, 감사 로그, 공지사항, 대시보드 화면/API 구조
+**D'Guard KMS**는 암호키와 개인정보를 관리하고, 주요 작업의 감사 로그 및 무결성을 확인하는 웹 애플리케이션입니다. React 기반 관리 화면과 Spring Boot API를 연결해 키 정책, 사용자 계정, 게시글과 암호화 첨부파일을 관리합니다.
 
-## 주요 화면 (Screenshots)
+대시보드에서는 키 현황·사용 추이·최근 활동을 확인하고 각 관리 화면으로 이동할 수 있습니다. 감사 로그는 행 HMAC과 해시 체인 검증으로 위·변조 여부를 확인하며, 개인정보 원문 조회는 별도 감사 이력으로 남깁니다.
 
-> 화면에 표시된 수치, 키 이름 및 UUID는 기능 시연을 위한 예시 데이터입니다.
+---
 
-### 대시보드
+## 주요 기능
 
-전체·활성·만료 임박 키, 등록 사용자 및 무결성 위반 현황을 요약 카드로 제공합니다. 일별/월별 키 사용 추이와 키 상태 분포를 함께 확인할 수 있습니다.
+| 기능 | 설명 |
+| --- | --- |
+| 로그인·세션 | JWT 인증, 역할별 화면 접근 제어, 남은 세션 시간 표시 및 세션 연장 |
+| 대시보드 | 전체 키·암호화 가능·만료 임박·무결성 위반 요약, 사용 추이, 최근 활동, 게시글 |
+| 키 통계 | 최근 30일·12개월 사용량, 키 상태 및 알고리즘 분포, 카드 내부 스크롤 |
+| 키 관리 | 키 검색·등록·상태 변경·갱신·배포·폐기, 버전·만료일·무결성 조회 |
+| 암·복호화 테스트 | 키 정책과 상태에 따른 암·복호화 실행, 결과 및 사용 이력 확인 |
+| 사용자 관리 | 이름·이메일 부분 검색, 연락처 정확 검색, 개인정보 마스킹·암호화 및 권한별 관리 |
+| 프로필 관리 | 본인 표시 이름·이메일·전화번호 조회 및 수정, 연락처 암호화 저장 |
+| 감사 로그 | 기간·행위자·행위별 검색, 행 HMAC 및 기간 해시 체인 검증, 위반 조회, CSV 내보내기 |
+| 게시판 | 공지 우선 표시, 게시글 작성·수정·삭제·노출 설정, 본문 입력 영역 내부 스크롤 |
+| 첨부파일 | 클릭·드래그 앤 드롭 첨부, 개별 10MB·최대 10개 검증, 암호화 저장 및 다운로드 |
 
-![D'Guard KMS 대시보드](readme-assets/dashboard.png)
+---
 
-### 키 목록
-
-키 이름 또는 UUID를 검색하고 알고리즘·상태·용도별로 필터링할 수 있습니다. 키 원문과 래핑 값은 목록에 노출하지 않으며 상태, 버전, 만료일, 무결성 결과만 제공합니다.
-
-![D'Guard KMS 키 목록](readme-assets/key-list.png)
-
-### 암복호화 테스트
-
-선택한 `ACTIVE` 키로 평문을 암호화하거나, 서버가 반환한 Base64 암호문과 IV를 입력해 복호화할 수 있습니다. 테스트 결과와 성공 여부는 키 사용 로그에 기록됩니다.
-
-| 암호화 | 복호화 |
-|---|---|
-| 평문을 AES-256-GCM으로 암호화하고 암호문과 임의 IV를 반환합니다. | 암호문과 IV를 검증한 뒤 원래 평문을 복원합니다. |
-| [![암호화 테스트 화면](readme-assets/crypto-encrypt.png)](readme-assets/crypto-encrypt.png) | [![복호화 테스트 화면](readme-assets/crypto-decrypt.png)](readme-assets/crypto-decrypt.png) |
-
-## 기술 스택 (Tech Stack)
-
-### Backend
-
-| 구분 | 기술 | 버전/용도 |
-|---|---|---|
-| Language | Java | 21 |
-| Framework | Spring Boot | 4.1.0 |
-| Security | Spring Security, JWT | JWT 인증, JWT 0.12.6 |
-| Persistence | Spring Data JPA, Flyway | ORM 및 DB 마이그레이션 |
-| API Docs | SpringDoc OpenAPI | 3.0.3 |
-| Build/Test | Gradle Wrapper, JUnit | 9.5.1 |
-| Database | PostgreSQL | 17 |
-
-### Frontend
-
-| 구분 | 기술 | 버전/용도 |
-|---|---|---|
-| Language | TypeScript | 6.0 |
-| UI | React | 19.2 |
-| Component Library | MUI (Material UI) | 9.3 |
-| Routing | React Router DOM | 7.18 |
-| HTTP Client | Axios | 1.19 |
-| Build Tool | Vite | 8.2 |
-| Lint | EsLint | 1.75 |
-
-### Infrastructure & Security
+## 기술 스택
 
 | 구분 | 기술 |
-|---|---|
-| Container | Docker, Docker Compose |
-| Web Server | Nginx 1.27 |
-| CI/CD | GitHub Actions, Docker Hub |
-| Key Derivation | PBKDF2-HMAC-SHA256, 10,000회 |
-| Encryption | AES-256-GCM |
-| Integrity | HMAC-SHA256 |
-| Encoding | Base64 |
+| --- | --- |
+| Backend | Java 21, Spring Boot 4.1, Spring Security, Spring Data JPA |
+| Frontend | React 19, TypeScript 6, MUI 9, React Router 7, Axios |
+| Database | PostgreSQL 17, Flyway |
+| Authentication | JWT, PBKDF2-HMAC-SHA256 비밀번호 해시 및 개별 Salt |
+| Cryptography | AES-256-GCM, RSA, HMAC-SHA256, 마스터키 KCV 검증 |
+| Build / Test | Gradle Wrapper, JUnit, Vite 8, Oxlint |
+| API Documentation | SpringDoc OpenAPI, Swagger UI |
+| Deployment | Docker Compose, Nginx, GitHub Actions |
 
-## 1주차 구현 목표 및 현황 (Week 1 Progress)
+---
 
-### 목표 대비 구현 결과
+## 화면 미리보기
 
-- [x] MUI 기반 로그인 화면 및 로그인 실패 `Alert` 구현
-- [x] `POST /api/auth/login` 로그인 API와 JWT 발급 구현
-- [x] `GET /api/auth/me`, `POST /api/auth/logout` 구현
-- [x] JWT 인증 필터, Stateless Spring Security 필터 체인 구성
-- [x] Axios 요청의 Bearer 토큰 자동 주입 및 401 자동 로그아웃 구현
-- [x] 인증 여부·역할에 따른 보호 라우팅 구현
-- [x] 반응형 AppBar, Drawer, 콘텐츠 레이아웃 구현
-- [x] 대시보드·키·사용자·감사 로그·공지사항 화면 및 라우팅 골격 구현
-- [x] 운영 자동 계정 생성을 제거하고 명시적 1회 프로비저닝으로 전환
-- [x] 마스터 패스프레이즈 기반 키 유도 및 KCV 검증 구현
-- [x] 패스프레이즈 불일치 시 애플리케이션 기동 중단 구현
-- [x] 인증, 해시 저장, KCV 실패, 암호문 변조 방지 통합 테스트 작성
+2026년 9월 UI 기준입니다. 이미지를 클릭하면 원본 크기로 확인할 수 있습니다.
 
-> 이 문서의 주차별 진행 섹션에는 추후 `Week 2`, `Week 3` 등을 순차적으로 추가 예정입니다.
+### 1. 로그인
 
-### 주요 파일·모듈 역할
+아이디·비밀번호로 로그인하고, 인증된 세션과 역할에 따라 관리 화면에 접근합니다.
 
-| 영역 | 파일/모듈 | 역할 |
-|---|---|---|
-| Backend | `config/UserProvisioningInitializer.java` | 명시적으로 활성화할 때만 계정을 해시 형태로 생성 |
-| Backend | `config/SecurityConfig.java` | Stateless 보안 정책, CORS, 인증/인가 예외 응답 구성 |
-| Backend | `security/JwtTokenProvider.java` | JWT 생성·파싱·검증 |
-| Backend | `security/JwtAuthenticationFilter.java` | 요청의 Bearer 토큰을 검증하고 인증 컨텍스트 구성 |
-| Backend | `security/PasswordService.java` | 비밀번호 PBKDF2 해시·Salt 생성 및 상수 시간 비교 |
-| Backend | `crypto/MasterKeyService.java` | 패스프레이즈로 마스터키 유도, KCV 저장·검증, 키 메모리 정리 |
-| Backend | `crypto/CryptoUtil.java` | AES-256-GCM 암복호화 |
-| Backend | `crypto/IntegrityService.java` | HMAC-SHA256 기반 데이터 무결성 검증 |
-| Backend | `domain/auth/` | 로그인·내 정보·로그아웃 API와 관리자 엔티티 |
-| Backend | `common/` | 공통 API/페이징 응답 및 전역 예외 처리 |
-| Backend | `db/migration/` | Flyway 기반 스키마 버전 관리 |
-| Frontend | `pages/Login.tsx` | 로그인 입력, 오류 메시지, 인증 성공 이동 |
-| Frontend | `layouts/MainLayout.tsx` | 상단 바, 반응형 사이드바, 역할별 메뉴와 콘텐츠 영역 |
-| Frontend | `components/auth/RouteGuards.tsx` | 로그인 여부 및 역할 기반 라우트 접근 제어 |
-| Frontend | `contexts/AuthProvider.tsx` | 로그인 세션, 토큰, 사용자 상태 관리 |
-| Frontend | `api/client.ts` | Axios 공통 설정, JWT 주입, 401 세션 정리 |
-| Frontend | `App.tsx` | 전체 페이지 라우팅과 Lazy Loading 구성 |
-| Frontend | `pages/` | 대시보드, 키, 사용자, 감사 로그, 공지사항 화면 |
+[![로그인 화면](readme-assets/login.png)](readme-assets/login.png)
 
-## 프로젝트 구조 (Directory Structure)
+### 2. 대시보드
+
+네 개의 요약 카드와 키 사용 추이·상태 분포를 한 화면에 표시합니다. 최근 활동과 게시글은 카드 내부에서 스크롤하며, 전체보기 버튼으로 상세 목록에 이동합니다.
+
+[![대시보드](readme-assets/dashboard.png)](readme-assets/dashboard.png)
+
+### 3. 키 목록
+
+검색 조건과 목록 열을 정렬해 키 이름·알고리즘·상태·버전·만료일·무결성을 비교합니다. 키 등록 창에서는 알고리즘, 용도, 자동 갱신 주기와 만료일을 설정합니다.
+
+| 키 목록 | 키 등록 |
+| --- | --- |
+| [![키 목록](readme-assets/key-list.png)](readme-assets/key-list.png) | [![키 등록 창](readme-assets/key-register.png)](readme-assets/key-register.png) |
+
+### 4. 감사 로그
+
+행위별 감사 이력을 조회하고 개인정보 원문 조회를 붉은 글씨로 구분합니다. 검증 기간을 선택하면 한국 시간 기준 해당 기간의 행 HMAC과 해시 체인 경계 연결을 검증합니다.
+
+[![감사 로그 목록](readme-assets/audit-log.png)](readme-assets/audit-log.png)
+
+| 검증 기간 선택 | 기간 검증 결과 |
+| --- | --- |
+| [![검증 기간 선택 창](readme-assets/audit-period.png)](readme-assets/audit-period.png) | [![해시 체인 검증 결과](readme-assets/audit-result.png)](readme-assets/audit-result.png) |
+
+### 5. 게시판
+
+**여러분의 목소리를 담습니다.** 공지는 목록 상단에서 주황색으로 강조하며, 게시글 상세와 첨부파일을 분리해 표시합니다.
+
+[![게시판 목록](readme-assets/board-list.png)](readme-assets/board-list.png)
+
+| 게시글 상세 | 글 작성 |
+| --- | --- |
+| [![게시글 상세와 첨부파일](readme-assets/board-detail.png)](readme-assets/board-detail.png) | [![게시글 작성과 파일 첨부](readme-assets/board-create.png)](readme-assets/board-create.png) |
+
+---
+
+## 프로젝트 구조
 
 ```text
-my-project/
-├── .github/
-│   └── workflows/deploy.yml          # 이미지 빌드·배포 CI/CD
-├── .codex-context.md                 # 개발 목표와 프로젝트 컨텍스트
-├── .env.example                      # 배포 환경변수 템플릿
-├── docker-compose.yml                # PostgreSQL·Backend·Frontend 구성
-├── README.md
-├── readme-assets/                    # README 화면 스크린샷
-├── backend/
-│   ├── build.gradle
-│   ├── gradlew
-│   ├── gradle/wrapper/
-│   ├── Dockerfile
-│   └── src/
-│       ├── main/
-│       │   ├── java/com/ineb/dguard_kms/
-│       │   │   ├── DguardKmsApplication.java
-│       │   │   ├── common/           # 공통 응답·예외 처리
-│       │   │   ├── config/           # Security·Crypto·초기 데이터 설정
-│       │   │   ├── crypto/           # 마스터키·암호화·무결성
-│       │   │   ├── security/         # JWT·비밀번호·인증 필터
-│       │   │   └── domain/
-│       │   │       ├── auth/         # 관리자 인증
-│       │   │       ├── config/       # 암호 설정 영속화
-│       │   │       ├── key/          # KMS 키 생명주기
-│       │   │       ├── user/         # 서비스 사용자
-│       │   │       ├── audit/        # 감사 로그·해시 체인
-│       │   │       ├── notice/       # 공지사항·첨부파일
-│       │   │       └── dashboard/    # 요약 통계
-│       │   └── resources/
-│       │       ├── application.properties
-│       │       ├── application-local.properties
-│       │       └── db/migration/     # Flyway SQL
-│       └── test/                     # 통합·KCV·키 관리 테스트
-└── frontend/
-    ├── package.json
-    ├── vite.config.ts
-    ├── Dockerfile
-    ├── nginx.conf
-    ├── public/
-    └── src/
-        ├── api/                       # Axios 및 API 엔드포인트
-        ├── components/                # 공통·인증·관리자 컴포넌트
-        ├── contexts/                  # 인증·KMS 상태 Provider
-        ├── hooks/                     # 인증·KMS 훅
-        ├── layouts/MainLayout.tsx
-        ├── mocks/                     # 화면 개발용 데이터
-        ├── pages/                     # 라우트별 화면
-        ├── theme/                     # MUI 테마
-        ├── types/                     # TypeScript 타입
-        ├── utils/                     # 상태·키 생명주기 유틸리티
-        ├── App.tsx
-        └── main.tsx
+AdminWeb/
+├─ frontend/
+│  ├─ src/
+│  │  ├─ api/                  # API 클라이언트와 엔드포인트
+│  │  ├─ components/           # 공통 표·검색·차트·인증 컴포넌트
+│  │  ├─ contexts/             # 인증·키 관리 상태
+│  │  ├─ layouts/              # 상단 바·사이드바·페이지 영역
+│  │  └─ pages/                # 대시보드·통계·키·사용자·감사·게시판·프로필
+│  ├─ package.json
+│  └─ Dockerfile
+├─ backend/
+│  ├─ src/main/java/com/ineb/dguard_kms/
+│  │  ├─ common/               # 공통 응답·예외 처리
+│  │  ├─ config/               # 보안·프로비저닝 설정
+│  │  ├─ crypto/               # 암호화·마스터키·무결성
+│  │  ├─ security/             # JWT·비밀번호 처리
+│  │  └─ domain/               # auth·key·user·audit·notice·config
+│  ├─ src/main/resources/db/migration/
+│  ├─ src/test/                # API·암호화·무결성 통합 테스트
+│  └─ build.gradle
+├─ readme-assets/              # 탭별 화면 이미지
+├─ docs/LOCAL_DEVELOPMENT.md    # 실행·운영·검증 상세 안내
+├─ .github/workflows/          # 이미지 빌드·배포
+├─ docker-compose.yml
+└─ README.md
 ```
 
-## 시작하기 (Getting Started)
+---
 
-### 사전 요구사항
+## 실행 방법
 
-- JDK 21
-- Node.js 22 및 npm
-- Docker 29+ (PostgreSQL을 컨테이너로 실행할 경우)
+### 1. 저장소 준비
 
-저장소를 받은 뒤 프론트엔드 의존성을 설치합니다. 백엔드는 Gradle Wrapper가 필요한 의존성을 자동으로 내려받습니다.
+JDK 21, Node.js 22 및 PostgreSQL 17을 준비합니다.
 
 ```bash
-git clone https://github.com/devlsj/AdminWeb.git my-project
-cd my-project
-
-cd frontend
-npm ci
-cd ..
+git clone https://github.com/DevLSJ/AdminWeb.git
+cd AdminWeb
+npm ci --prefix frontend
 ```
 
-### 1. PostgreSQL 실행
+### 2. 환경 설정 및 계정 생성
 
-로컬 개발용 PostgreSQL 17 컨테이너를 실행합니다. `dguard-postgres-data` 볼륨에 데이터가 유지됩니다.
+DB 연결 정보, `KMS_MASTER_PASSPHRASE`, `INTEGRITY_HMAC_KEY`, `JWT_SECRET`을 환경변수로 설정합니다. 최초 계정은 명시적 일회성 프로비저닝으로 생성하며 기본 로그인 비밀번호를 제공하지 않습니다.
 
-```bash
-docker run --name dguard-postgres \
-  -e POSTGRES_DB=dguard_kms \
-  -e POSTGRES_USER=dguard \
-  -e POSTGRES_PASSWORD=dguard-local-password \
-  -p 127.0.0.1:5432:5432 \
-  -v dguard-postgres-data:/var/lib/postgresql/data \
-  -d postgres:17-alpine
-```
+DB 기동, 환경변수 설정, 최초 계정 생성과 Docker Compose 배포는 [실행·운영 안내](docs/LOCAL_DEVELOPMENT.md)를 참고하세요.
 
-이미 생성한 컨테이너는 다음 명령으로 다시 실행할 수 있습니다.
+### 3. 백엔드·프런트엔드 실행
 
 ```bash
-docker start dguard-postgres
-```
-
-### 2. 환경 설정
-
-필수 비밀값은 저장소에 커밋하지 말고 로컬 개발에서는 셸 환경변수로 관리합니다. 루트 `.env` 파일은 Docker Compose 배포에서만 사용합니다.
-
-| 환경변수 | 설명 | 예시/기본값 |
-|---|---|---|
-| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/dguard_kms` |
-| `SPRING_DATASOURCE_USERNAME` | DB 사용자 | `dguard` |
-| `SPRING_DATASOURCE_PASSWORD` | DB 비밀번호 | 필수 |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL 정책 | 기본·운영 `validate`, local 프로필 `update` |
-| `KMS_MASTER_PASSPHRASE` | 마스터키 유도 패스프레이즈 | 필수, UTF-8 32바이트 이상 |
-| `INTEGRITY_HMAC_KEY` | 무결성 HMAC 키 | 필수 |
-| `JWT_SECRET` | JWT 서명 키 | 필수 |
-| `KMS_PBKDF2_ITERATIONS` | 마스터키 PBKDF2 반복 횟수 | `10000` |
-| `PASSWORD_PBKDF2_ITERATIONS` | 비밀번호 PBKDF2 반복 횟수 | `10000` |
-| `USER_PROVISIONING_ENABLED` | 일회성 계정 생성 활성화 | 기본 `false` |
-| `PROVISION_USER_LOGIN_ID` | 생성할 로그인 ID | 프로비저닝 시 필수 |
-| `PROVISION_USER_PASSWORD` | 생성할 계정 비밀번호 | 프로비저닝 시 필수 |
-| `PROVISION_USER_NAME` | 표시 이름 | 프로비저닝 시 필수 |
-| `PROVISION_USER_ROLE` | 계정 역할 | `ADMIN` 또는 `CLIENT` |
-
-```bash
-export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/dguard_kms
-export SPRING_DATASOURCE_USERNAME=dguard
-export SPRING_DATASOURCE_PASSWORD=dguard-local-password
-export SPRING_JPA_HIBERNATE_DDL_AUTO=update
-export KMS_MASTER_PASSPHRASE=local-master-passphrase-at-least-32-bytes
-export INTEGRITY_HMAC_KEY=local-integrity-hmac-key-at-least-32-chars
-export JWT_SECRET=local-jwt-secret-at-least-32-characters
-```
-
-최초 기동 시 `crypto_config`에 마스터키 유도 Salt와 KCV가 기록됩니다. **같은 DB를 사용할 때는 이후에도 동일한 `KMS_MASTER_PASSPHRASE`를 사용해야 합니다.**
-
-운영 코드에는 기본 계정이나 비밀번호가 없습니다. 최초 계정은 아래처럼 프로비저닝
-모드로 한 번 생성합니다. 비밀번호는 셸 기록에 남지 않도록 대화식으로 입력하고,
-완료 후 관련 환경변수를 제거합니다.
-
-```bash
-cd backend
-read -s PROVISION_USER_PASSWORD
-export PROVISION_USER_PASSWORD
-export USER_PROVISIONING_ENABLED=true
-export PROVISION_USER_LOGIN_ID=admin
-export PROVISION_USER_NAME=관리자
-export PROVISION_USER_ROLE=ADMIN
-./gradlew bootRun --args='--spring.main.web-application-type=none'
-unset PROVISION_USER_PASSWORD USER_PROVISIONING_ENABLED \
-  PROVISION_USER_LOGIN_ID PROVISION_USER_NAME PROVISION_USER_ROLE
-```
-
-프로비저닝은 기존 `login_id`가 있으면 건너뛰므로 기존 계정을 덮어쓰지 않습니다.
-
-### 3. Backend 실행
-
-```bash
+# 터미널 1 — 환경 설정과 최초 계정 생성 후 실행
 cd backend
 ./gradlew bootRun
 ```
 
-### 4. Frontend 실행
-
-새 터미널에서 API 주소를 지정해 Vite 개발 서버를 실행합니다.
-
 ```bash
-cd frontend
-VITE_API_BASE_URL=http://localhost:8080 npm run dev
+# 터미널 2 — 저장소 루트에서 실행
+VITE_API_BASE_URL=http://localhost:8080 npm run dev --prefix frontend
 ```
 
-터미널에 출력된 Vite 주소(기본값 <http://localhost:5173>)로 접속한 뒤 앞에서
-프로비저닝한 계정으로 로그인합니다.
+| 서비스 | 기본 주소 |
+| --- | --- |
+| 웹 콘솔 | `http://localhost:5173` |
+| Backend API | `http://localhost:8080/api` |
+| Swagger UI | `http://localhost:8080/api/swagger-ui.html` |
 
-### Docker Compose 배포
+---
 
-루트 `docker-compose.yml`은 Docker Hub에 빌드된 이미지와 서버의 `/home/dguard/app/` 마운트 경로를 사용하는 **배포 환경용 구성**입니다.
+## 구현 포인트
 
-```bash
-cp .env.example .env
-# .env의 이미지 계정과 모든 비밀값을 실제 값으로 변경
-docker compose pull
-docker compose up -d
-docker compose ps
-```
+### 1. 키 생명주기와 암호화
 
-배포 환경에서는 프론트엔드 Nginx가 `/api/*` 요청을 백엔드로 프록시하며, 외부 서비스 포트는 `80`입니다.
+키의 상태·용도에 따라 작업을 제한하며 등록, 상태 변경, 갱신, 폐기 이력을 관리합니다. 키 갱신은 확인 창과 경고를 거쳐 진행하고, 갱신 전 버전의 암호문 복호화를 차단합니다. 마스터 패스프레이즈 불일치는 KCV 검증 단계에서 기동을 중단합니다.
 
-배포 DB에 최초 계정을 생성할 때는 서버에서 비밀번호를 대화식으로 받은 뒤,
-동일한 백엔드 이미지를 일회성 non-web 컨테이너로 실행합니다.
+### 2. 감사 로그 위·변조 검증
 
-```bash
-read -s PROVISION_USER_PASSWORD
-export PROVISION_USER_PASSWORD
-docker compose run --rm \
-  -e USER_PROVISIONING_ENABLED=true \
-  -e PROVISION_USER_LOGIN_ID=admin \
-  -e PROVISION_USER_PASSWORD \
-  -e PROVISION_USER_NAME=관리자 \
-  -e PROVISION_USER_ROLE=ADMIN \
-  backend --spring.main.web-application-type=none
-unset PROVISION_USER_PASSWORD
-```
+개별 행의 HMAC과 이전 행을 연결하는 해시 체인을 검증합니다. 기간 검증은 한국 시간으로 시작일과 종료일을 포함하고 경계 연결도 확인합니다. CSV에는 열별 설명·예시 안내 표와 행별 검증 결과를 포함합니다.
 
+### 3. 개인정보 보호와 본인 프로필
 
-### 명령어
+개인정보는 암호화하여 저장하고 사용자 목록에서는 마스킹합니다. 이름·이메일은 부분 검색, 연락처는 구분 기호를 제외한 전체 번호의 정확 검색을 지원합니다. 본인 프로필 API는 인증 정보에서 수정 대상을 결정하며, 개인정보 원문을 감사 로그에 기록하지 않습니다.
 
-#### 1) 로그인 API 확인
+### 4. 화면 배치와 성능
 
-```bash
-curl -i -X POST http://localhost:8080/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"loginId":"admin","password":"<provisioned-password>"}'
-```
+목록의 머리글·본문 정렬과 열 너비 조절을 공통화했습니다. 대시보드·키 통계는 페이지 높이를 고정하고 카드 내부에서 스크롤합니다. 세션 카운트다운을 별도 컴포넌트로 분리하고 사용하지 않는 데이터 조회를 제거해 반복 작업을 줄였습니다.
 
-정상 응답의 `data.token`에 JWT가 포함됩니다.
+### 5. 게시글과 파일 첨부
 
-#### 감사 로그 기간 체인 검증
+본문 입력은 화면 높이에 맞추고 긴 내용은 입력 박스 안에서 스크롤합니다. 파일은 선택하거나 끌어다 놓아 추가하며 기존 첨부 목록을 유지합니다. 첨부파일은 AES-256-GCM으로 암호화해 저장합니다.
 
-Apidog에서 `GET /api/audit-logs/verify?from=2026-09-06&to=2026-09-07`을 호출하고,
-로그인 응답의 JWT를 Bearer Token으로 지정합니다. `from`, `to`는 `YYYY-MM-DD` 형식입니다.
-한국 시간 기준 시작일 0시 이상, 종료일 다음 날 0시 미만을 검증하며 같은 날짜도 허용합니다.
-두 날짜를 모두 생략하면 전체 체인을 검증합니다. 날짜를 지정할 때는 두 값이 모두 필요하며
-종료일을 포함해 최대 366일까지 선택할 수 있습니다. 응답의 `rangeTo`는 미포함 종료 경계입니다.
-기존 날짜·시간 형식의 요청은 날짜 형식으로 변경해야 합니다.
-
-#### 2) 비밀번호 저장 형태 확인
-
-```bash
-docker exec -it dguard-db psql -U dguard -d dguard_kms -c \
-  'SELECT login_id, role, status, password_algo, password_iter, length(password_hash) AS hash_len, length(password_salt) AS salt_len FROM admin_user;'
-```
-
-`password` 원문 컬럼은 존재하지 않으며 `password_hash`, `password_salt`, 알고리즘과 반복 횟수만 저장됩니다.
-
-#### 3) KCV 실패 확인
-
-정상 패스프레이즈로 한 번 기동해 KCV를 생성한 뒤 서버를 종료하고, 같은 DB에서 다른 패스프레이즈로 다시 실행합니다.
-
-```bash
-cd backend
-KMS_MASTER_PASSPHRASE=wrong-master-passphrase-at-least-32-bytes ./gradlew bootRun
-```
-
-로그에 아래 `ERROR` 메시지와 `Master key KCV verification failed` 예외가 출력되고 Spring Boot 기동이 중단되어야 합니다. 실제 패스프레이즈나 KCV 값은 로그에 출력되지 않습니다.
-
-```text
-KCV verification failed: the configured KMS master passphrase does not match the persisted master key configuration. Application startup is aborted.
-```
-
-시연 후에는 원래 패스프레이즈로 복구합니다.
+---
 
 ## 테스트 및 품질 검사
 
 ```bash
-# Backend 테스트
+# Backend 통합 테스트
 cd backend
 ./gradlew test
 
@@ -381,20 +207,15 @@ npm run lint
 npm run build
 ```
 
-주요 테스트는 초기 계정의 Salt 적용 여부, 로그인/JWT 인증, 잘못된 로그인 거절, KCV 불일치 기동 실패, AES-GCM 임의 IV 및 변조 거절을 검증합니다.
+인증·권한, 암호화 저장, 키 갱신, 개인정보 검색, 프로필 수정, 감사 로그 무결성과 파일 처리 등을 검증합니다. 환경 설정과 CSV 형식에 관한 상세 내용은 [실행·운영 안내](docs/LOCAL_DEVELOPMENT.md)에 정리되어 있습니다.
 
-## 보안 주의사항
+---
 
-- `.env`, DB 비밀번호, JWT 키, 마스터 패스프레이즈를 Git에 커밋하지 않습니다.
-- 운영 환경에서 `USER_PROVISIONING_ENABLED`를 상시 활성화하지 않습니다.
-- 프로비저닝 비밀번호는 Git, `.env`, 셸 명령 인자에 기록하지 않습니다.
-- 운영 환경에서는 `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`를 사용합니다.
-- 암호화된 데이터와 `crypto_config`가 있는 DB를 백업할 때 마스터 패스프레이즈도 별도의 안전한 경로로 관리합니다.
-- 마스터 패스프레이즈 변경은 단순 환경변수 교체가 아니라 키 재래핑 절차가 필요합니다.
+## 개발자 정보
 
-### 감사 로그 CSV 안내 표
-
-감사 로그 CSV는 UTF-8 BOM으로 시작하며 최상단에 열별 한글 의미·설명·예시를 포함합니다.
-첫 셀이 `#`으로 시작하는 행은 안내 표입니다. CSV를 자동 처리할 때는 이 안내 행을 건너뛰고
-`logUid,actor,...,rowValid` 행을 데이터 헤더로 사용하세요. 조회 결과가 없어도 안내 표와 헤더는 포함됩니다.
-`createdAt`은 기존 UTC 원문을 유지하며, `rowValid`는 내보내기 시점의 개별 행 HMAC 검사 결과입니다.
+| 항목 | 내용 |
+| --- | --- |
+| Developer | DevLSJ |
+| Project | D'Guard KMS |
+| Type | 통합 키 관리 웹 애플리케이션 |
+| Repository | [DevLSJ/AdminWeb](https://github.com/DevLSJ/AdminWeb) |
