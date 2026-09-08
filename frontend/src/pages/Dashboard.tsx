@@ -68,7 +68,30 @@ function KeyStatusChart({ distribution }: { distribution: Array<{ status: Canoni
   let offset = 0
 
   const openStatus = (status: CanonicalKeyStatus) => navigate(`/keys?status=${status}`)
-  return <Box sx={{ overflow: 'hidden' }}><Box sx={{ position: 'relative', width: 160, height: 160, mx: 'auto', my: .5, overflow: 'hidden' }}><Box component="svg" viewBox="0 0 140 140" sx={{ width: '100%', height: '100%', transform: 'rotate(-90deg)', overflow: 'hidden' }}><circle cx="70" cy="70" r="52" fill="none" stroke="#edf1f7" strokeWidth="14" />{distribution.map((item) => { const length = total ? item.value / total * circumference : 0; const dashOffset = -offset; offset += length; const selected = activeStatus === item.status; return <circle key={item.status} cx="70" cy="70" r="52" fill="none" stroke={statusColors[item.status]} strokeWidth={selected ? 18 : 14} strokeLinecap="round" strokeDasharray={`${Math.max(0, length - 3)} ${circumference}`} strokeDashoffset={dashOffset} onMouseEnter={() => setActiveStatus(item.status)} onMouseLeave={() => setActiveStatus(null)} onClick={() => openStatus(item.status)} style={{ cursor: 'pointer', transition: 'stroke-width 180ms cubic-bezier(.16,1,.3,1), opacity 180ms ease', opacity: activeStatus && !selected ? .72 : 1 }} /> })}</Box><Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', pointerEvents: 'none' }}><Typography sx={{ color: active ? statusColors[active.status] : 'text.primary', fontSize: active ? 15 : 29, fontWeight: 850, transition: 'all 180ms ease' }}>{active ? getStatusLabel(active.status) : total}</Typography><Typography sx={{ mt: .2, color: 'text.secondary', fontSize: 11.5 }}>{active ? `${active.value}개 · ${total ? Math.round(active.value / total * 100) : 0}%` : '전체 키'}</Typography></Box></Box><Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: .75 }}>{distribution.map(({ status, value }) => <Box key={status} role="link" tabIndex={0} onMouseEnter={() => setActiveStatus(status)} onMouseLeave={() => setActiveStatus(null)} onClick={() => openStatus(status)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatus(status) }} sx={{ display: 'flex', justifyContent: 'space-between', minWidth: 0, p: .75, borderRadius: 1, cursor: 'pointer', bgcolor: activeStatus === status ? alpha(statusColors[status], .1) : 'transparent', transition: 'background-color 180ms ease' }}><Stack direction="row" spacing={.7} sx={{ minWidth: 0, alignItems: 'center' }}><Box sx={{ width: 8, height: 8, flexShrink: 0, bgcolor: statusColors[status] }} /><Typography noWrap sx={{ fontSize: 12.5 }}>{getStatusLabel(status)}</Typography></Stack><Typography sx={{ ml: 1, fontSize: 12.5, fontWeight: 800 }}>{value}</Typography></Box>)}</Box></Box>
+  return <Box className="dashboard-status-chart" sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'stretch', gap: .5, flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
+    <Box sx={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0, containerType: 'size' }}>
+      <Box component="svg" viewBox="0 0 140 140" sx={{ display: 'block', width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+        <circle cx="70" cy="70" r="52" fill="none" stroke="#edf1f7" strokeWidth="14" />
+        {distribution.map((item) => {
+          const length = total ? item.value / total * circumference : 0
+          const dashOffset = -offset
+          offset += length
+          const selected = activeStatus === item.status
+          return <circle key={item.status} cx="70" cy="70" r="52" fill="none" stroke={statusColors[item.status]} strokeWidth={selected ? 18 : 14} strokeLinecap="round" strokeDasharray={`${Math.max(0, length - 3)} ${circumference}`} strokeDashoffset={dashOffset} onMouseEnter={() => setActiveStatus(item.status)} onMouseLeave={() => setActiveStatus(null)} onClick={() => openStatus(item.status)} style={{ cursor: 'pointer', transition: 'stroke-width 180ms cubic-bezier(.16,1,.3,1), opacity 180ms ease', opacity: activeStatus && !selected ? .72 : 1 }} />
+        })}
+      </Box>
+      <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', pointerEvents: 'none' }}>
+        <Typography sx={{ color: active ? statusColors[active.status] : 'text.primary', fontSize: active ? 'min(15px, 13cqmin)' : 'min(29px, 22cqmin)', fontWeight: 850 }}>{active ? getStatusLabel(active.status) : total}</Typography>
+        <Typography sx={{ color: 'text.secondary', fontSize: 'min(11.5px, 10cqmin)' }}>{active ? `${active.value}개 · ${total ? Math.round(active.value / total * 100) : 0}%` : '전체 키'}</Typography>
+      </Box>
+    </Box>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', alignContent: 'center', gap: .25, flexShrink: 0, width: { xs: '100%', sm: '45%' } }}>
+      {distribution.map(({ status, value }) => <Box key={status} role="link" tabIndex={0} onFocus={() => setActiveStatus(status)} onBlur={() => setActiveStatus(null)} onMouseEnter={() => setActiveStatus(status)} onMouseLeave={() => setActiveStatus(null)} onClick={() => openStatus(status)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openStatus(status) } }} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: .5, minWidth: 0, px: .5, py: .25, borderRadius: 1, cursor: 'pointer', bgcolor: activeStatus === status ? alpha(statusColors[status], .1) : 'transparent', transition: 'background-color 180ms ease' }}>
+        <Stack direction="row" spacing={.5} sx={{ minWidth: 0, alignItems: 'center' }}><Box sx={{ width: 6, height: 6, flexShrink: 0, bgcolor: statusColors[status] }} /><Typography noWrap sx={{ fontSize: { xs: 10, sm: 12 } }}>{getStatusLabel(status)}</Typography></Stack>
+        <Typography sx={{ fontSize: { xs: 10, sm: 12 }, fontWeight: 800 }}>{value}</Typography>
+      </Box>)}
+    </Box>
+  </Box>
 }
 
 function Dashboard() {
@@ -110,9 +133,19 @@ function Dashboard() {
       </Box>
     </CardContent></Card>
 
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1.6fr) minmax(0,1fr)' }, gap: 1.5, flex: '1.35 1 0', minHeight: 0 }}>
-      <Card sx={{ minWidth: 0, minHeight: 0, overflow: 'auto' }}><CardContent sx={{ p: '12px 16px !important' }}><Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography variant="h6">키 생성·사용 추이</Typography><Button size="small" endIcon={<ArrowForwardRounded />} onClick={() => navigate('/analytics')}>상세 통계</Button></Stack><ToggleButtonGroup exclusive size="small" value={period} onChange={(_e, value) => value && setPeriod(value)}><ToggleButton value="DAY">일</ToggleButton><ToggleButton value="MONTH">월</ToggleButton></ToggleButtonGroup></Box><InteractiveUsageChart trend={trend} compact /></CardContent></Card>
-      <Card sx={{ minWidth: 0, minHeight: 0, overflow: 'auto' }}><CardContent sx={{ p: '12px 16px !important' }}><Typography variant="h6">전체 키 상태</Typography><KeyStatusChart distribution={statusDistribution} /></CardContent></Card>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1.6fr) minmax(0,1fr)' }, gap: 1.5, flex: '1.8 1 0', minHeight: { xs: 240, sm: 180 } }}>
+      <Card className="dashboard-trend-panel" sx={{ minWidth: 0, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+        <CardContent sx={{ p: '10px 12px !important', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: .5, justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, mb: .5 }}>
+            <Stack direction="row" useFlexGap spacing={.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Typography variant="h6" sx={{ fontSize: { xs: 13, sm: 16 } }}>키 생성·사용 추이</Typography><Button size="small" sx={{ minWidth: 0, px: .5, '& .MuiButton-endIcon': { display: { xs: 'none', sm: 'inline-flex' } } }} endIcon={<ArrowForwardRounded />} onClick={() => navigate('/analytics')}>상세 통계</Button></Stack>
+            <ToggleButtonGroup exclusive size="small" value={period} onChange={(_e, value) => value && setPeriod(value)}><ToggleButton value="DAY">일</ToggleButton><ToggleButton value="MONTH">월</ToggleButton></ToggleButtonGroup>
+          </Box>
+          <Box role="region" aria-label="키 생성·사용 추이 차트" sx={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}><InteractiveUsageChart trend={trend} compact fillContainer /></Box>
+        </CardContent>
+      </Card>
+      <Card className="dashboard-status-panel" sx={{ minWidth: 0, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+        <CardContent sx={{ p: '10px 12px !important', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}><Typography variant="h6" sx={{ flexShrink: 0, fontSize: { xs: 13, sm: 16 } }}>전체 키 상태</Typography><KeyStatusChart distribution={statusDistribution} /></CardContent>
+      </Card>
     </Box>
 
     <Box sx={{ display: 'grid', gridTemplateColumns: isAdminRole(user?.role) ? 'minmax(0,.8fr) minmax(0,1.7fr)' : 'minmax(0,1fr)', gap: 1.5, flex: '1 1 0', minHeight: 0 }}>

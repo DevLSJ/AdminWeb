@@ -72,7 +72,7 @@ export function InteractiveUsageChart({ trend, detailed = false, compact = false
     <Box sx={{ minWidth: 0, ...(fillContainer && { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }) }}>
       {fillContainer && <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: .75, px: .5, pb: .5, flexShrink: 0 }}>
         <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 750 }}>{selected.period}</Typography>
-        <Stack direction="row" spacing={1.5}>{series.map((item) => <Stack key={item.field} direction="row" spacing={.5} sx={{ alignItems: 'center' }}><Box sx={{ width: 12, height: 3, bgcolor: item.color }} /><Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{item.label} <Typography component="span" sx={{ fontSize: 'inherit', fontWeight: 800, color: 'text.primary' }}>{selected[item.field].toLocaleString()}건</Typography></Typography></Stack>)}</Stack>
+        <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', columnGap: 1.5, rowGap: .25 }}>{series.map((item) => <Stack key={item.field} direction="row" spacing={.5} sx={{ alignItems: 'center' }}><Box sx={{ width: 12, height: 3, bgcolor: item.color }} /><Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{item.label} <Typography component="span" sx={{ fontSize: 'inherit', fontWeight: 800, color: 'text.primary' }}>{selected[item.field].toLocaleString()}건</Typography></Typography></Stack>)}</Stack>
       </Stack>}
       {!fillContainer && <Stack direction="row" spacing={{ xs: 1.5, sm: 2.5 }} useFlexGap sx={{ mt: 1.5, mb: 1.25, flexWrap: 'wrap' }}>
         {series.map((item) => (
@@ -109,20 +109,20 @@ export function InteractiveUsageChart({ trend, detailed = false, compact = false
           </Box>}
 
           <Box component="svg" viewBox={`0 0 ${width} ${fillContainer ? plotSize.height : detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: fillContainer ? '100%' : compact ? 240 : detailed ? 382 : 296 }}>
-            {[0, .25, .5, .75, 1].map((ratio) => {
+            {(chartHeight < 90 ? [0, .5, 1] : [0, .25, .5, .75, 1]).map((ratio) => {
               const y = chartBottom - ratio * chartHeight
               return <g key={ratio}><line x1="54" x2={width - 32} y1={y} y2={y} stroke="currentColor" opacity=".1" /><text x="45" y={y + 4} textAnchor="end" fill="currentColor" opacity=".56" fontSize="10">{Math.round(roundedMax * ratio)}</text></g>
             })}
             <line x1={activeX} x2={activeX} y1={chartTop} y2={chartBottom} stroke="#1769e8" strokeWidth="1.5" opacity=".72" />
             {series.map((item, seriesIndex) => (
               <g key={item.field} className="kms-chart-series" style={{ animationDelay: `${seriesIndex * 90}ms` }}>
-                <path d={pathFor(item.field)} fill="none" stroke={item.color} strokeWidth={detailed ? 3 : 2.5} strokeLinecap="round" strokeLinejoin="round" />
+                <path pathLength={1} d={pathFor(item.field)} fill="none" stroke={item.color} strokeWidth={detailed ? 3 : 2.5} strokeLinecap="round" strokeLinejoin="round" />
                 {points.map((point, index) => <circle key={`${item.field}-${point.period}`} className={index === activeIndex ? 'kms-chart-point is-active' : 'kms-chart-point'} cx={xFor(index)} cy={yFor(point[item.field])} r={index === activeIndex ? 5 : 3.25} fill="var(--mui-palette-background-paper, #fff)" stroke={item.color} strokeWidth={index === activeIndex ? 3 : 2} />)}
               </g>
             ))}
             {points.map((point, index) => {
               const x = xFor(index)
-              const showLabel = index % labelEvery === 0 || index === points.length - 1
+              const showLabel = index === points.length - 1 || (index % labelEvery === 0 && points.length - 1 - index >= labelEvery)
               return <g key={point.period}><rect role="button" tabIndex={0} aria-label={`${point.period} 데이터 선택`} x={x - Math.max(16, (width - 86) / Math.max(1, points.length - 1) / 2)} y={chartTop - 4} width={Math.max(32, (width - 86) / Math.max(1, points.length - 1))} height={chartHeight + 12} fill="transparent" onMouseEnter={() => setActiveIndex(index)} onClick={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)} />{showLabel && <text x={x} y={chartBottom + 25} textAnchor="middle" fill="currentColor" opacity={index === activeIndex ? 1 : .55} fontSize="10.5" fontWeight={index === activeIndex ? 800 : 500}>{formatPeriod(point.period)}</text>}</g>
             })}
           </Box>
