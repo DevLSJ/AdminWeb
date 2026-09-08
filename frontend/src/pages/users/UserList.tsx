@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { ResizableTable as Table } from '../../components/admin/ResizableTable'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   AddRounded,
   ArrowBackRounded,
@@ -28,7 +29,6 @@ import {
   MenuItem,
   Select,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableContainer,
@@ -59,11 +59,12 @@ import type { AdminAccount, AppUser, AppUserPlain, ManagedUser, PageResponse, Us
 import { useLocation, useNavigate } from 'react-router-dom'
 
 type EditableRole = 'ADMIN' | 'CLIENT'
-type UserForm = { name: string; phone: string; email: string; password: string; role: EditableRole }
+type UserForm = { name: string; phone: string; email: string; password: string; passwordConfirm: string; role: EditableRole }
 
 const emptyPage: PageResponse<ManagedUser> = { content: [], page: 0, size: 10, totalElements: 0, totalPages: 0 }
-const emptyForm: UserForm = { name: '', phone: '', email: '', password: '', role: 'CLIENT' }
-const initialParams: UserListParams = { name: '', phone: '', status: 'ALL', page: 0, size: 10 }
+const emptyForm: UserForm = { name: '', phone: '', email: '', password: '', passwordConfirm: '', role: 'CLIENT' }
+const initialParams: UserListParams = { name: '', phone: '', email: '', status: 'ALL', page: 0, size: 10 }
+const validPassword = (value: string) => value.length >= 8 && value.length <= 128 && /[^\p{L}\p{N}\s]/u.test(value)
 const phonePattern = /^[0-9+()\-\s]{9,20}$/
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -78,6 +79,7 @@ function UserList() {
   const { user: sessionUser } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const requestSequence = useRef(0)
   const [draft, setDraft] = useState(initialParams)
   const [params, setParams] = useState(initialParams)
   const [pageData, setPageData] = useState(emptyPage)
@@ -102,12 +104,19 @@ function UserList() {
   const [adminPasswordOpen, setAdminPasswordOpen] = useState(false)
   const [managedPassword, setManagedPassword] = useState('')
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setParams({ ...draft, page: 0 }), 300)
+    return () => window.clearTimeout(timer)
+  }, [draft])
+
+  useEffect(() => { if (location.search.includes('create=1')) { setForm(emptyForm); setFormUser(null) } }, [location.search])
+
   const phoneDigits = form.phone.replace(/\D/g, '')
   const nameValid = form.name.trim().length >= 1 && form.name.trim().length <= 64
   const phoneValid = phonePattern.test(form.phone) && phoneDigits.length >= 9 && phoneDigits.length <= 15
   const emailValid = form.email.length <= 254 && emailPattern.test(form.email.trim())
-  const passwordValid = form.password.length >= 8 && form.password.length <= 128
-  const formValid = nameValid && phoneValid && emailValid && (Boolean(formUser) || passwordValid)
+  const passwordValid = validPassword(form.password)
+  const formValid = nameValid && phoneValid && emailValid && (Boolean(formUser) || (passwordValid && form.password === form.passwordConfirm))
   const canAssignAdmin = sessionUser?.role === 'S.ADMIN'
   const adminPhoneDigits = adminPhone.replace(/\D/g, '')
   const adminPhoneValid = !adminPhone || (phonePattern.test(adminPhone) && adminPhoneDigits.length >= 9 && adminPhoneDigits.length <= 15)
@@ -119,14 +128,16 @@ function UserList() {
   const isDetailRoute = (detailKind === 'admin' || detailKind === 'app') && Boolean(detailUid)
 
   const loadUsers = useCallback(async (nextParams: UserListParams) => {
+    const sequence = ++requestSequence.current
     setLoading(true)
     setError('')
     try {
-      setPageData(await fetchManagedUserPage(nextParams))
+      const result = await fetchManagedUserPage(nextParams)
+      if (sequence === requestSequence.current) setPageData(result)
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, '사용자 목록을 불러오지 못했습니다.'))
+      if (sequence === requestSequence.current) setError(getApiErrorMessage(requestError, '사용자 목록을 불러오지 못했습니다.'))
     } finally {
-      setLoading(false)
+      if (sequence === requestSequence.current) setLoading(false)
     }
   }, [])
 
@@ -164,7 +175,7 @@ function UserList() {
     setError('')
     try {
       const plain = await fetchUserPlain(user.userUid, '사용자 개인정보 수정')
-      setForm({ name: plain.name, phone: plain.phone, email: plain.email, password: '', role: user.role })
+      setForm({ name: plain.name, phone: plain.phone, email: plain.email, password: '', passwordConfirm: '', role: user.role })
       setFormUser(user)
       setMessage('수정 화면 구성을 위한 원문 조회가 감사 로그에 기록되었습니다.')
     } catch (requestError) {
@@ -177,6 +188,7 @@ function UserList() {
   const saveUser = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
+    if (!formValid) return
     try {
       if (formUser) {
         const updated = await updateUser(formUser.userUid, { name: form.name, phone: form.phone, email: form.email, role: form.role })
@@ -210,7 +222,7 @@ function UserList() {
   }
 
   const resetPassword = async () => {
-    if (!passwordUser || newPassword.length < 8) return
+    if (!passwordUser || !validPassword(newPassword)) return
     setBusyUserUid(passwordUser.userUid)
     setError('')
     try {
@@ -265,7 +277,7 @@ function UserList() {
   }
 
   const resetManagedAdminPassword = async () => {
-    if (!managedAdmin || managedPassword.length < 8 || !canManageAdmin(managedAdmin)) return
+    if (!managedAdmin || !validPassword(managedPassword) || !canManageAdmin(managedAdmin)) return
     try {
       await resetAdminAccountPassword(managedAdmin.userUid, managedPassword)
       setManagedPassword('')
@@ -290,7 +302,7 @@ function UserList() {
   const detailDrawer = (
     <Drawer anchor="right" open={isDetailRoute} onClose={closeDetail} slotProps={{ backdrop: { sx: { bgcolor: 'rgba(20,29,48,.34)', backdropFilter: 'blur(5px)' } }, paper: { sx: { top: { sm: 24 }, bottom: { sm: 'auto' }, width: { xs: '100%', sm: 700 }, maxWidth: '100%', height: { xs: '100%', sm: 'auto' }, maxHeight: { sm: 'calc(100% - 48px)' }, borderRadius: { sm: '16px 0 0 16px' }, boxShadow: '-24px 0 64px rgba(25,42,78,.2)' } } }}>
       <Box sx={{ overflowY: 'auto', p: { xs: 2, sm: 3 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, pb: 2, mb: 2.5, borderBottom: '2px solid', borderColor: 'divider' }}><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}><Button color="inherit" startIcon={<ArrowBackRounded />} onClick={closeDetail}>사용자 목록</Button><Box sx={{ height: 34, borderLeft: '2px solid', borderColor: 'divider' }} /><Box sx={{ minWidth: 0 }}><Typography variant="h5" noWrap>{managedAdmin?.loginId ?? managedAppUser?.nameMasked ?? '사용자'}</Typography><Typography noWrap sx={{ color: 'text.secondary', fontFamily: 'monospace', fontSize: 11 }}>{managedAdmin?.userUid ?? managedAppUser?.userUid}</Typography></Box></Stack><IconButton aria-label="사용자 상세 닫기" onClick={closeDetail}><CloseRounded /></IconButton></Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, pb: 2, mb: 2.5, borderBottom: '2px solid', borderColor: 'divider' }}><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}><Button color="inherit" startIcon={<ArrowBackRounded />} onClick={closeDetail}>사용자 목록</Button><Box sx={{ height: 34, borderLeft: '2px solid', borderColor: 'divider' }} /><Box sx={{ minWidth: 0 }}><Typography variant="h5" noWrap>{managedAdmin?.loginId ?? managedAppUser?.nameMasked ?? '사용자'}</Typography></Box></Stack><IconButton aria-label="사용자 상세 닫기" onClick={closeDetail}><CloseRounded /></IconButton></Box>
         {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
         {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
         {loading && <Box sx={{ display: 'grid', minHeight: 240, placeItems: 'center' }}><CircularProgress /></Box>}
@@ -321,7 +333,8 @@ function UserList() {
 
       <SearchFilterForm onSearch={search} onReset={resetFilters}>
           <TextField size="small" label="이름 검색" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
-          <TextField size="small" label="연락처 정확히 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
+          <TextField size="small" label="연락처 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
+          <TextField size="small" label="이메일 검색" value={draft.email ?? ''} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
       </SearchFilterForm>
 
       <Card>
@@ -336,7 +349,7 @@ function UserList() {
                 const isAdminAccount = user.accountType === 'ADMIN_ACCOUNT'
                 return (
                   <TableRow key={`${user.accountType}-${user.userUid}`} hover tabIndex={0} className="interactive-row" onClick={() => navigate(`/users/${isAdminAccount ? 'admin' : 'app'}/${user.userUid}`)} sx={{ cursor: 'pointer', ...(!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : {}) }}>
-                    <TableCell><Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', minWidth: 0 }}><Avatar sx={{ width: 34, height: 34, bgcolor: isAdminAccount ? '#e8efff' : '#eaf7f1', color: isAdminAccount ? '#1f5ed7' : '#137653', fontSize: 14, fontWeight: 850 }}>{user.nameDisplay.slice(0, 1)}</Avatar>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 800 }}>{user.nameDisplay}</Typography><Typography noWrap sx={{ maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', color: 'text.secondary', fontSize: 11 }}>{user.loginId ?? user.userUid}</Typography></Box></Stack></TableCell>
+                    <TableCell><Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', minWidth: 0 }}><Avatar sx={{ width: 34, height: 34, bgcolor: isAdminAccount ? '#e8efff' : '#eaf7f1', color: isAdminAccount ? '#1f5ed7' : '#137653', fontSize: 14, fontWeight: 850 }}>{user.nameDisplay.slice(0, 1)}</Avatar>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 800, fontSize: 16 }}>{user.nameDisplay}</Typography></Box></Stack></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap', color: user.phoneMasked ? 'inherit' : 'text.disabled' }}>{user.phoneMasked ?? '—'}</TableCell>
                     <TableCell><Typography noWrap sx={{ color: user.emailMasked ? 'inherit' : 'text.disabled' }}>{user.emailMasked ?? '—'}</Typography></TableCell>
                     <TableCell><Typography sx={{ color: user.role === 'S.ADMIN' ? 'primary.main' : 'text.primary', fontSize: 12, fontWeight: 800 }}>{user.role}</Typography></TableCell>
@@ -377,7 +390,8 @@ function UserList() {
               <TextField required label="이름" value={form.name} error={Boolean(form.name) && !nameValid} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} slotProps={{ htmlInput: { maxLength: 64 } }} helperText="1~64자" />
               <TextField required label="연락처" placeholder="010-1234-5678" value={form.phone} error={Boolean(form.phone) && !phoneValid} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} slotProps={{ htmlInput: { maxLength: 20, pattern: '[0-9+()\\-\\s]{9,20}' } }} helperText={form.phone && !phoneValid ? '숫자 9~15자리의 연락처 형식을 확인하세요.' : '마스터키 AES-256-GCM 암호화 · HMAC 정확 검색'} />
               <TextField required type="email" label="이메일" value={form.email} error={Boolean(form.email) && !emailValid} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} slotProps={{ htmlInput: { maxLength: 254 } }} helperText={form.email && !emailValid ? '올바른 이메일 형식을 입력하세요.' : '마스터키 AES-256-GCM 암호화 저장'} />
-              {!formUser && <TextField required type="password" label="초기 비밀번호" value={form.password} error={Boolean(form.password) && !passwordValid} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · SHA-256 기반 PBKDF2 해시 저장" />}
+              {!formUser && <TextField required type="password" label="초기 비밀번호" value={form.password} error={Boolean(form.password) && !passwordValid} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · 특수문자 1개 이상 포함" />}
+              {!formUser && <TextField required type="password" label="비밀번호 확인" value={form.passwordConfirm} error={Boolean(form.passwordConfirm) && form.passwordConfirm !== form.password} helperText={form.passwordConfirm && form.passwordConfirm !== form.password ? "비밀번호가 일치하지 않습니다." : "초기 비밀번호를 다시 입력하세요."} onChange={(event) => setForm((current) => ({ ...current, passwordConfirm: event.target.value }))} />}
             </Stack>
           </DialogContent>
           <DialogActions><Button onClick={() => setFormUser(undefined)}>취소</Button><Button data-testid="user-save-button" type="submit" variant="contained" disabled={!formValid}>암호화 저장</Button></DialogActions>
@@ -391,11 +405,11 @@ function UserList() {
       </Dialog>
 
       <Dialog open={adminPasswordOpen} onClose={() => setAdminPasswordOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>비밀번호 재설정</DialogTitle><DialogContent><TextField autoFocus fullWidth type="password" label="새 비밀번호" value={managedPassword} error={Boolean(managedPassword) && (managedPassword.length < 8 || managedPassword.length > 128)} onChange={(event) => setManagedPassword(event.target.value)} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · 새 Salt와 PBKDF2-HMAC-SHA256 적용" sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setAdminPasswordOpen(false)}>취소</Button><Button variant="contained" disabled={managedPassword.length < 8 || managedPassword.length > 128} onClick={() => void resetManagedAdminPassword()}>재설정</Button></DialogActions>
+        <DialogTitle>비밀번호 재설정</DialogTitle><DialogContent><TextField autoFocus fullWidth type="password" label="새 비밀번호" value={managedPassword} error={Boolean(managedPassword) && (!validPassword(managedPassword))} onChange={(event) => setManagedPassword(event.target.value)} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · 특수문자 포함 · 새 Salt와 PBKDF2-HMAC-SHA256 적용" sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setAdminPasswordOpen(false)}>취소</Button><Button variant="contained" disabled={!validPassword(managedPassword)} onClick={() => void resetManagedAdminPassword()}>재설정</Button></DialogActions>
       </Dialog>
 
       <Dialog open={Boolean(passwordUser)} onClose={() => setPasswordUser(null)} fullWidth maxWidth="xs">
-        <DialogTitle>비밀번호 재설정</DialogTitle><DialogContent><TextField autoFocus fullWidth type="password" label="새 비밀번호" value={newPassword} error={Boolean(newPassword) && (newPassword.length < 8 || newPassword.length > 128)} onChange={(event) => setNewPassword(event.target.value)} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · 새 Salt로 PBKDF2 해시를 생성하고 감사 로그를 기록합니다." sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setPasswordUser(null)}>취소</Button><Button variant="contained" disabled={newPassword.length < 8 || newPassword.length > 128 || busyUserUid === passwordUser?.userUid} onClick={() => void resetPassword()}>재설정</Button></DialogActions>
+        <DialogTitle>비밀번호 재설정</DialogTitle><DialogContent><TextField autoFocus fullWidth type="password" label="새 비밀번호" value={newPassword} error={Boolean(newPassword) && (!validPassword(newPassword))} onChange={(event) => setNewPassword(event.target.value)} slotProps={{ htmlInput: { minLength: 8, maxLength: 128 } }} helperText="8~128자 · 특수문자 포함 · 새 Salt로 PBKDF2 해시를 생성하고 감사 로그를 기록합니다." sx={{ mt: 1 }} /></DialogContent><DialogActions><Button onClick={() => setPasswordUser(null)}>취소</Button><Button variant="contained" disabled={!validPassword(newPassword) || busyUserUid === passwordUser?.userUid} onClick={() => void resetPassword()}>재설정</Button></DialogActions>
       </Dialog>
     </Box>
   )

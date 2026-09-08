@@ -1,3 +1,4 @@
+import { ResizableTable as Table } from '../../components/admin/ResizableTable'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { CalendarMonthRounded, CloseRounded, DownloadRounded, FactCheckRounded, FlightTakeoffRounded, SearchRounded, VerifiedRounded, WarningAmberRounded } from '@mui/icons-material'
 import {
@@ -14,7 +15,6 @@ import {
   InputAdornment,
   IconButton,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableContainer,
@@ -23,7 +23,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogEntry, verifyAuditLogs } from '../../api/kms'
+import { fetchAuditViolations, type AuditViolation, exportAuditLogs, fetchAuditLogPage, getApiErrorMessage, verifyAuditLogEntry, verifyAuditLogs } from '../../api/kms'
 import { InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
 import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
 import { SearchFilterForm } from '../../components/admin/SearchFilterForm'
@@ -64,6 +64,7 @@ function AuditLog() {
   const [params, setParams] = useState(defaultParams)
   const [pageData, setPageData] = useState(emptyPage)
   const [loading, setLoading] = useState(true)
+  const [violations, setViolations] = useState<AuditViolation[]>([])
   const [verification, setVerification] = useState<AuditVerification | null>(null)
   const [detail, setDetail] = useState<AuditLogType | null>(null)
   const [entryVerification, setEntryVerification] = useState<AuditEntryVerification | null>(null)
@@ -128,7 +129,10 @@ function AuditLog() {
     setVerificationRangeError('')
     setVerifyingRange(true)
     try {
-      setVerification(await verifyAuditLogs(verificationRange.from, verificationRange.to))
+      setViolations([])
+      const result = await verifyAuditLogs(verificationRange.from, verificationRange.to)
+      setVerification(result)
+      if (!result.valid) setViolations(await fetchAuditViolations(verificationRange.from, verificationRange.to))
       setVerificationOpen(false)
     } catch (requestError) {
       setVerificationRangeError(getApiErrorMessage(requestError, '선택 기간의 감사 로그 체인을 검증하지 못했습니다.'))
@@ -176,6 +180,7 @@ function AuditLog() {
       />
       {verification?.valid && <Alert data-testid="audit-verify-success" icon={<VerifiedRounded />} severity={verification.checkedCount === 0 ? 'info' : 'success'} onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}{verification.checkedCount === 0 ? '선택 기간에 검증할 감사 로그가 없습니다.' : `총 ${verification.checkedCount.toLocaleString()}건의 행 HMAC과 기간 경계 연결이 정상입니다.`} · {formatKst(verification.verifiedAt)} KST</Alert>}
       {verification && !verification.valid && <Alert icon={<WarningAmberRounded />} severity="error" onClose={() => setVerification(null)} sx={{ mb: 2 }}>{verification.rangeFrom && verification.rangeTo ? formatVerificationRange(verification.rangeFrom, verification.rangeTo) : ''}해시 체인 검증 실패: {verification.invalidLogUids.length ? verification.invalidLogUids.join(', ') : '기간 경계'} 구간의 변조 또는 삭제 가능성을 확인하세요.</Alert>}
+      {verification && !verification.valid && violations.map((violation) => <Alert key={violation.logUid} severity="error" sx={{ mb: 1 }}><Typography sx={{ fontWeight: 700 }}>{auditActionLabels[violation.action] ?? violation.action} · {violation.actor}</Typography><Typography sx={{ fontSize: 13 }}>위반 기록 시각: {formatKst(violation.recordedAt)} KST · 탐지: {formatKst(violation.detectedAt)} KST</Typography><Typography sx={{ fontSize: 12 }}>{violation.violations.map((reason) => ({ ROW_HMAC_MISMATCH: '행 HMAC 불일치', PREVIOUS_LINK_MISMATCH: '이전 연결 불일치', NEXT_LINK_MISMATCH: '다음 연결 불일치', CHAIN_HEAD_MISMATCH: '체인 헤드 불일치' }[reason] ?? reason)).join(' · ')}</Typography></Alert>)}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
       <SearchFilterForm columns={4} onSearch={search} onReset={() => { setDraft(defaultParams); setParams(defaultParams) }}>
@@ -194,7 +199,7 @@ function AuditLog() {
               {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={6} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 감사 로그가 없습니다.</TableCell></TableRow>}
               {!loading && pageData.content.map((log) => {
                 const invalid = !log.chainValid || invalidLogUids.has(log.logUid)
-                return <TableRow key={log.logUid} hover tabIndex={0} className="interactive-row" onClick={() => { setDetail(log); setEntryVerification(null); void verifyEntry(log) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { setDetail(log); setEntryVerification(null); void verifyEntry(log) } }} sx={{ cursor: 'pointer', ...(invalid ? { bgcolor: 'rgba(228, 81, 111, 0.09)' } : {}) }}><TableCell sx={{ whiteSpace: 'nowrap' }}>{formatKst(log.createdAt)}</TableCell><TableCell><StatusBadge label={log.actor} tone="neutral" /></TableCell><TableCell><Typography noWrap sx={{ fontWeight: 700, color: log.action === 'USER_VIEW_PLAIN' ? 'error.main' : 'text.primary', fontSize: 13.5 }}>{auditActionLabels[log.action] ?? log.action}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.targetType}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.detail}</Typography></TableCell><TableCell align="center">{verifyingUid === log.logUid ? <CircularProgress size={18} /> : <StatusBadge dot status={invalid ? 'INVALID' : 'VALID'} />}</TableCell></TableRow>
+                return <TableRow key={log.logUid} hover tabIndex={0} className="interactive-row" onClick={() => { setDetail(log); setEntryVerification(null); void verifyEntry(log) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { setDetail(log); setEntryVerification(null); void verifyEntry(log) } }} sx={{ cursor: 'pointer', ...(invalid ? { bgcolor: 'rgba(228, 81, 111, 0.09)' } : {}) }}><TableCell sx={{ whiteSpace: 'nowrap', color: invalid ? 'error.main' : 'text.primary', fontWeight: invalid ? 700 : 400 }}>{formatKst(log.createdAt)}</TableCell><TableCell><StatusBadge label={log.actor} tone="neutral" /></TableCell><TableCell><Typography noWrap sx={{ fontWeight: 700, color: invalid ? 'error.main' : 'text.primary', fontSize: 13.5 }}>{auditActionLabels[log.action] ?? log.action}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.targetType}</Typography></TableCell><TableCell><Typography noWrap sx={{ fontSize: 13.5 }}>{log.detail}</Typography></TableCell><TableCell align="center">{verifyingUid === log.logUid ? <CircularProgress size={18} /> : <StatusBadge dot status={invalid ? 'INVALID' : 'VALID'} />}</TableCell></TableRow>
               })}
             </TableBody>
           </Table>
@@ -240,13 +245,13 @@ function AuditLog() {
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0,1fr))' }, alignItems: 'stretch', gap: 2, p: 3 }}>
               <Box sx={{ minWidth: 0, p: 2.25, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
                 <Typography sx={{ minHeight: 24, mb: 1.5, fontSize: 12, fontWeight: 850, letterSpacing: '.08em', color: 'text.secondary' }}>EVENT</Typography>
-                <InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={auditActionLabels[detail.action] ?? detail.action} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="기록 시각" value={`${formatKst(detail.createdAt)} KST`} />
+                <InfoRow label="로그 UID" value={detail.logUid} /><InfoRow label="행위자" value={detail.actor} /><InfoRow label="행위" value={<Typography color={entryVerification && !entryVerification.valid ? "error.main" : "text.primary"}>{auditActionLabels[detail.action] ?? detail.action}</Typography>} /><InfoRow label="대상 유형" value={detail.targetType} /><InfoRow label="기록 시각" value={<Typography color={entryVerification && !entryVerification.valid ? "error.main" : "text.primary"}>{formatKst(detail.createdAt)} KST</Typography>} />
                 <Box sx={{ mt: 1.5 }}><Typography sx={{ mb: .75, color: 'text.secondary', fontSize: 12.5, fontWeight: 750 }}>상세</Typography><Box component="pre" sx={{ m: 0, minHeight: 92, p: 1.5, border: '1px solid', borderColor: 'divider', bgcolor: 'action.hover', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 13, lineHeight: 1.6 }}>{detail.detail}</Box></Box>
               </Box>
               <Box sx={{ minWidth: 0, p: 2.25, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
                 <Typography sx={{ minHeight: 24, mb: 1.5, fontSize: 12, fontWeight: 850, letterSpacing: '.08em', color: 'text.secondary' }}>CHAIN VERIFICATION</Typography>
                 {verifyingUid === detail.logUid && <Box sx={{ display: 'grid', minHeight: 220, placeItems: 'center' }}><CircularProgress size={28} /></Box>}
-                {entryVerification && <><Alert severity={entryVerification.valid ? 'success' : 'error'} sx={{ mb: 2 }}>{entryVerification.valid ? '선택 행과 인접 체인이 정상입니다.' : '선택 행 구간에서 위변조 가능성이 발견되었습니다.'}</Alert><InfoRow label="행 HMAC" value={<StatusBadge dot status={entryVerification.rowHashValid ? 'VALID' : 'INVALID'} />} /><InfoRow label="이전 연결" value={<StatusBadge dot status={entryVerification.previousLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.previousLinkValid ? 'prev_hash 일치' : 'prev_hash 불일치'} />} /><InfoRow label="다음 연결" value={<StatusBadge dot status={entryVerification.nextLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLinkValid ? 'next.prev_hash 일치' : 'next.prev_hash 불일치'} />} /><InfoRow label="체인 헤드" value={<StatusBadge dot status={entryVerification.chainHeadValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLogUid ? '중간 행' : entryVerification.chainHeadValid ? '최종 헤드 일치' : '최종 헤드 불일치'} />} /><InfoRow label="검증 시각" value={`${formatKst(entryVerification.verifiedAt)} KST`} /></>}
+                {entryVerification && <><Alert severity={entryVerification.valid ? 'success' : 'error'} sx={{ mb: 2 }}>{entryVerification.valid ? '선택 행과 인접 체인이 정상입니다.' : '선택 행 구간에서 위변조 가능성이 발견되었습니다. 기록 시각은 해당 행위가 기록된 시각이며 실제 변조 시점은 확정할 수 없습니다.'}</Alert><InfoRow label="행 HMAC" value={<StatusBadge dot status={entryVerification.rowHashValid ? 'VALID' : 'INVALID'} />} /><InfoRow label="이전 연결" value={<StatusBadge dot status={entryVerification.previousLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.previousLinkValid ? 'prev_hash 일치' : 'prev_hash 불일치'} />} /><InfoRow label="다음 연결" value={<StatusBadge dot status={entryVerification.nextLinkValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLinkValid ? 'next.prev_hash 일치' : 'next.prev_hash 불일치'} />} /><InfoRow label="체인 헤드" value={<StatusBadge dot status={entryVerification.chainHeadValid ? 'VALID' : 'INVALID'} label={entryVerification.nextLogUid ? '중간 행' : entryVerification.chainHeadValid ? '최종 헤드 일치' : '최종 헤드 불일치'} />} /><InfoRow label="검증 시각" value={`${formatKst(entryVerification.verifiedAt)} KST`} /></>}
               </Box>
             </Box>
           )}

@@ -243,6 +243,7 @@ export async function fetchUserPage(params: UserListParams) {
       params: {
         name: params.name.trim() || undefined,
         phone: params.phone.trim() || undefined,
+        email: params.email?.trim() || undefined,
         status: params.status === 'ALL' ? undefined : params.status,
         page: params.page,
         size: params.size,
@@ -258,6 +259,7 @@ export async function fetchManagedUserPage(params: UserListParams) {
       params: {
         name: params.name.trim() || undefined,
         phone: params.phone.trim() || undefined,
+        email: params.email?.trim() || undefined,
         status: params.status === 'ALL' ? undefined : params.status,
         page: params.page,
         size: params.size,
@@ -323,4 +325,9 @@ export async function downloadNoticeFile(fileUid: string, originalName: string) 
   anchor.download = originalName
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+export interface AuditViolation { logUid: string; action: AuditLog['action']; actor: string; recordedAt: string; detectedAt: string; violations: string[] }
+export async function fetchAuditViolations(from: string, to: string) {
+  return unwrap(await apiClient.get<ApiResponse<AuditViolation[]>>('/api/audit-logs/violations', { params: { from, to } }))
 }

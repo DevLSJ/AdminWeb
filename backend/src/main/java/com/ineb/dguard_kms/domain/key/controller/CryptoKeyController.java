@@ -177,7 +177,7 @@ public class CryptoKeyController {
     }
 
     @PostMapping("/{keyUid}/rotate")
-    @Operation(summary = "키 갱신", description = "새 키 버전을 생성하고 이전 버전을 복호화 전용으로 전환합니다.")
+    @Operation(summary = "키 갱신", description = "새 키 버전을 생성하고 이전 버전 암호문의 복호화를 차단합니다.")
     @PreAuthorize("hasAnyRole('ADMIN', 'S.ADMIN')")
     public ApiResponse<KeyRotationResponse> rotate(
             @PathVariable UUID keyUid,

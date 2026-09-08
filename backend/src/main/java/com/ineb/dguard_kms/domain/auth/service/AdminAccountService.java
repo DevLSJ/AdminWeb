@@ -47,6 +47,29 @@ public class AdminAccountService {
     }
 
     @Transactional
+    public List<AdminAccountResponse> searchContacts(String phone, String email) {
+        return repository.findAll(Sort.by(Sort.Direction.ASC, "loginId")).stream()
+                .filter(account -> {
+                    if ((phone == null || phone.isBlank()) && (email == null || email.isBlank())) return true;
+                    if (!initializeAndMap(account).integrityValid()) return false;
+                    return matchesContact(account.getPhoneCiphertext(), account.getPhoneIv(), phone, true)
+                            && matchesContact(account.getEmailCiphertext(), account.getEmailIv(), email, false);
+                }).map(this::initializeAndMap).toList();
+    }
+
+    private boolean matchesContact(byte[] ciphertext, byte[] iv, String query, boolean phone) {
+        if (query == null || query.isBlank()) return true;
+        if (ciphertext == null || iv == null) return false;
+        byte[] plain = cryptoUtil.decrypt(new CryptoUtil.EncryptedPayload(iv, ciphertext));
+        try {
+            String value = new String(plain, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
+            String filter = query.trim().toLowerCase(Locale.ROOT);
+            if (phone) { value = value.replaceAll("\\D", ""); filter = filter.replaceAll("\\D", ""); }
+            return !filter.isEmpty() && value.contains(filter);
+        } finally { Arrays.fill(plain, (byte) 0); }
+    }
+
+    @Transactional
     public AdminAccountResponse get(UUID userUid) { return initializeAndMap(required(userUid)); }
 
     @Transactional

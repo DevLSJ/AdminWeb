@@ -24,6 +24,7 @@ public record UserCreateRequest(
 
         @NotBlank(message = "초기 비밀번호를 입력하세요.")
         @Size(min = 8, max = 128, message = "비밀번호는 8~128자여야 합니다.")
+        @Pattern(regexp = ".*[^\\p{L}\\p{N}\\s].*", message = "비밀번호는 특수문자를 포함해야 합니다.")
         String password,
 
         @Pattern(regexp = "ADMIN|CLIENT", message = "권한은 ADMIN 또는 CLIENT여야 합니다.")

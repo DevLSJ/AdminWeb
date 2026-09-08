@@ -159,6 +159,7 @@ export type UserStatus = 'ACTIVE' | 'INACTIVE'
 export type UserRole = 'S.ADMIN' | 'ADMIN' | 'CLIENT'
 
 export interface UserListParams {
+  email?: string
   name: string
   status: UserStatus | 'ALL'
   phone: string
@@ -304,6 +305,7 @@ export interface NoticeFile {
 }
 
 export interface Notice {
+  authorRole?: UserRole
   noticeUid: string
   title: string
   content: string

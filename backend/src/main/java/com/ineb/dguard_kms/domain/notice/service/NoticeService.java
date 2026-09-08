@@ -32,12 +32,14 @@ public class NoticeService {
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
     private static final int MAX_FILES = 10;
 
+    private final com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository authorRepository;
     private final NoticeRepository noticeRepository;
     private final NoticeFileRepository fileRepository;
     private final CryptoUtil cryptoUtil;
     private final AuditLogService auditLogService;
 
-    public NoticeService(NoticeRepository noticeRepository, NoticeFileRepository fileRepository, CryptoUtil cryptoUtil, AuditLogService auditLogService) {
+    public NoticeService(NoticeRepository noticeRepository, NoticeFileRepository fileRepository, CryptoUtil cryptoUtil, AuditLogService auditLogService, com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository authorRepository) {
+        this.authorRepository = authorRepository;
         this.noticeRepository = noticeRepository;
         this.fileRepository = fileRepository;
         this.cryptoUtil = cryptoUtil;
@@ -151,7 +153,7 @@ public class NoticeService {
         fileRepository.flush();
     }
 
-    private NoticeResponse response(Notice notice) { return NoticeResponse.from(notice, fileRepository.findAllByNoticeIdOrderByCreatedAtAsc(notice.getId())); }
+    private NoticeResponse response(Notice notice) { return NoticeResponse.from(notice, fileRepository.findAllByNoticeIdOrderByCreatedAtAsc(notice.getId()), authorRepository.findByLoginId(notice.getCreatedBy()).map(author -> author.getRole()).orElse("CLIENT")); }
     private String normalizeCategory(String value) { return value == null || value.isBlank() ? "GENERAL" : switch (value.trim().toUpperCase()) { case "NOTICE" -> "NOTICE"; case "GENERAL" -> "GENERAL"; default -> throw new IllegalArgumentException("게시글 구분은 NOTICE 또는 GENERAL이어야 합니다."); }; }
     private String normalizeExpose(String value) { return value == null || value.isBlank() ? "Y" : switch (value.trim().toUpperCase()) { case "Y" -> "Y"; case "N" -> "N"; default -> throw new IllegalArgumentException("노출 상태는 Y 또는 N이어야 합니다."); }; }
     private void assertCategoryWritable(String category, String role) { if ("NOTICE".equals(category) && !isAdmin(role)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "공지사항은 관리자만 작성할 수 있습니다."); }

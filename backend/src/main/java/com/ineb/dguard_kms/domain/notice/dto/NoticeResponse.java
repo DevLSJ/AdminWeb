@@ -15,14 +15,15 @@ public record NoticeResponse(
         String exposeYn,
         long viewCount,
         String createdBy,
+        String authorRole,
         Instant createdAt,
         Instant updatedAt,
         List<NoticeFileResponse> files
 ) {
-    public static NoticeResponse from(Notice notice, List<NoticeFile> files) {
+    public static NoticeResponse from(Notice notice, List<NoticeFile> files, String authorRole) {
         return new NoticeResponse(
                 notice.getNoticeUid(), notice.getTitle(), notice.getContent(), notice.getCategory(), notice.getExposeYn(),
-                notice.getViewCount(), notice.getCreatedBy(), notice.getCreatedAt(), notice.getUpdatedAt(),
+                notice.getViewCount(), notice.getCreatedBy(), authorRole, notice.getCreatedAt(), notice.getUpdatedAt(),
                 files.stream().map(NoticeFileResponse::from).toList()
         );
     }

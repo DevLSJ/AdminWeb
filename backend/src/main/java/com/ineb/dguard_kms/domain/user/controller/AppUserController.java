@@ -51,6 +51,7 @@ public class AppUserController {
     @GetMapping("/managed")
     @Operation(summary = "관리 계정과 암호화 사용자의 통합 목록 조회")
     public ApiResponse<PageResponse<ManagedUserResponse>> searchManaged(
+            @RequestParam(required = false) String email,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String status,
@@ -59,7 +60,7 @@ public class AppUserController {
     ) {
         int safeSize = Math.min(Math.max(size, 1), 100);
         return ApiResponse.success(
-                managedUserService.search(name, phone, status, Math.max(page, 0), safeSize),
+                managedUserService.search(name, phone, email, status, Math.max(page, 0), safeSize),
                 "관리 대상 사용자 통합 목록을 조회했습니다."
         );
     }
@@ -67,6 +68,7 @@ public class AppUserController {
     @GetMapping
     @Operation(summary = "사용자 마스킹 목록 조회")
     public ApiResponse<PageResponse<UserResponse>> search(
+            @RequestParam(required = false) String email,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String status,
@@ -75,7 +77,7 @@ public class AppUserController {
     ) {
         int safeSize = Math.min(Math.max(size, 1), 100);
         return ApiResponse.success(
-                service.search(name, phone, status, Math.max(page, 0), safeSize),
+                service.search(name, phone, email, status, Math.max(page, 0), safeSize),
                 "사용자 목록을 마스킹하여 조회했습니다."
         );
     }

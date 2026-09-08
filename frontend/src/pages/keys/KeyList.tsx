@@ -1,3 +1,4 @@
+import { ResizableTable as Table } from '../../components/admin/ResizableTable'
 import { useCallback, useEffect, useState } from 'react'
 import {
   AddRounded,
@@ -24,7 +25,6 @@ import {
   MenuItem,
   Select,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableContainer,

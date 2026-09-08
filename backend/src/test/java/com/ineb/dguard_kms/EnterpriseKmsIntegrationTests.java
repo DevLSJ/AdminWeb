@@ -62,9 +62,12 @@ class EnterpriseKmsIntegrationTests {
                 keyUid, new KeyStatusChangeRequest(KeyStatus.ACTIVE, "다시 활성화"), "admin"
         );
         assertThat(keyService.encrypt(keyUid, new KeyEncryptRequest("new-data"), "admin").ciphertext()).isNotBlank();
-        assertThat(keyService.decrypt(
+        assertThatThrownBy(() -> keyService.decrypt(
                 keyUid, new KeyDecryptRequest(encrypted.ciphertext(), encrypted.iv(), encrypted.version()), "admin"
-        ).plaintext()).isEqualTo("enterprise-secret");
+        )).isInstanceOfSatisfying(KeyOperationException.class,
+                exception -> assertThat(exception.getErrorCode()).isEqualTo("KEY_VERSION_RETIRED"));
+        var currentEncrypted = keyService.encrypt(keyUid, new KeyEncryptRequest("current-secret"), "admin");
+        assertThat(keyService.decrypt(keyUid, new KeyDecryptRequest(currentEncrypted.ciphertext(), currentEncrypted.iv(), currentEncrypted.version()), "admin").plaintext()).isEqualTo("current-secret");
 
         keyService.changeStatus(
                 keyUid, new KeyStatusChangeRequest(KeyStatus.DEACTIVATED, "폐기 준비"), "admin"

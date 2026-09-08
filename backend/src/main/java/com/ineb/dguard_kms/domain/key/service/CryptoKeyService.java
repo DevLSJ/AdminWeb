@@ -492,7 +492,7 @@ public class CryptoKeyService {
             if (requestedVersion != key.getCurrentVersion()) {
                 throw new KeyOperationException(
                         HttpStatus.BAD_REQUEST,
-                        "과거 키 버전은 복호화 전용입니다.",
+                        "갱신된 이전 키 버전은 사용할 수 없습니다.",
                         "KEY_VERSION_ENCRYPT_NOT_ALLOWED"
                 );
             }
@@ -594,6 +594,9 @@ public class CryptoKeyService {
 
     private byte[] unwrapKeyVersion(CryptoKey key, Integer requestedVersion) {
         int version = requestedVersion == null ? key.getCurrentVersion() : requestedVersion;
+        if (version != key.getCurrentVersion()) {
+            throw conflict("키 갱신 이후 이전 버전의 암호문은 복호화할 수 없습니다.", "KEY_VERSION_RETIRED");
+        }
         KeyMaterial material = materialRepository.findByCryptoKeyAndKeyVersion(key, version)
                 .orElseThrow(() -> new KeyOperationException(
                         HttpStatus.NOT_FOUND,

@@ -31,6 +31,7 @@ function KeyDetail() {
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({ keyName: '', purpose: 'ENCRYPT' as KeyPurpose, expireAt: '' })
   const [statusOpen, setStatusOpen] = useState(false)
+  const [rotating, setRotating] = useState(false)
   const [rotateOpen, setRotateOpen] = useState(false)
   const [toStatus, setToStatus] = useState<KeyStatus | ''>('')
   const [reason, setReason] = useState('')
@@ -84,13 +85,16 @@ function KeyDetail() {
   }
 
   const executeRotation = async () => {
-    if (!key) return
+    if (!key || rotating) return
+    setRotating(true)
     try {
       const newVersion = await rotateKey(key.keyUid)
       setRotateOpen(false)
       setNotice(`새 키 버전 v${newVersion}을 생성했습니다.`)
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : '키를 갱신하지 못했습니다.')
+    } finally {
+      setRotating(false)
     }
   }
 
@@ -116,7 +120,7 @@ function KeyDetail() {
           <Box sx={{ height: 40, borderLeft: '2px solid', borderColor: 'text.disabled' }} />
           <Box><Typography variant="h5">{key.keyName}</Typography><Typography sx={{ mt: .25, color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{key.keyUid}</Typography></Box>
         </Stack>
-        {isAdmin && <Button variant="contained" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => { setToStatus(''); setReason(''); setStatusOpen(true) }}>상태 변경</Button>}
+        {isAdmin && <Stack direction="row" spacing={1}><Button variant="contained" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => { setToStatus(''); setReason(''); setStatusOpen(true) }}>상태 변경</Button><Button variant="outlined" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !canRotateWithStatus(key.status)} onClick={() => setRotateOpen(true)}>키 갱신</Button></Stack>}
       </Box>
 
       {notice && <Alert severity="success" onClose={() => setNotice('')} sx={{ mb: 2 }}>{notice}</Alert>}
@@ -151,7 +155,7 @@ function KeyDetail() {
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm" slotProps={{ paper: { sx: { borderRadius: 1 } } }}><DialogTitle>기본 정보 수정</DialogTitle><DialogContent><TextField fullWidth label="키 이름" value={editForm.keyName} onChange={(event) => setEditForm((current) => ({ ...current, keyName: event.target.value }))} sx={{ mt: 1, mb: 2 }} /><FormControl fullWidth sx={{ mb: 2 }}><InputLabel>용도</InputLabel><Select label="용도" value={editForm.purpose} onChange={(event) => setEditForm((current) => ({ ...current, purpose: event.target.value as KeyPurpose }))}><MenuItem value="ENCRYPT">데이터 암복호화</MenuItem><MenuItem value="WRAP">키 래핑</MenuItem><MenuItem value="SIGN">전자서명</MenuItem><MenuItem value="AUTH">메시지 인증</MenuItem></Select></FormControl><TextField fullWidth type="date" label="만료일" value={editForm.expireAt} onChange={(event) => setEditForm((current) => ({ ...current, expireAt: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} /></DialogContent><DialogActions><Button onClick={() => setEditOpen(false)}>취소</Button><Button variant="contained" disabled={!editForm.keyName.trim() || !editForm.expireAt} onClick={() => void saveMetadata()}>저장</Button></DialogActions></Dialog>
       <Dialog open={statusOpen} onClose={() => setStatusOpen(false)} fullWidth maxWidth="sm" slotProps={{ paper: { sx: { borderRadius: 1 } } }}><DialogTitle>키 상태 변경</DialogTitle><DialogContent><InfoRow label="현재 상태" value={<StatusBadge dot status={key.status} minWidth={0} />} /><FormControl fullWidth sx={{ mt: 1, mb: 2 }}><InputLabel>변경 상태</InputLabel><Select label="변경 상태" value={toStatus} onChange={(event) => setToStatus(event.target.value as KeyStatus)}>{getManualKeyStatusTransitions(key.status).map((status) => <MenuItem key={status} value={status}>{getStatusLabel(status)}</MenuItem>)}</Select></FormControl><TextField fullWidth required multiline minRows={3} label="변경 사유" value={reason} onChange={(event) => setReason(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setStatusOpen(false)}>취소</Button><Button variant="contained" disabled={!toStatus || !reason.trim()} onClick={() => void applyStatus()}>변경 실행</Button></DialogActions></Dialog>
-      <Dialog open={rotateOpen} onClose={() => setRotateOpen(false)} fullWidth maxWidth="sm" slotProps={{ paper: { sx: { borderRadius: 1 } } }}><DialogTitle>키 갱신</DialogTitle><DialogContent><Alert severity="info" sx={{ mb: 2 }}>현재 v{key.version}을 보존하고 신규 v{key.version + 1} 키 재료를 생성합니다.</Alert><InfoRow label="대상 키" value={key.keyName} /><InfoRow label="현재 상태" value={<StatusBadge status={key.status} />} /></DialogContent><DialogActions><Button onClick={() => setRotateOpen(false)}>취소</Button><Button variant="contained" startIcon={<AutorenewRounded />} onClick={() => void executeRotation()}>v{key.version + 1} 생성</Button></DialogActions></Dialog>
+      <Dialog open={rotateOpen} onClose={() => { if (!rotating) setRotateOpen(false) }} fullWidth maxWidth="sm" slotProps={{ backdrop: { sx: { backdropFilter: "blur(5px)" } }, paper: { sx: { borderRadius: 2 } } }}><DialogTitle>키 갱신</DialogTitle><DialogContent><Alert severity="warning" sx={{ mb: 2 }}>현재 버전: v{key.version}</Alert><Typography sx={{ mb: 2 }}>정말 v{key.version + 1}로 갱신하시겠습니까?</Typography><Alert severity="error" sx={{ mb: 2 }}><strong>키 갱신</strong> 이후에는 그 키로 <strong>이전 암호문의 해독이 불가능합니다.</strong></Alert><InfoRow label="대상 키" value={key.keyName} /><InfoRow label="현재 상태" value={<StatusBadge status={key.status} />} /></DialogContent><DialogActions><Button disabled={rotating} onClick={() => setRotateOpen(false)}>취소</Button><Button variant="contained" disabled={rotating} startIcon={<AutorenewRounded />} onClick={() => void executeRotation()}>v{key.version + 1} 생성</Button></DialogActions></Dialog>
     </Box>
   )
 }

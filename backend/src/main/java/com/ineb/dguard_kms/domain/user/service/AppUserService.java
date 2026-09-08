@@ -72,19 +72,40 @@ public class AppUserService {
             int page,
             int size
     ) {
-        var result = repository.findAll(
-                searchSpecification(name, phone, status),
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
-        ).map(this::response);
-        return PageResponse.from(result);
+        return search(name, phone, null, status, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> search(String name, String phone, String email, String status, int page, int size) {
+        if (isBlank(name) && isBlank(phone) && isBlank(email)) {
+            return PageResponse.from(repository.findAll(searchSpecification(null, null, status),
+                    PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))).map(this::response));
+        }
+        List<UserResponse> matches = searchAllForManagement(name, phone, email, status);
+        int start = (int) Math.min((long) page * size, matches.size());
+        return new PageResponse<>(matches.subList(start, Math.min(start + size, matches.size())), page, size,
+                matches.size(), (matches.size() + size - 1) / size);
     }
 
     @Transactional(readOnly = true)
     public List<UserResponse> searchAllForManagement(String name, String phone, String status) {
-        return repository.findAll(
-                searchSpecification(name, phone, status),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        ).stream().map(this::response).toList();
+        return searchAllForManagement(name, phone, null, status);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> searchAllForManagement(String name, String phone, String email, String status) {
+        boolean filtered = !isBlank(name) || !isBlank(phone) || !isBlank(email);
+        return repository.findAll(searchSpecification(null, null, status), Sort.by(Sort.Direction.DESC, "createdAt"))
+                .stream().filter(user -> !filtered || (verifyIntegrity(user)
+                        && contains(decrypt(user.getNameCiphertext(), user.getNameIv()), name)
+                        && (isBlank(phone) || (!phone.replaceAll("\\D", "").isEmpty()
+                            && decrypt(user.getPhoneCiphertext(), user.getPhoneIv()).replaceAll("\\D", "").contains(phone.replaceAll("\\D", ""))))
+                        && contains(decrypt(user.getEmailCiphertext(), user.getEmailIv()), email)))
+                .map(this::response).toList();
+    }
+
+    private boolean contains(String value, String query) {
+        return isBlank(query) || value.toLowerCase(Locale.ROOT).contains(query.trim().toLowerCase(Locale.ROOT));
     }
 
     @Transactional(readOnly = true)

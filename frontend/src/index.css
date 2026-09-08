@@ -282,7 +282,7 @@ input {
 }
 
 .notice-page .MuiCard-root {
-  border-radius: 2px !important;
+  border-radius: 8px !important;
 }
 
 .kms-chart-point {
@@ -337,4 +337,21 @@ input {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.column-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 3;
+  border-right: 2px solid rgba(120, 135, 155, .35);
+}
+.column-resize-handle:hover, .column-resize-handle:focus-visible {
+  background: rgba(23, 105, 232, .18);
+  border-right-color: #1769e8;
+  outline: none;
 }

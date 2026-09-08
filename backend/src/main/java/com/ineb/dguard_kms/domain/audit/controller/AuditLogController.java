@@ -58,6 +58,14 @@ public class AuditLogController {
         );
     }
 
+    @GetMapping("/violations")
+    @Operation(summary = "감사 로그 위변조 위반 조회", description = "행 HMAC·체인 연결 위반의 행위, 기록 시각, 탐지 시각과 위반 유형을 반환합니다. 실제 변조 시점은 확정할 수 없습니다.")
+    public ApiResponse<java.util.List<com.ineb.dguard_kms.domain.audit.dto.AuditViolationResponse>> violations(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ApiResponse.success(service.violations(from, to), "감사 로그 위반 검증을 완료했습니다.");
+    }
+
     @GetMapping("/verify")
     @Operation(summary = "감사 로그 기간 체인 검증", description = "YYYY-MM-DD 형식의 시작일과 종료일을 받습니다. 한국 시간 시작일 0시 이상, 종료일 다음 날 0시 미만의 행 HMAC과 범위 앞뒤 연결을 검증합니다. 두 날짜를 생략하면 전체 체인을 검증합니다.")
     public ApiResponse<AuditVerificationResponse> verify(

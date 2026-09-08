@@ -129,6 +129,14 @@ class WeekThreeUserAuditIntegrationTests {
                 """.formatted(phone, email), 409);
         assertThat(duplicate.path("errorCode").asText()).isEqualTo("USER_DUPLICATE");
 
+        for (String filter : new String[] {"name=" + URLEncoder.encode("홍", StandardCharsets.UTF_8), "phone=123", "email=" + URLEncoder.encode(email.substring(0, email.indexOf('@')), StandardCharsets.UTF_8)}) {
+            if (filter.equals("phone=123")) filter = "phone=" + phone.replaceAll("\\D", "").substring(3, 7);
+            JsonNode partial = sendJson(client, "GET", "/api/users/managed?size=100&" + filter, adminToken, "", 200);
+            assertThat(findUser(partial.path("data").path("content"), userUid).path("nameDisplay").asText()).doesNotContain("홍길동");
+        }
+        sendJson(client, "POST", "/api/users", adminToken,
+                "{\"name\":\"규칙검사\",\"phone\":\"010-8888-8888\",\"email\":\"policy@example.com\",\"password\":\"abcdefgh\"}", 400);
+
         var stored = userRepository.findByUserUid(userUid).orElseThrow();
         assertThat(new String(stored.getNameCiphertext(), StandardCharsets.UTF_8)).doesNotContain("홍길동");
         assertThat(new String(stored.getPhoneCiphertext(), StandardCharsets.UTF_8)).doesNotContain(phone);
@@ -298,8 +306,8 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(csv.headers().firstValue("content-disposition").orElse("")).contains("attachment");
         assertThat(csv.body()).contains("USER_VIEW_PLAIN", userUid.toString(), "rowHash");
         String dataHeader = "logUid,actor,action,targetType,targetId,detail,createdAt,previousHash,rowHash,rowValid\r\n";
-        assertThat(csv.body()).startsWith("\uFEFF\"# 감사 로그 CSV 읽는 법\"");
-        assertThat(csv.body()).contains("한글 의미", "한국 시간은 9시간을 더합니다", "true = 일치", "CSV 파일 자체의 서명 검증 결과가 아닙니다");
+        assertThat(csv.body()).startsWith("\uFEFF\"# 감사 로그 CSV 안내\"");
+        assertThat(csv.body()).contains("항목", "한국 시간: +9시간", "true = 일치", "기간 체인 검증 사용");
         String[] exportedSections = csv.body().split(dataHeader, -1);
         assertThat(exportedSections).hasSize(2);
         for (String column : dataHeader.trim().split(",")) {
@@ -309,7 +317,7 @@ class WeekThreeUserAuditIntegrationTests {
         HttpResponse<String> emptyCsv = send(client, "GET",
                 "/api/audit-logs/export?action=NO_MATCHING_ACTION", adminToken, "");
         assertThat(emptyCsv.statusCode()).isEqualTo(200);
-        assertThat(emptyCsv.body()).startsWith("\uFEFF\"# 감사 로그 CSV 읽는 법\"").endsWith(dataHeader);
+        assertThat(emptyCsv.body()).startsWith("\uFEFF\"# 감사 로그 CSV 안내\"").endsWith(dataHeader);
 
         JsonNode afterExport = sendJson(client, "GET", "/api/audit-logs/verify", adminToken, "", 200);
         assertThat(afterExport.path("data").path("valid").asBoolean()).isTrue();
@@ -339,6 +347,15 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(invalid.path("data").path("valid").asBoolean()).isFalse();
         assertThat(invalid.path("data").path("invalidLogUids")).anySatisfy(uid ->
                 assertThat(uid.asText()).isEqualTo(lastLog.getLogUid().toString()));
+
+        JsonNode violations = sendJson(client, "GET", "/api/audit-logs/violations", token, "", 200);
+        assertThat(violations.path("data")).anySatisfy(violation -> {
+            assertThat(violation.path("logUid").asText()).isEqualTo(lastLog.getLogUid().toString());
+            assertThat(violation.path("action").asText()).isEqualTo(lastLog.getAction());
+            assertThat(violation.path("recordedAt").asText()).isNotBlank();
+            assertThat(violation.path("detectedAt").asText()).isNotBlank();
+            assertThat(violation.path("violations").toString()).contains("ROW_HMAC_MISMATCH");
+        });
 
         jdbcTemplate.update("UPDATE audit_log SET detail = ? WHERE id = ?", originalDetail, lastLog.getId());
         JsonNode restored = sendJson(client, "GET", "/api/audit-logs/verify", token, "", 200);

@@ -208,7 +208,7 @@ class KeyManagementIntegrationTests {
         assertThat(versions.path("data").get(0).path("version").asInt()).isEqualTo(2);
         assertThat(versions.path("data").get(0).path("decryptOnly").asBoolean()).isFalse();
         assertThat(versions.path("data").get(1).path("version").asInt()).isEqualTo(1);
-        assertThat(versions.path("data").get(1).path("decryptOnly").asBoolean()).isTrue();
+        assertThat(versions.path("data").get(1).path("decryptOnly").asBoolean()).isFalse();
 
         JsonNode decryptedWithPreviousVersion = sendJson(
                 client,
@@ -218,10 +218,10 @@ class KeyManagementIntegrationTests {
                 """
                 {"ciphertext":"%s","iv":"%s","version":1}
                 """.formatted(ciphertext, iv),
-                200
+                409
         );
-        assertThat(decryptedWithPreviousVersion.path("data").path("plaintext").asText())
-                .isEqualTo("Hello DGuard");
+        assertThat(decryptedWithPreviousVersion.path("errorCode").asText())
+                .isEqualTo("KEY_VERSION_RETIRED");
 
         key = keyRepository.findByKeyUid(keyUid).orElseThrow();
         KeyMaterial retiredV1 = materialRepository.findByCryptoKeyAndKeyVersion(key, 1).orElseThrow();

@@ -27,19 +27,20 @@ public class ManagedUserService {
     public PageResponse<ManagedUserResponse> search(
             String name,
             String phone,
+            String email,
             String status,
             int page,
             int size
     ) {
         List<ManagedUserResponse> users = new ArrayList<>();
-        appUserService.searchAllForManagement(name, phone, status).stream()
+        appUserService.searchAllForManagement(name, phone, email, status).stream()
                 .map(ManagedUserResponse::from)
                 .forEach(users::add);
 
-        if (isBlank(phone)) {
+        {
             String nameFilter = isBlank(name) ? null : name.trim().toLowerCase(Locale.ROOT);
             String statusFilter = isBlank(status) || "ALL".equalsIgnoreCase(status) ? null : status.trim().toUpperCase(Locale.ROOT);
-            adminAccountService.list().stream()
+            adminAccountService.searchContacts(phone, email).stream()
                     .filter(account -> nameFilter == null
                             || account.name().toLowerCase(Locale.ROOT).contains(nameFilter)
                             || account.loginId().toLowerCase(Locale.ROOT).contains(nameFilter))

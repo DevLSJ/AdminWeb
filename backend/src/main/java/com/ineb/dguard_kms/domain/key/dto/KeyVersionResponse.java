@@ -16,7 +16,7 @@ public record KeyVersionResponse(
         Instant createdAt,
         @Schema(description = "버전을 생성한 로그인 ID")
         String createdBy,
-        @Schema(description = "복호화 전용 여부", example = "false")
+        @Schema(description = "복호화 전용 여부 (갱신된 이전 버전은 사용 차단)", example = "false")
         boolean decryptOnly
 ) {
     public static KeyVersionResponse from(KeyMaterial material) {
@@ -24,7 +24,7 @@ public record KeyVersionResponse(
                 material.getKeyVersion(),
                 KeyMaterial.RETIRED.equals(material.getMaterialStatus()) ? "DEPRECATED" : material.getMaterialStatus(),
                 material.getCreatedAt(),
-                material.getCreatedBy(), KeyMaterial.RETIRED.equals(material.getMaterialStatus())
+                material.getCreatedBy(), false
         );
     }
 }
