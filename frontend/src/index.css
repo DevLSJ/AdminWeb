@@ -348,7 +348,10 @@ input {
   cursor: col-resize;
   touch-action: none;
   z-index: 3;
-  border-right: 2px solid rgba(120, 135, 155, .35);
+  border-right: 1px solid transparent;
+}
+.MuiTableCell-head:hover > .column-resize-handle {
+  border-right-color: rgba(120, 135, 155, .3);
 }
 .column-resize-handle:hover, .column-resize-handle:focus-visible {
   background: rgba(23, 105, 232, .18);

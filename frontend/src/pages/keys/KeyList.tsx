@@ -5,7 +5,6 @@ import {
   AccountTreeRounded,
   CloudUploadRounded,
   DeleteOutlineRounded,
-  FilterAltOffRounded,
   SearchRounded,
 } from '@mui/icons-material'
 import {
@@ -36,8 +35,9 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { alpha } from '@mui/material/styles'
 import { categoryMenuProps } from '../../components/admin/categoryMenu'
-import { FilterCard, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
-import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
+import { PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { managementTableSx, managementTableContainerSx } from '../../components/admin/managementTable'
+import { SearchFilterForm } from '../../components/admin/SearchFilterForm'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { KeyLifecycleGuide } from '../../components/keys/KeyLifecycleGuide'
 import { useAuth } from '../../hooks/useAuth'
@@ -238,8 +238,7 @@ function KeyList() {
       {(error || listError) && <Alert severity="error" sx={{ mb: 2 }}>{listError || error}</Alert>}
       {(loading || listLoading) && <Alert severity="info" sx={{ mb: 2 }}>키 목록을 불러오는 중입니다.</Alert>}
 
-      <FilterCard>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(230px, 1.7fr) repeat(5, minmax(125px, 1fr))' }, gap: 1.5 }}>
+      <SearchFilterForm columns={6} onSearch={(event) => { event.preventDefault(); setParams((current) => ({ ...current, page: 0 })) }} onReset={() => setParams((current) => ({ ...defaultParams, size: current.size }))} extraFilters={params.category === 'EXPIRING' && <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>만료 기준</Typography><Select MenuProps={categoryMenuProps} inputProps={{ 'aria-label': '만료 기준' }} size="small" value={params.expiringWithinDays ?? 30} onChange={(event) => updateParam('expiringWithinDays', Number(event.target.value))}>{[7, 30, 60].map((days) => <MenuItem key={days} value={days}>{days}일 이내</MenuItem>)}</Select></Stack>}>
           <TextField
             size="small"
             label="검색어"
@@ -253,23 +252,19 @@ function KeyList() {
           <FormControl size="small"><InputLabel id="key-filter-status-label">상태</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-status-label" label="상태" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{statusOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : getStatusLabel(option)}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel id="key-filter-purpose-label">용도</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-purpose-label" label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : purposeLabels[option]}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel id="key-filter-sort-label">정렬</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-sort-label" label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
-        </Box>
-        {params.category === 'EXPIRING' && <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>만료 기준</Typography><Select MenuProps={categoryMenuProps} inputProps={{ 'aria-label': '만료 기준' }} size="small" value={params.expiringWithinDays ?? 30} onChange={(event) => updateParam('expiringWithinDays', Number(event.target.value))}>{[7, 30, 60].map((days) => <MenuItem key={days} value={days}>{days}일 이내</MenuItem>)}</Select></Stack>}
-        <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center', justifyContent: 'flex-end' }}>
-          <Button size="small" color="inherit" startIcon={<FilterAltOffRounded />} onClick={() => setParams((current) => ({ ...defaultParams, size: current.size }))}>필터 초기화</Button>
-        </Stack>
-      </FilterCard>
+      </SearchFilterForm>
 
       <Card sx={{ overflow: 'hidden' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack></Box>
-        <TableContainer sx={paginatedTableContainerSx(params.size)}>
-          <Table stickyHeader size="small" sx={{ width: '100%', minWidth: 1180, tableLayout: 'fixed', '& .MuiTableCell-root': { px: 1.35, ...paginatedTableCellSx(params.size) }, '& .MuiTableCell-head': { py: 1, bgcolor: 'background.paper', fontSize: 13, letterSpacing: '0.02em' } }}>
-            <TableHead><TableRow><TableCell sx={{ width: 250 }}>키 이름 / UID</TableCell><TableCell sx={{ width: 170 }}>알고리즘·모드</TableCell><TableCell sx={{ width: 110 }}>용도</TableCell><TableCell sx={{ width: 120 }}>상태</TableCell><TableCell sx={{ width: 70 }}>버전</TableCell><TableCell sx={{ width: 105 }}>자동 갱신</TableCell><TableCell sx={{ width: 130 }}>만료일</TableCell><TableCell sx={{ width: 110 }}>무결성</TableCell><TableCell align="center" sx={{ width: 150 }}>관리</TableCell></TableRow></TableHead>
+        <TableContainer sx={managementTableContainerSx}>
+          <Table stickyHeader size="small" sx={managementTableSx}>
+            <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 200 }}>키 이름 / UID</TableCell><TableCell sx={{ width: 140 }}>알고리즘·모드</TableCell><TableCell sx={{ width: 95 }}>용도</TableCell><TableCell sx={{ width: 95 }}>상태</TableCell><TableCell sx={{ width: 65 }}>버전</TableCell><TableCell sx={{ width: 80 }}>자동 갱신</TableCell><TableCell sx={{ width: 100 }}>만료일</TableCell><TableCell sx={{ width: 95 }}>무결성</TableCell><TableCell align="center" sx={{ width: 120 }}>관리</TableCell></TableRow></TableHead>
             <TableBody>
-              {pageContent.map((key) => (
+              {pageContent.map((key, index) => (
                 <TableRow key={key.keyUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? (theme) => alpha(theme.palette.primary.main, 0.07) : (theme) => alpha(theme.palette.error.main, 0.13) } }} onClick={() => navigate(`/keys/${key.keyUid}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(`/keys/${key.keyUid}`) }}>
-                  <TableCell><Typography noWrap sx={{ maxWidth: 220, fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography noWrap sx={{ maxWidth: 220, color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
-                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
+                  <TableCell>{params.page * params.size + index + 1}</TableCell>
+                  <TableCell><Typography noWrap sx={{ maxWidth: '100%', fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography className="table-secondary" noWrap sx={{ maxWidth: '100%', color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
+                  <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography className="table-secondary" sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
                   <TableCell sx={{ fontSize: 12 }}>{purposeLabels[key.purpose]}</TableCell>
                   <TableCell><StatusBadge dot status={key.status} /></TableCell>
                   <TableCell sx={{ fontSize: 12, fontWeight: 800 }}>v{key.version}</TableCell>
@@ -279,7 +274,7 @@ function KeyList() {
                   <TableCell align="center" sx={{ width: 150 }}><Stack direction="row" spacing={0.35} sx={{ alignItems: 'center', justifyContent: 'center' }}>{isAdmin && <Button size="small" variant="outlined" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={(event) => { event.stopPropagation(); openTransition(key) }}>상태</Button>}{isAdmin && <Button size="small" color="error" disabled={key.status === 'DESTROYED'} onClick={(event) => { event.stopPropagation(); openDelete(key) }}><DeleteOutlineRounded sx={{ fontSize: 18 }} /></Button>}</Stack></TableCell>
                 </TableRow>
               ))}
-              {!listLoading && pageContent.length === 0 && <TableRow><TableCell colSpan={9} align="center" sx={{ py: 8, color: 'text.secondary' }}>조건에 맞는 키가 없습니다.</TableCell></TableRow>}
+              {!listLoading && pageContent.length === 0 && <TableRow><TableCell colSpan={10} align="center" sx={{ py: 8, color: 'text.secondary' }}>조건에 맞는 키가 없습니다.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </TableContainer>

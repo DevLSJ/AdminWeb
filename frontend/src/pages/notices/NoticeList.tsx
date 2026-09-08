@@ -5,7 +5,7 @@ import { Alert, Box, Button, Card, CardContent, FormControl, FormHelperText, Ico
 import { useLocation, useNavigate } from 'react-router-dom'
 import { createNotice, deleteNotice as deleteNoticeApi, deleteNoticeFile, downloadNoticeFile, fetchNotice, fetchNoticePage, getApiErrorMessage, updateNotice } from '../../api/kms'
 import { PageHeader } from '../../components/admin/AdminPage'
-import { paginatedTableCellSx, paginatedTableContainerSx } from '../../components/admin/pagination'
+import { managementTableSx, managementTableContainerSx } from '../../components/admin/managementTable'
 import { categoryMenuProps } from '../../components/admin/categoryMenu'
 import { SearchFilterForm } from '../../components/admin/SearchFilterForm'
 import { StatusBadge } from '../../components/common/StatusBadge'
@@ -190,11 +190,12 @@ function NoticeList() {
       </SearchFilterForm>
       <Card className="section-card" sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden', borderRadius: '2px !important' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ fontSize: 14, fontWeight: 800 }}>게시글 목록</Typography><StatusBadge label={`${totalElements.toLocaleString()}건`} tone="neutral" minWidth={0} /></Box>
-        <TableContainer sx={{ width: '100%', maxWidth: '100%', overflowX: 'auto', ...paginatedTableContainerSx(params.size) }}>
-          <Table stickyHeader size="small" className="dense-data-table" sx={{ width: '100%', minWidth: 1000, tableLayout: 'fixed', '& .MuiTableCell-root': { px: 1.5, overflow: 'hidden', fontSize: 13.25, ...paginatedTableCellSx(params.size) }, '& .MuiTableCell-head': { py: 1, bgcolor: 'background.paper', fontSize: 13, fontWeight: 800 } }}>
-            <TableHead><TableRow><TableCell sx={{ width: 120 }}>구분</TableCell><TableCell sx={{ width: '38%' }}>제목</TableCell><TableCell sx={{ width: 95 }}>첨부</TableCell><TableCell sx={{ width: 105 }}>노출</TableCell><TableCell sx={{ width: 150 }}>작성자</TableCell><TableCell sx={{ width: 130 }}>등록일</TableCell><TableCell sx={{ width: 95 }} align="center">조회수</TableCell></TableRow></TableHead>
-            <TableBody>{notices.map((notice) => (
-              <TableRow key={notice.noticeUid} hover tabIndex={0} className="interactive-row" sx={notice.category === 'NOTICE' ? { cursor: 'pointer', '& .MuiTableCell-root': { bgcolor: (theme) => theme.palette.mode === 'light' ? '#fff7ed' : 'rgba(249,115,22,.10)' }, '&:hover .MuiTableCell-root': { bgcolor: (theme) => theme.palette.mode === 'light' ? '#ffedd5' : 'rgba(249,115,22,.16)' }, '& .MuiTableCell-root:first-of-type': { borderLeft: '4px solid #f59e0b' } } : { cursor: 'pointer', '& .MuiTableCell-root': { bgcolor: 'background.paper' }, '&:hover .MuiTableCell-root': { bgcolor: 'action.hover' }, '& .MuiTableCell-root:first-of-type': { borderLeft: '4px solid transparent' } }} onClick={() => openDetail(notice)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(notice) }}>
+        <TableContainer sx={managementTableContainerSx}>
+          <Table stickyHeader size="small" sx={managementTableSx}>
+            <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 120 }}>구분</TableCell><TableCell sx={{ width: 380 }}>제목</TableCell><TableCell sx={{ width: 95 }}>첨부</TableCell><TableCell sx={{ width: 105 }}>노출</TableCell><TableCell sx={{ width: 150 }}>작성자</TableCell><TableCell sx={{ width: 130 }}>등록일</TableCell><TableCell sx={{ width: 95 }} align="center">조회수</TableCell></TableRow></TableHead>
+            <TableBody>{notices.map((notice, index) => (
+              <TableRow key={notice.noticeUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }} onClick={() => openDetail(notice)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(notice) }}>
+                <TableCell>{params.page * params.size + index + 1}</TableCell>
                 <TableCell><StatusBadge icon={notice.category === 'NOTICE' ? <PushPinRounded /> : undefined} label={notice.category === 'NOTICE' ? '공지' : '일반'} tone={notice.category === 'NOTICE' ? 'warning' : 'neutral'} minWidth={0} sx={notice.category === 'NOTICE' ? { color: '#c2410c', bgcolor: '#fff1e7', borderColor: '#fed7aa' } : undefined} /></TableCell>
                 <TableCell><Typography sx={{ fontWeight: isAdminRole(notice.authorRole) ? 800 : 400, fontSize: 16 }}>{notice.title}</Typography></TableCell>
                 <TableCell><Stack direction="row" spacing={.65} sx={{ alignItems: 'center', color: notice.files.length ? 'primary.main' : 'text.disabled' }}><AttachFileRounded sx={{ fontSize: 17 }} /><Typography sx={{ fontSize: 12.5, fontWeight: 750 }}>{notice.files.length}개</Typography></Stack></TableCell>
@@ -203,7 +204,7 @@ function NoticeList() {
                 <TableCell><Typography sx={{ color: 'text.secondary', fontSize: 12.25 }}>{notice.createdAt.split('T')[0]}</Typography></TableCell>
                 <TableCell align="center" sx={{ fontSize: 13.5, fontWeight: 800 }}>{notice.viewCount.toLocaleString()}</TableCell>
               </TableRow>
-            ))}{!loading && notices.length === 0 && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>조건에 맞는 게시글이 없습니다.</TableCell></TableRow>}{loading && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>게시글을 불러오는 중입니다.</TableCell></TableRow>}</TableBody>
+            ))}{!loading && notices.length === 0 && <TableRow><TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>조건에 맞는 게시글이 없습니다.</TableCell></TableRow>}{loading && <TableRow><TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>게시글을 불러오는 중입니다.</TableCell></TableRow>}</TableBody>
           </Table>
         </TableContainer>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{totalElements === 0 ? '0건' : `${params.page * params.size + 1}–${Math.min((params.page + 1) * params.size, totalElements)} / ${totalElements.toLocaleString()}건`} · 공지 우선</Typography><Pagination count={Math.max(1, Math.ceil(totalElements / params.size))} page={params.page + 1} onChange={(_event, page) => setParams((current) => ({ ...current, page: page - 1 }))} color="primary" size="small" siblingCount={1} boundaryCount={1} sx={{ '& .MuiPaginationItem-root': { minWidth: 32, height: 32, border: '1px solid', borderColor: 'divider', borderRadius: 1.25, fontWeight: 700 }, '& .Mui-selected': { borderColor: 'primary.main' } }} /></Box>

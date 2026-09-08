@@ -12,7 +12,6 @@ import {
 } from '@mui/icons-material'
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Card,
@@ -52,6 +51,7 @@ import {
   updateUser,
 } from '../../api/kms'
 import { InfoRow, PageHeader, PaginationBar } from '../../components/admin/AdminPage'
+import { managementTableSx, managementTableContainerSx } from '../../components/admin/managementTable'
 import { SearchFilterForm } from '../../components/admin/SearchFilterForm'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
@@ -331,7 +331,7 @@ function UserList() {
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
 
-      <SearchFilterForm onSearch={search} onReset={resetFilters}>
+      <SearchFilterForm columns={3} onSearch={search} onReset={resetFilters}>
           <TextField size="small" label="이름 검색" value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
           <TextField size="small" label="연락처 검색" value={draft.phone} onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} />
           <TextField size="small" label="이메일 검색" value={draft.email ?? ''} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
@@ -339,17 +339,18 @@ function UserList() {
 
       <Card>
         <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {pageData.totalElements.toLocaleString()}명</Typography></Box>
-        <TableContainer sx={{ maxHeight: 'calc(100vh - 390px)', minHeight: 290 }}>
-          <Table stickyHeader size="small" sx={{ minWidth: 1080, tableLayout: 'fixed' }}>
-            <TableHead><TableRow><TableCell sx={{ width: '17%' }}>사용자</TableCell><TableCell sx={{ width: '13%' }}>연락처</TableCell><TableCell sx={{ width: '18%' }}>이메일</TableCell><TableCell sx={{ width: '9%' }}>권한</TableCell><TableCell sx={{ width: '9%' }}>상태</TableCell><TableCell sx={{ width: '10%' }}>무결성</TableCell><TableCell sx={{ width: '11%' }}>등록일</TableCell><TableCell align="center" sx={{ width: '13%' }}>최근 접속일</TableCell></TableRow></TableHead>
+        <TableContainer sx={managementTableContainerSx}>
+          <Table stickyHeader size="small" sx={managementTableSx}>
+            <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 150 }}>사용자</TableCell><TableCell sx={{ width: 160 }}>연락처</TableCell><TableCell sx={{ width: 195 }}>이메일</TableCell><TableCell sx={{ width: 95 }}>권한</TableCell><TableCell sx={{ width: 95 }}>상태</TableCell><TableCell sx={{ width: 95 }}>무결성</TableCell><TableCell sx={{ width: 150 }}>등록일</TableCell><TableCell align="center" sx={{ width: 160 }}>최근 접속일</TableCell></TableRow></TableHead>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={8} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
-              {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={8} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
-              {!loading && pageData.content.map((user) => {
+              {loading && <TableRow><TableCell colSpan={9} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
+              {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={9} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
+              {!loading && pageData.content.map((user, index) => {
                 const isAdminAccount = user.accountType === 'ADMIN_ACCOUNT'
                 return (
                   <TableRow key={`${user.accountType}-${user.userUid}`} hover tabIndex={0} className="interactive-row" onClick={() => navigate(`/users/${isAdminAccount ? 'admin' : 'app'}/${user.userUid}`)} sx={{ cursor: 'pointer', ...(!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : {}) }}>
-                    <TableCell><Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', minWidth: 0 }}><Avatar sx={{ width: 34, height: 34, bgcolor: isAdminAccount ? '#e8efff' : '#eaf7f1', color: isAdminAccount ? '#1f5ed7' : '#137653', fontSize: 14, fontWeight: 850 }}>{user.nameDisplay.slice(0, 1)}</Avatar>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 800, fontSize: 16 }}>{user.nameDisplay}</Typography></Box></Stack></TableCell>
+                    <TableCell>{params.page * params.size + index + 1}</TableCell>
+                    <TableCell><Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', minWidth: 0 }}>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 800, fontSize: 16 }}>{user.nameDisplay}</Typography></Box></Stack></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap', color: user.phoneMasked ? 'inherit' : 'text.disabled' }}>{user.phoneMasked ?? '—'}</TableCell>
                     <TableCell><Typography noWrap sx={{ color: user.emailMasked ? 'inherit' : 'text.disabled' }}>{user.emailMasked ?? '—'}</Typography></TableCell>
                     <TableCell><Typography sx={{ color: user.role === 'S.ADMIN' ? 'primary.main' : 'text.primary', fontSize: 12, fontWeight: 800 }}>{user.role}</Typography></TableCell>
