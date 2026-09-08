@@ -62,8 +62,8 @@ const defaultParams: KeyListParams = {
   sort: 'createdAt,desc',
 }
 
-const categoryOptions = ['ALL', 'ENCRYPT_CAPABLE', 'DECRYPT_CAPABLE', 'EXPIRING', 'INTEGRITY_VIOLATION'] as const
-const categoryLabels: Record<KeyListCategory, string> = { ALL: '전체 관리 키', ENCRYPT_CAPABLE: '암호화 가능', DECRYPT_CAPABLE: '복호화 가능', EXPIRING: '만료 임박', INTEGRITY_VIOLATION: '무결성 위반' }
+const categoryOptions = ['ALL', 'ENCRYPT_CAPABLE', 'EXPIRING', 'INTEGRITY_VIOLATION'] as const
+const categoryLabels: Record<KeyListCategory, string> = { ALL: '전체 관리 키', ENCRYPT_CAPABLE: '암호화 가능', EXPIRING: '만료 임박', INTEGRITY_VIOLATION: '무결성 위반' }
 const algorithmOptions = ['ALL', 'AES', 'RSA', 'HMAC'] as const
 const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'DEACTIVATED', 'COMPROMISED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const

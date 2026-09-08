@@ -239,7 +239,7 @@ function MainLayout() {
             p: { xs: 2, sm: 2.5 },
           }}
         >
-          <Box key={location.pathname} className="page-route-transition">
+          <Box key={location.pathname.startsWith('/users') ? '/users' : location.pathname} className="page-route-transition">
             <Outlet />
           </Box>
         </Box>

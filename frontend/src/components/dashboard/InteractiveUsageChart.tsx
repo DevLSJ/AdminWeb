@@ -11,6 +11,7 @@ const series = [
 interface InteractiveUsageChartProps {
   trend: DashboardTrend | null
   detailed?: boolean
+  compact?: boolean
 }
 
 function formatPeriod(period: string) {
@@ -26,13 +27,13 @@ function AccessibleSummary({ point }: { point: DashboardTrendPoint }) {
   )
 }
 
-export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUsageChartProps) {
+export function InteractiveUsageChart({ trend, detailed = false, compact = false }: InteractiveUsageChartProps) {
   const points = trend?.points ?? []
   const [activeIndex, setActiveIndex] = useState(Math.max(points.length - 1, 0))
   useEffect(() => setActiveIndex(Math.max(points.length - 1, 0)), [points.length])
 
   if (!points.length) {
-    return <Box sx={{ display: 'grid', height: detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
+    return <Box sx={{ display: 'grid', height: compact ? 180 : detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
   }
 
   // Keep the plot canvas stable when switching between daily and monthly data.
@@ -67,20 +68,20 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
       </Stack>
 
       <Box className="usage-chart-scroll" sx={{ width: '100%', maxWidth: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
-        <Box sx={{ position: 'relative', minWidth: width, width: '100%' }}>
+        <Box sx={{ position: 'relative', minWidth: compact ? 0 : width, width: '100%' }}>
           <Box
             sx={{
               position: 'absolute',
               zIndex: 3,
-              top: activeTop,
+              top: compact ? 0 : activeTop,
               left: tooltipLeft,
-              minWidth: detailed ? 190 : 164,
-              p: detailed ? 1.5 : 1.15,
+              minWidth: compact ? 140 : detailed ? 190 : 164,
+              p: compact ? .5 : detailed ? 1.5 : 1.15,
               border: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
               boxShadow: '0 12px 30px rgba(28,54,98,.16)',
-              transform: 'translate(-50%, calc(-100% - 12px))',
+              transform: compact ? 'translateX(-50%)' : 'translate(-50%, calc(-100% - 12px))',
               pointerEvents: 'none',
               transition: 'left 180ms cubic-bezier(.16,1,.3,1), top 180ms cubic-bezier(.16,1,.3,1)',
             }}
@@ -91,7 +92,7 @@ export function InteractiveUsageChart({ trend, detailed = false }: InteractiveUs
             </Stack>
           </Box>
 
-          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: detailed ? 382 : 296 }}>
+          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: compact ? 180 : detailed ? 382 : 296 }}>
             {[0, .25, .5, .75, 1].map((ratio) => {
               const y = chartBottom - ratio * chartHeight
               return <g key={ratio}><line x1="54" x2={width - 32} y1={y} y2={y} stroke="currentColor" opacity=".1" /><text x="45" y={y + 4} textAnchor="end" fill="currentColor" opacity=".56" fontSize="10">{Math.round(roundedMax * ratio)}</text></g>

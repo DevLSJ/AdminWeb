@@ -83,6 +83,7 @@ function UserList() {
   const [draft, setDraft] = useState(initialParams)
   const [params, setParams] = useState(initialParams)
   const [pageData, setPageData] = useState(emptyPage)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busyUserUid, setBusyUserUid] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -146,13 +147,17 @@ function UserList() {
   }, [loadUsers, params])
 
   useEffect(() => {
-    if (!isDetailRoute || !detailUid) { setManagedAdmin(null); setManagedAppUser(null); return }
+    let active = true
+    setManagedAdmin(null)
+    setManagedAppUser(null)
+    if (!isDetailRoute || !detailUid) { setDetailLoading(false); return }
     setError('')
-    setLoading(true)
+    setDetailLoading(true)
     const request = detailKind === 'admin'
-      ? fetchAdminAccount(detailUid).then((account) => { setManagedAdmin(account); setManagedAppUser(null); setAdminName(account.name); if (account.role !== 'S.ADMIN') setAdminRole(account.role) })
-      : fetchUser(detailUid).then((appUser) => { setManagedAppUser(appUser); setManagedAdmin(null) })
-    void request.catch((requestError) => setError(getApiErrorMessage(requestError, '사용자 상세를 불러오지 못했습니다.'))).finally(() => setLoading(false))
+      ? fetchAdminAccount(detailUid).then((account) => { if (!active) return; setManagedAdmin(account); setAdminName(account.name); if (account.role !== 'S.ADMIN') setAdminRole(account.role) })
+      : fetchUser(detailUid).then((appUser) => { if (active) setManagedAppUser(appUser) })
+    void request.catch((requestError) => { if (active) setError(getApiErrorMessage(requestError, '사용자 상세를 불러오지 못했습니다.')) }).finally(() => { if (active) setDetailLoading(false) })
+    return () => { active = false }
   }, [detailKind, detailUid, isDetailRoute])
 
   const search = (event: FormEvent<HTMLFormElement>) => {
@@ -305,14 +310,14 @@ function UserList() {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, pb: 2, mb: 2.5, borderBottom: '2px solid', borderColor: 'divider' }}><Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', minWidth: 0 }}><Button color="inherit" startIcon={<ArrowBackRounded />} onClick={closeDetail}>사용자 목록</Button><Box sx={{ height: 34, borderLeft: '2px solid', borderColor: 'divider' }} /><Box sx={{ minWidth: 0 }}><Typography variant="h5" noWrap>{managedAdmin?.loginId ?? managedAppUser?.nameMasked ?? '사용자'}</Typography></Box></Stack><IconButton aria-label="사용자 상세 닫기" onClick={closeDetail}><CloseRounded /></IconButton></Box>
         {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
         {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
-        {loading && <Box sx={{ display: 'grid', minHeight: 240, placeItems: 'center' }}><CircularProgress /></Box>}
-        {managedAdmin && !loading && (
+        {detailLoading && <Box sx={{ display: 'grid', minHeight: 240, placeItems: 'center' }}><CircularProgress /></Box>}
+        {managedAdmin && !detailLoading && (
           <Card className="section-card">
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">사용자 정보 및 제어</Typography><StatusBadge dot label={managedAdmin.integrityValid ? '정상' : '비정상'} tone={managedAdmin.integrityValid ? 'positive' : 'danger'} minWidth={0} /></Box>
             <Box sx={{ p: 2.5 }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))' }, columnGap: 3 }}><InfoRow label="이름" value={managedAdmin.name} /><InfoRow label="로그인 ID" value={managedAdmin.loginId} /><InfoRow label="권한" value={managedAdmin.role} /><InfoRow label="상태" value={<StatusBadge dot status={managedAdmin.status} minWidth={0} />} /><InfoRow label="연락처" value={managedAdmin.phoneMasked ?? '미등록'} /><InfoRow label="이메일" value={managedAdmin.emailMasked ?? '미등록'} /><InfoRow label="등록일" value={formatKst(managedAdmin.createdAt)} /><InfoRow label="최근 접속일" value={managedAdmin.lastLoginAt ? formatKst(managedAdmin.lastLoginAt) : '접속 이력 없음'} /></Box>{!accountManageable && <Alert severity="info" sx={{ mt: 2 }}>ADMIN은 CLIENT 계정만 수정할 수 있으며 S.ADMIN은 모든 계정을 관리할 수 있습니다.</Alert>}<Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)' }, gap: 1, mt: 2 }}><Button variant="contained" startIcon={<EditRounded />} disabled={!managedAdmin.integrityValid || !accountManageable} onClick={openAdminEdit}>상세 수정</Button><Button variant="outlined" startIcon={<VisibilityRounded />} disabled>개인정보 원문 조회</Button><Button variant="outlined" startIcon={<LockResetRounded />} disabled={!managedAdmin.integrityValid || !accountManageable} onClick={() => { setManagedPassword(''); setAdminPasswordOpen(true) }}>비밀번호 재설정</Button><Button variant="outlined" color={managedAdmin.status === 'ACTIVE' ? 'error' : 'primary'} disabled={!managedAdmin.integrityValid || !accountManageable || sessionUser?.loginId === managedAdmin.loginId} onClick={() => void toggleManagedAdminStatus()}>{managedAdmin.status === 'ACTIVE' ? '사용자 정지' : '사용자 활성화'}</Button></Box></Box>
           </Card>
         )}
-        {managedAppUser && !loading && (
+        {managedAppUser && !detailLoading && (
           <Card className="section-card">
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">사용자 정보 및 제어</Typography><StatusBadge dot label={managedAppUser.integrityValid ? '정상' : '비정상'} tone={managedAppUser.integrityValid ? 'positive' : 'danger'} minWidth={0} /></Box>
             <Box sx={{ p: 2.5 }}><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))' }, columnGap: 3 }}><InfoRow label="이름" value={managedAppUser.nameMasked} /><InfoRow label="권한" value={managedAppUser.role} /><InfoRow label="상태" value={<StatusBadge dot status={managedAppUser.status} minWidth={0} />} /><InfoRow label="연락처" value={managedAppUser.phoneMasked} /><InfoRow label="이메일" value={managedAppUser.emailMasked} /><InfoRow label="등록일" value={formatKst(managedAppUser.createdAt)} /></Box>{!appAccountManageable && <Alert severity="info" sx={{ mt: 2 }}>ADMIN은 CLIENT 계정만 수정할 수 있으며 S.ADMIN은 모든 계정을 관리할 수 있습니다.</Alert>}<Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)' }, gap: 1, mt: 2 }}><Button variant="contained" startIcon={<EditRounded />} disabled={!managedAppUser.integrityValid || !appAccountManageable} onClick={() => void openEdit(managedAppUser)}>상세 수정</Button><Button variant="outlined" startIcon={<VisibilityRounded />} disabled={!managedAppUser.integrityValid || !appAccountManageable} onClick={() => { setPlainCandidate(managedAppUser); setPlainReason('') }}>개인정보 원문 조회</Button><Button variant="outlined" startIcon={<LockResetRounded />} disabled={!managedAppUser.integrityValid || !appAccountManageable} onClick={() => { setPasswordUser(managedAppUser); setNewPassword('') }}>비밀번호 재설정</Button><Button variant="outlined" color={managedAppUser.status === 'ACTIVE' ? 'error' : 'primary'} disabled={!managedAppUser.integrityValid || !appAccountManageable} onClick={() => void toggleManagedAppStatus()}>{managedAppUser.status === 'ACTIVE' ? '사용자 정지' : '사용자 활성화'}</Button></Box></Box>
@@ -340,7 +345,7 @@ function UserList() {
       <Card>
         <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {pageData.totalElements.toLocaleString()}명</Typography></Box>
         <TableContainer sx={managementTableContainerSx}>
-          <Table stickyHeader size="small" sx={managementTableSx}>
+          <Table stickyHeader size="small" sx={[managementTableSx, { '& .MuiTableCell-body': { fontSize: 14, lineHeight: 1.55 }, '& .MuiTableCell-head': { fontSize: 14, fontWeight: 750 } }]}>
             <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 150 }}>사용자</TableCell><TableCell sx={{ width: 160 }}>연락처</TableCell><TableCell sx={{ width: 195 }}>이메일</TableCell><TableCell sx={{ width: 95 }}>권한</TableCell><TableCell sx={{ width: 95 }}>상태</TableCell><TableCell sx={{ width: 95 }}>무결성</TableCell><TableCell sx={{ width: 150 }}>등록일</TableCell><TableCell align="center" sx={{ width: 160 }}>최근 접속일</TableCell></TableRow></TableHead>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={9} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}

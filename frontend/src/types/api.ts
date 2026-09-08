@@ -43,7 +43,6 @@ export interface KeyListParams {
 export type KeyListCategory =
   | 'ALL'
   | 'ENCRYPT_CAPABLE'
-  | 'DECRYPT_CAPABLE'
   | 'EXPIRING'
   | 'INTEGRITY_VIOLATION'
 
