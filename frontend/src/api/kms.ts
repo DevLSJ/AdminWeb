@@ -152,6 +152,10 @@ export async function decryptWithKey(keyUid: string, ciphertext: string, iv: str
   return unwrap(await apiClient.post<ApiResponse<{ plaintext: string }>>(apiEndpoints.keys.decryptTest(keyUid), { ciphertext, iv, version }))
 }
 
+export async function fetchDashboardExpiring(days = 30) {
+  return unwrap(await apiClient.get<ApiResponse<import('../types/api').DashboardExpiringKey[]>>(apiEndpoints.dashboard.expiring, { params: { days } }))
+}
+
 export async function fetchDashboardSummary() {
   return unwrap(await apiClient.get<ApiResponse<DashboardSummary>>(apiEndpoints.dashboard.summary))
 }

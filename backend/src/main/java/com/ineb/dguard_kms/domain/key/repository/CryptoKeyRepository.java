@@ -18,6 +18,11 @@ public interface CryptoKeyRepository extends JpaRepository<CryptoKey, Long>, Jpa
 
     Optional<CryptoKey> findByKeyUid(UUID keyUid);
 
+    List<CryptoKey> findAllByStatusAndExpireAtBetweenOrderByExpireAtAscKeyUidAsc(
+            com.ineb.dguard_kms.domain.key.entity.KeyStatus status, java.time.Instant from, java.time.Instant to);
+    long countByStatusAndExpireAtBetween(com.ineb.dguard_kms.domain.key.entity.KeyStatus status, java.time.Instant from, java.time.Instant to);
+    List<CryptoKey> findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThan(java.time.Instant from, java.time.Instant to);
+
     boolean existsByKeyName(String keyName);
 
     List<CryptoKey> findAllByIntegrityHash(String integrityHash);

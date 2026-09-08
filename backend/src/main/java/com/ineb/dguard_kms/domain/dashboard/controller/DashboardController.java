@@ -33,6 +33,12 @@ public class DashboardController {
         return ApiResponse.success(dashboardService.summary(), "대시보드 요약 조회에 성공했습니다.");
     }
 
+    @GetMapping("/expiring")
+    @Operation(summary = "만료 임박 ACTIVE 키", description = "KST 오늘부터 days일 후까지 포함, 만료일 오름차순. 기본 30일, 최대 365일.")
+    public ApiResponse<java.util.List<com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse>> expiring(@RequestParam(defaultValue = "30") int days) {
+        return ApiResponse.success(dashboardService.expiring(days), "만료 임박 키를 조회했습니다.");
+    }
+
     @GetMapping({"/usage-trend", "/trends"})
     @Operation(summary = "키 생성·사용 추이", description = "일별 또는 월별 라인 차트용 0 포함 시계열을 반환합니다.")
     public ApiResponse<DashboardTrendResponse> usageTrend(

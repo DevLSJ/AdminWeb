@@ -5,3 +5,7 @@ dist
 *.log
 *.tmp
 src/**/*.test.*
+
+e2e
+playwright-report
+test-results

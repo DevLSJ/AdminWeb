@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.crypto.CryptoUtil;
+import com.ineb.dguard_kms.crypto.CryptoOperationException;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
 import com.ineb.dguard_kms.domain.notice.dto.NoticeCreateRequest;
 import com.ineb.dguard_kms.domain.notice.dto.NoticeFileDownload;
@@ -111,10 +112,21 @@ public class NoticeService {
         assertReadable(notice, actor, role);
         byte[] ciphertext = file.getEncryptedContent();
         if (ciphertext == null) throw new ResponseStatusException(HttpStatus.GONE, "기존 첨부파일 본문이 없습니다.");
-        byte[] plaintext = cryptoUtil.decrypt(new CryptoUtil.EncryptedPayload(file.getIv(), ciphertext));
-        Arrays.fill(ciphertext, (byte) 0);
-        auditLogService.append(actor, "FILE_DOWNLOAD", "NOTICE_FILE", fileUid.toString(), "암호화 첨부파일 복호화 다운로드");
-        return new NoticeFileDownload(file.getOriginalName(), file.getContentType(), plaintext);
+        if (file.getEncryptionVersion() != 1) throw new ResponseStatusException(HttpStatus.CONFLICT, "지원하지 않는 첨부파일 암호화 세대입니다.");
+        byte[] plaintext = null;
+        try {
+            // Authenticate the complete GCM payload before sending any plaintext.
+            plaintext = cryptoUtil.decrypt(new CryptoUtil.EncryptedPayload(file.getIv(), ciphertext));
+            auditLogService.append(actor, "FILE_DOWNLOAD", "NOTICE_FILE", fileUid.toString(), "암호화 첨부파일 복호화 다운로드");
+            return new NoticeFileDownload(file.getOriginalName(), file.getContentType(), plaintext);
+        } catch (CryptoOperationException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "첨부파일 무결성 검증에 실패했습니다.");
+        } catch (RuntimeException exception) {
+            if (plaintext != null) Arrays.fill(plaintext, (byte) 0);
+            throw exception;
+        } finally {
+            Arrays.fill(ciphertext, (byte) 0);
+        }
     }
 
     @Transactional
@@ -128,7 +140,7 @@ public class NoticeService {
 
     private void saveFiles(Notice notice, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) return;
-        if (files.size() > MAX_FILES) throw new IllegalArgumentException("첨부파일은 최대 10개까지 등록할 수 있습니다.");
+        if (fileRepository.countByNoticeId(notice.getId()) + files.stream().filter(file -> !file.isEmpty()).count() > MAX_FILES) throw new IllegalArgumentException("첨부파일은 최대 10개까지 등록할 수 있습니다.");
         for (MultipartFile file : files) {
             if (file.isEmpty()) continue;
             if (file.getSize() > MAX_FILE_SIZE) throw new IllegalArgumentException("첨부파일은 개별 10MB 이하여야 합니다.");
@@ -141,6 +153,10 @@ public class NoticeService {
                 ciphertext = encrypted.ciphertext();
                 iv = encrypted.iv();
                 String originalName = file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename().replaceAll("[\\r\\n]", "_");
+                originalName = originalName.replace('\\', '/');
+                originalName = originalName.substring(originalName.lastIndexOf('/') + 1);
+                if (originalName.isBlank() || originalName.length() > 255) throw new IllegalArgumentException("첨부파일 이름은 1~255자여야 합니다.");
+                if (file.getContentType() != null && file.getContentType().length() > 255) throw new IllegalArgumentException("첨부파일 형식이 너무 깁니다.");
                 fileRepository.save(new NoticeFile(notice.getId(), originalName, file.getContentType(), file.getSize(), iv, ciphertext));
             } catch (IOException exception) {
                 throw new IllegalArgumentException("첨부파일을 읽지 못했습니다.", exception);

@@ -11,5 +11,11 @@ public record DashboardSummaryResponse(
         long integrityViolations,
         long totalOperations,
         long successfulOperations,
+        long totalUsers,
+        long totalNotices,
+        long expiringKeys,
+        long keyIntegrityViolations,
+        long userIntegrityViolations,
+        long auditIntegrityViolations,
         long failedOperations
 ) { }

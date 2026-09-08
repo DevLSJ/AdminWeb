@@ -120,7 +120,20 @@ export interface KeyEncryptResult {
   version: number
 }
 
+export interface DashboardExpiringKey {
+  keyUid: string
+  keyName: string
+  algorithm: string
+  expireAt: string
+}
+
 export interface DashboardSummary {
+  totalUsers: number
+  totalNotices: number
+  expiringKeys: number
+  keyIntegrityViolations: number
+  userIntegrityViolations: number
+  auditIntegrityViolations: number
   totalKeys: number
   encryptCapableKeys: number
   decryptCapableKeys: number

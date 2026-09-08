@@ -1,7 +1,7 @@
 package com.ineb.dguard_kms.domain.dashboard.service;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.LinkedHashMap;
@@ -27,6 +27,11 @@ import com.ineb.dguard_kms.domain.key.service.KeyOperationException;
 @Service
 public class DashboardService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private final com.ineb.dguard_kms.domain.user.repository.AppUserRepository userRepository;
+    private final com.ineb.dguard_kms.domain.notice.repository.NoticeRepository noticeRepository;
+    private final com.ineb.dguard_kms.domain.user.service.AppUserService userService;
+    private final com.ineb.dguard_kms.domain.audit.service.AuditLogService auditService;
     private final CryptoKeyRepository keyRepository;
     private final KeyUsageLogRepository usageRepository;
     private final CryptoKeyService keyService;
@@ -34,8 +39,16 @@ public class DashboardService {
     public DashboardService(
             CryptoKeyRepository keyRepository,
             KeyUsageLogRepository usageRepository,
-            CryptoKeyService keyService
+            CryptoKeyService keyService,
+            com.ineb.dguard_kms.domain.user.repository.AppUserRepository userRepository,
+            com.ineb.dguard_kms.domain.notice.repository.NoticeRepository noticeRepository,
+            com.ineb.dguard_kms.domain.user.service.AppUserService userService,
+            com.ineb.dguard_kms.domain.audit.service.AuditLogService auditService
     ) {
+        this.userRepository = userRepository;
+        this.noticeRepository = noticeRepository;
+        this.userService = userService;
+        this.auditService = auditService;
         this.keyRepository = keyRepository;
         this.usageRepository = usageRepository;
         this.keyService = keyService;
@@ -44,23 +57,44 @@ public class DashboardService {
     @Transactional(readOnly = true)
     public DashboardSummaryResponse summary() {
         List<CryptoKey> keys = keyRepository.findAll();
-        List<KeyUsageLog> operations = usageRepository.findAll();
-        long success = operations.stream().filter(KeyUsageLog::isSuccess).count();
+        long operations = usageRepository.count();
+        long success = usageRepository.countByResult("SUCCESS");
+        long keyViolations = keyService.verifyAllIntegrity().invalidKeys();
+        long userViolations = userService.countIntegrityViolations();
+        var audit = auditService.verifyChain();
+        long auditViolations = audit.invalidLogUids().size();
+        if (!audit.valid() && auditViolations == 0) auditViolations = 1;
+        LocalDate today = LocalDate.now(KST);
         return new DashboardSummaryResponse(
                 keys.size(),
                 keys.stream().filter(key -> key.getStatus().canEncrypt()).count(),
                 keys.stream().filter(key -> key.getStatus().canDecrypt()).count(),
                 keys.stream().filter(key -> key.getStatus() == KeyStatus.DESTROYED).count(),
-                keyService.verifyAllIntegrity().invalidKeys(),
-                operations.size(),
+                keyViolations + userViolations + auditViolations,
+                operations,
                 success,
-                operations.size() - success
+                userRepository.count(),
+                noticeRepository.count(),
+                keyRepository.countByStatusAndExpireAtBetween(KeyStatus.ACTIVE, expiryDate(today), expiryDate(today.plusDays(30))),
+                keyViolations,
+                userViolations,
+                auditViolations,
+                operations - success
         );
     }
 
     @Transactional(readOnly = true)
+    public List<com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse> expiring(int days) {
+        if (days < 1 || days > 365) throw badRequest("days는 1~365여야 합니다.", "INVALID_EXPIRING_DAYS");
+        LocalDate today = LocalDate.now(KST);
+        return keyRepository.findAllByStatusAndExpireAtBetweenOrderByExpireAtAscKeyUidAsc(KeyStatus.ACTIVE, expiryDate(today), expiryDate(today.plusDays(days)))
+                .stream().map(key -> new com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse(
+                        key.getKeyUid(), key.getKeyName(), key.getAlgorithm(), key.getExpireAt())).toList();
+    }
+
+    @Transactional(readOnly = true)
     public DashboardTrendResponse usageTrend(LocalDate requestedFrom, LocalDate requestedTo, String requestedInterval) {
-        LocalDate to = requestedTo == null ? LocalDate.now(ZoneOffset.UTC) : requestedTo;
+        LocalDate to = requestedTo == null ? LocalDate.now(KST) : requestedTo;
         LocalDate from = requestedFrom == null ? to.minusDays(29) : requestedFrom;
         String interval = requestedInterval == null ? "DAY" : requestedInterval.trim().toUpperCase(Locale.ROOT);
         if (!"DAY".equals(interval) && !"MONTH".equals(interval)) {
@@ -71,13 +105,13 @@ public class DashboardService {
         }
 
         Map<LocalDate, MutablePoint> points = initializePoints(from, to, interval);
-        keyRepository.findAll().stream()
-                .filter(key -> within(key.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate(), from, to))
-                .forEach(key -> points.get(bucket(key.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate(), interval)).keys++);
-        usageRepository.findAll().stream()
-                .filter(log -> within(log.getUsedAt().atZone(ZoneOffset.UTC).toLocalDate(), from, to))
+        keyRepository.findAllByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from.atStartOfDay(KST).toInstant(), to.plusDays(1).atStartOfDay(KST).toInstant()).stream()
+                .filter(key -> within(key.getCreatedAt().atZone(KST).toLocalDate(), from, to))
+                .forEach(key -> points.get(bucket(key.getCreatedAt().atZone(KST).toLocalDate(), interval)).keys++);
+        usageRepository.findAllByUsedAtGreaterThanEqualAndUsedAtLessThan(from.atStartOfDay(KST).toInstant(), to.plusDays(1).atStartOfDay(KST).toInstant()).stream()
+                .filter(log -> within(log.getUsedAt().atZone(KST).toLocalDate(), from, to))
                 .forEach(log -> {
-                    MutablePoint point = points.get(bucket(log.getUsedAt().atZone(ZoneOffset.UTC).toLocalDate(), interval));
+                    MutablePoint point = points.get(bucket(log.getUsedAt().atZone(KST).toLocalDate(), interval));
                     if ("ENCRYPT".equals(log.getOperation())) point.encryptions++;
                     if ("DECRYPT".equals(log.getOperation())) point.decryptions++;
                     point.total++;
@@ -90,6 +124,11 @@ public class DashboardService {
                 ))
                 .toList();
         return new DashboardTrendResponse(from, to, interval, responsePoints);
+    }
+
+    // CryptoKey stores a date as UTC midnight; choose today's date in KST first.
+    private java.time.Instant expiryDate(LocalDate date) {
+        return date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     }
 
     private Map<LocalDate, MutablePoint> initializePoints(LocalDate from, LocalDate to, String interval) {

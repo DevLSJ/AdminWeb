@@ -188,7 +188,8 @@
               }
             }
           }
-        }
+        },
+        "description": "multipart metadata(JSON)와 files(다중). 기존 첨부 포함 게시글당 10개, 개별 10MiB, 요청 전체 101MiB. 마스터키 AES-256-GCM BYTEA 저장. 검증 실패 시 전체 트랜잭션 롤백."
       },
       "delete": {
         "tags": [
@@ -586,7 +587,8 @@
               }
             }
           }
-        }
+        },
+        "description": "multipart metadata(JSON)와 files(다중). 기존 첨부 포함 게시글당 10개, 개별 10MiB, 요청 전체 101MiB. 마스터키 AES-256-GCM BYTEA 저장. 검증 실패 시 전체 트랜잭션 롤백."
       }
     },
     "/api/keys": {
@@ -1483,17 +1485,21 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "복호화한 원본 파일",
             "content": {
-              "*/*": {
+              "application/octet-stream": {
                 "schema": {
                   "type": "string",
-                  "format": "byte"
+                  "format": "binary"
                 }
               }
             }
+          },
+          "409": {
+            "description": "암호문 변조 또는 지원하지 않는 enc_ver"
           }
-        }
+        },
+        "description": "권한과 GCM 인증 태그를 먼저 검증하고 attachment로 전송. no-store, nosniff. 64KiB씩 출력 후 평문 버퍼 제거. 파일 전체 인증을 위해 최대 10MiB 평문은 일시적으로 메모리에 보관."
       }
     },
     "/api/dashboard/usage-trend": {
@@ -1502,7 +1508,7 @@
           "Dashboard"
         ],
         "summary": "키 생성·사용 추이",
-        "description": "일별 또는 월별 라인 차트용 0 포함 시계열을 반환합니다.",
+        "description": "KST 날짜 기준 일/월별 0 포함 시계열. 생략 시 오늘 포함 최근 30일. 종료일 포함. 키 생성·암호화·복호화 호출 수(실패 포함).",
         "operationId": "usageTrend",
         "parameters": [
           {
@@ -1553,7 +1559,7 @@
           "Dashboard"
         ],
         "summary": "키 생성·사용 추이",
-        "description": "일별 또는 월별 라인 차트용 0 포함 시계열을 반환합니다.",
+        "description": "KST 날짜 기준 일/월별 0 포함 시계열. 생략 시 오늘 포함 최근 30일. 종료일 포함. 키 생성·암호화·복호화 호출 수(실패 포함).",
         "operationId": "usageTrend_1",
         "parameters": [
           {
@@ -1902,6 +1908,63 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/dashboard/expiring": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "만료 임박 ACTIVE 키 목록",
+        "description": "KST 오늘부터 days일 후까지 포함. expireAt 오름차순, 동일 만료일은 UUID순. 키 값 미반환.",
+        "operationId": "expiring",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "minimum": 1,
+              "maximum": 365
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DashboardExpiringKeyResponse"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "days 범위 오류"
+          },
+          "401": {
+            "description": "미인증"
           }
         }
       }
@@ -3768,7 +3831,8 @@
           },
           "integrityViolations": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "키·서비스 사용자·감사 체인 위반 수의 합"
           },
           "totalOperations": {
             "type": "integer",
@@ -3781,6 +3845,36 @@
           "failedOperations": {
             "type": "integer",
             "format": "int64"
+          },
+          "totalUsers": {
+            "type": "integer",
+            "format": "int64",
+            "description": "app_user 서비스 사용자 수 (관리 로그인 계정 제외)"
+          },
+          "totalNotices": {
+            "type": "integer",
+            "format": "int64",
+            "description": "공지·일반 게시글 전체 수 (숨김 포함)"
+          },
+          "expiringKeys": {
+            "type": "integer",
+            "format": "int64",
+            "description": "KST 오늘부터 30일 후까지 ACTIVE 키 수"
+          },
+          "keyIntegrityViolations": {
+            "type": "integer",
+            "format": "int64",
+            "description": "키 및 버전 무결성 위반 키 수"
+          },
+          "userIntegrityViolations": {
+            "type": "integer",
+            "format": "int64",
+            "description": "app_user 행 HMAC 위반 수"
+          },
+          "auditIntegrityViolations": {
+            "type": "integer",
+            "format": "int64",
+            "description": "감사 체인 위반 UUID 수, 식별 불가 헤드 위반은 1건"
           }
         }
       },
@@ -4115,6 +4209,25 @@
             ],
             "description": "실패한 경우의 애플리케이션 오류 코드",
             "example": "UNAUTHORIZED"
+          }
+        }
+      },
+      "DashboardExpiringKeyResponse": {
+        "type": "object",
+        "properties": {
+          "keyUid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "keyName": {
+            "type": "string"
+          },
+          "algorithm": {
+            "type": "string"
+          },
+          "expireAt": {
+            "type": "string",
+            "format": "date"
           }
         }
       }

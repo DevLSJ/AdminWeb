@@ -30,7 +30,7 @@ public class NoticeFile {
     private long size;
     @Column(nullable = false)
     private byte[] iv;
-    @Column(name = "content_enc")
+    @Column(name = "content_enc", columnDefinition = "bytea")
     private byte[] encryptedContent;
     @Column(name = "enc_ver", nullable = false)
     private int encryptionVersion;

@@ -43,6 +43,17 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.failure(exception.getMessage(), exception.getErrorCode()));
     }
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStatus(org.springframework.web.server.ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatusCode())
+                .body(ApiResponse.failure(exception.getReason(), "HTTP_" + exception.getStatusCode().value()));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUploadSize(org.springframework.web.multipart.MaxUploadSizeExceededException exception) {
+        return ResponseEntity.badRequest().body(ApiResponse.failure("첨부파일은 개별 10MB, 요청당 101MB 이하여야 합니다.", "UPLOAD_TOO_LARGE"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException exception) {
         return ResponseEntity.badRequest()

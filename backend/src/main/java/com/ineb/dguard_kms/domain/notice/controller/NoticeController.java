@@ -1,13 +1,15 @@
 package com.ineb.dguard_kms.domain.notice.controller;
 
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.util.Arrays;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -67,16 +69,24 @@ public class NoticeController {
     }
 
     @GetMapping("/files/{fileUid}/download")
-    public ResponseEntity<byte[]> download(@PathVariable UUID fileUid, @AuthenticationPrincipal AdminUserDetails actor) {
+    public void download(@PathVariable UUID fileUid, @AuthenticationPrincipal AdminUserDetails actor, HttpServletResponse response) throws IOException {
         NoticeFileDownload file = service.downloadFile(fileUid, actor.getUsername(), actor.getRole());
-        MediaType mediaType;
-        try { mediaType = file.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(file.contentType()); }
-        catch (IllegalArgumentException ignored) { mediaType = MediaType.APPLICATION_OCTET_STREAM; }
-        return ResponseEntity.ok()
-                .contentType(mediaType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(file.originalName(), StandardCharsets.UTF_8).build().toString())
-                .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(file.content());
+        byte[] plaintext = file.content();
+        try {
+            // Always download as a file, regardless of the uploaded MIME type.
+            response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(file.originalName(), StandardCharsets.UTF_8).build().toString());
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+            response.setHeader("X-Content-Type-Options", "nosniff");
+            response.setContentLengthLong(plaintext.length);
+            var output = response.getOutputStream();
+            for (int offset = 0; offset < plaintext.length; offset += 64 * 1024) {
+                output.write(plaintext, offset, Math.min(64 * 1024, plaintext.length - offset));
+            }
+            output.flush();
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
+        }
     }
 
     @DeleteMapping("/files/{fileUid}")

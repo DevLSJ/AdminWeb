@@ -83,7 +83,7 @@ function NoticeList() {
 
   const selectFiles = (nextFiles: File[]) => {
     setFiles(nextFiles)
-    if (nextFiles.length > 10) setError('첨부파일은 한 번에 최대 10개까지 등록할 수 있습니다.')
+    if (nextFiles.length + (selectedNotice?.files.length ?? 0) > 10) setError('첨부파일은 기존 파일을 포함해 게시글당 최대 10개까지 등록할 수 있습니다.')
     else {
       const oversizedFile = nextFiles.find((file) => file.size > 10 * 1024 * 1024)
       setError(oversizedFile ? `${oversizedFile.name}: 첨부파일은 개별 10MB 이하여야 합니다.` : '')
@@ -110,8 +110,8 @@ function NoticeList() {
 
   const saveNotice = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (files.length > 10) {
-      setError('첨부파일은 한 번에 최대 10개까지 등록할 수 있습니다.')
+    if (files.length + (selectedNotice?.files.length ?? 0) > 10) {
+      setError('첨부파일은 기존 파일을 포함해 게시글당 최대 10개까지 등록할 수 있습니다.')
       return
     }
     const oversizedFile = files.find((file) => file.size > 10 * 1024 * 1024)

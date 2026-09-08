@@ -1,13 +1,13 @@
 import { ResizableTable as Table } from '../components/admin/ResizableTable'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AccessTimeRounded, ArrowForwardRounded, CheckCircleRounded, SecurityRounded, VpnKeyRounded } from '@mui/icons-material'
+import { AccessTimeRounded, ArrowForwardRounded, PeopleRounded, CampaignRounded, SecurityRounded, VpnKeyRounded } from '@mui/icons-material'
 import { Alert, Avatar, Box, Button, Card, CardContent, Divider, LinearProgress, Stack, TableBody, TableCell, TableContainer, TableHead, TableRow, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useNavigate } from 'react-router-dom'
-import { fetchAuditLogPage, fetchDashboardSummary, fetchDashboardTrend, fetchKeys, fetchNoticePage } from '../api/kms'
+import { fetchAuditLogPage, fetchDashboardExpiring, fetchDashboardSummary, fetchDashboardTrend, fetchKeys, fetchNoticePage } from '../api/kms'
 import { InteractiveUsageChart } from '../components/dashboard/InteractiveUsageChart'
 import { useAuth } from '../hooks/useAuth'
-import type { AuditLog, CryptoKey, DashboardSummary, DashboardTrend, Notice } from '../types/api'
+import type { AuditLog, CryptoKey, DashboardExpiringKey, DashboardSummary, DashboardTrend, Notice } from '../types/api'
 import { isAdminRole } from '../types/auth'
 import { getStatusLabel } from '../utils/status'
 import { getCanonicalKeyStatus, keyStatusOrder, type CanonicalKeyStatus } from '../utils/keyLifecycle'
@@ -56,7 +56,7 @@ function SummaryCard({ label, value, note, color, icon, href }: SummaryCardProps
   )
 }
 
-function formatDate(date: Date) { return date.toISOString().slice(0, 10) }
+function formatDate(date: Date) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date) }
 function formatKst(value: string) { return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value)) }
 
 function KeyStatusChart({ distribution }: { distribution: Array<{ status: CanonicalKeyStatus; value: number }> }) {
@@ -74,10 +74,11 @@ function KeyStatusChart({ distribution }: { distribution: Array<{ status: Canoni
 function Dashboard() {
   const { user } = useAuth(); const navigate = useNavigate()
   const [summary, setSummary] = useState<DashboardSummary | null>(null); const [keys, setKeys] = useState<CryptoKey[]>([]); const [trend, setTrend] = useState<DashboardTrend | null>(null); const [activities, setActivities] = useState<AuditLog[]>([])
+  const [expiringKeys, setExpiringKeys] = useState<DashboardExpiringKey[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
   const [period, setPeriod] = useState<'DAY' | 'MONTH'>('DAY'); const [expiryDays] = useState(30); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   useEffect(() => { const to = new Date(); const from = new Date(to); if (period === 'DAY') from.setDate(from.getDate() - 29); else from.setMonth(from.getMonth() - 11); void fetchDashboardTrend(formatDate(from), formatDate(to), period).then(setTrend).catch(() => setError('키 사용 추이를 불러오지 못했습니다.')) }, [period])
-  useEffect(() => { setLoading(true); const requests: Promise<unknown>[] = [fetchDashboardSummary().then(setSummary), fetchKeys().then(setKeys), fetchNoticePage({ title: "", category: "ALL", exposeYn: "ALL", page: 0, size: 20 }).then((page) => setNotices(page.content))]; if (isAdminRole(user?.role)) requests.push(fetchAuditLogPage({ from: '', to: '', actor: '', action: 'ALL', page: 0, size: 20 }).then((page) => setActivities(page.content))); void Promise.all(requests).catch(() => setError('대시보드 실데이터를 불러오지 못했습니다.')).finally(() => setLoading(false)) }, [user?.role])
+  useEffect(() => { setLoading(true); const requests: Promise<unknown>[] = [fetchDashboardSummary().then(setSummary), fetchDashboardExpiring().then(setExpiringKeys), fetchKeys().then(setKeys), fetchNoticePage({ title: "", category: "ALL", exposeYn: "ALL", page: 0, size: 20 }).then((page) => setNotices(page.content))]; if (isAdminRole(user?.role)) requests.push(fetchAuditLogPage({ from: '', to: '', actor: '', action: 'ALL', page: 0, size: 20 }).then((page) => setActivities(page.content))); void Promise.all(requests).catch(() => setError('대시보드 실데이터를 불러오지 못했습니다.')).finally(() => setLoading(false)) }, [user?.role])
   const statusDistribution = useMemo(() => {
     const counts = keys.reduce<Record<CanonicalKeyStatus, number>>((result, key) => {
       const status = getCanonicalKeyStatus(key.status)
@@ -86,18 +87,11 @@ function Dashboard() {
     }, { CREATED: 0, ACTIVE: 0, DEACTIVATED: 0, COMPROMISED: 0, DESTROYED: 0 })
     return keyStatusOrder.map((status) => ({ status, value: counts[status] }))
   }, [keys])
-  const expiringKeyCount = useMemo(() => {
-    const now = Date.now()
-    return keys.reduce((count, key) => {
-      const days = Math.ceil((new Date(`${key.expireAt}T23:59:59`).getTime() - now) / 86_400_000)
-      return count + Number(key.status !== 'DESTROYED' && days >= 0 && days <= expiryDays)
-    }, 0)
-  }, [keys, expiryDays])
   const summaryItems: SummaryCardProps[] = [
     { label: '전체 관리 키', value: String(summary?.totalKeys ?? 0), note: 'DB crypto_key 전체', color: '#d92f81', icon: <VpnKeyRounded />, href: '/keys?category=ALL' },
-    { label: '암호화 가능', value: String(summary?.encryptCapableKeys ?? 0), note: '현재 정책상 암호화 허용', color: '#2e9b69', icon: <CheckCircleRounded />, href: '/keys?category=ENCRYPT_CAPABLE' },
-    { label: '만료 임박 키', value: String(expiringKeyCount), note: `${expiryDays}일 이내 확인 필요`, color: '#e99220', icon: <AccessTimeRounded />, href: `/keys?category=EXPIRING&expiringWithinDays=${expiryDays}` },
-    { label: '무결성 위반', value: String(summary?.integrityViolations ?? 0), note: summary?.integrityViolations ? '즉시 격리·조사 필요' : '검증 결과 정상', color: '#c93451', icon: <SecurityRounded />, href: '/keys?category=INTEGRITY_VIOLATION' },
+    { label: '서비스 사용자', value: String(summary?.totalUsers ?? 0), note: '등록된 서비스 사용자 수', color: '#2e9b69', icon: <PeopleRounded />, href: '/users' },
+    { label: '전체 게시글', value: String(summary?.totalNotices ?? 0), note: '공지·일반 게시글 수', color: '#e99220', icon: <CampaignRounded />, href: '/notices' },
+    { label: '무결성 위반', value: String(summary?.integrityViolations ?? 0), note: `키 ${summary?.keyIntegrityViolations ?? 0} · 사용자 ${summary?.userIntegrityViolations ?? 0} · 감사 ${summary?.auditIntegrityViolations ?? 0}`, color: '#c93451', icon: <SecurityRounded />, href: '/audit-logs' },
   ]
   const dashboardPanelHeaderSx = { display: 'flex', minHeight: 48, flexShrink: 0, flexWrap: 'wrap', gap: 1, justifyContent: 'space-between', alignItems: 'center', px: 2.25, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }
   return <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', minHeight: 0 }}>
@@ -105,6 +99,16 @@ function Dashboard() {
     {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
     {loading && <LinearProgress sx={{ mb: 2 }} />}
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,minmax(0,1fr))', md: `repeat(${summaryItems.length},minmax(0,1fr))` }, gap: 1.5, flexShrink: 0 }}>{summaryItems.map((item) => <SummaryCard key={item.label} {...item} />)}</Box>
+
+    <Card sx={{ flexShrink: 0 }}><CardContent sx={{ p: '8px 16px !important' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><AccessTimeRounded color="warning" /><Typography variant="h6">만료 임박 키 ({summary?.expiringKeys ?? 0})</Typography><Typography sx={{ fontSize: 12, color: 'text.secondary' }}>{expiryDays}일 이내 · ACTIVE</Typography></Stack>
+        <Button size="small" onClick={() => navigate(`/keys?status=ACTIVE&category=EXPIRING&expiringWithinDays=${expiryDays}`)}>전체보기</Button>
+      </Stack>
+      <Box role="region" aria-label="만료 임박 키 목록" sx={{ display: 'flex', gap: 1, overflowX: 'auto', minHeight: 32, alignItems: 'center' }}>
+        {expiringKeys.length === 0 ? <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>만료 임박 키가 없습니다.</Typography> : expiringKeys.map((key) => <Button key={key.keyUid} size="small" sx={{ flexShrink: 0 }} onClick={() => navigate(`/keys/${key.keyUid}`)}>{key.keyName} · {key.expireAt}</Button>)}
+      </Box>
+    </CardContent></Card>
 
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1.6fr) minmax(0,1fr)' }, gap: 1.5, flex: '1.35 1 0', minHeight: 0 }}>
       <Card sx={{ minWidth: 0, minHeight: 0, overflow: 'auto' }}><CardContent sx={{ p: '12px 16px !important' }}><Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between', alignItems: 'center' }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography variant="h6">키 생성·사용 추이</Typography><Button size="small" endIcon={<ArrowForwardRounded />} onClick={() => navigate('/analytics')}>상세 통계</Button></Stack><ToggleButtonGroup exclusive size="small" value={period} onChange={(_e, value) => value && setPeriod(value)}><ToggleButton value="DAY">일</ToggleButton><ToggleButton value="MONTH">월</ToggleButton></ToggleButtonGroup></Box><InteractiveUsageChart trend={trend} compact /></CardContent></Card>

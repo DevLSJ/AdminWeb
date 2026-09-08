@@ -11,5 +11,6 @@ import com.ineb.dguard_kms.domain.notice.entity.NoticeFile;
 public interface NoticeFileRepository extends JpaRepository<NoticeFile, Long> {
     List<NoticeFile> findAllByNoticeIdOrderByCreatedAtAsc(Long noticeId);
     Optional<NoticeFile> findByFileUid(UUID fileUid);
+    long countByNoticeId(Long noticeId);
     void deleteAllByNoticeId(Long noticeId);
 }

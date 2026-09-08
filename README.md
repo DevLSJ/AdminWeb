@@ -219,3 +219,8 @@ npm run build
 | Project | D'Guard KMS |
 | Type | 통합 키 관리 웹 애플리케이션 |
 | Repository | [DevLSJ/AdminWeb](https://github.com/DevLSJ/AdminWeb) |
+
+
+### 구현 4주차 검증
+
+게시판 첨부 보호·대시보드 API와 테이블 보완, 수용 테스트 22개 및 키 역할·HSM 비교는 [4주차 완료 보고서](docs/WEEK_04_DELIVERY.md)를 참고하세요. 로컬 H2·PostgreSQL 각각 22/22, 전체 백엔드 54/54, 실제 브라우저 8/8 시나리오를 검증했습니다. 선행 구현의 PBKDF2 반복 횟수·상태 전이와 안내서 사이 차이도 보고서에 명시했습니다.

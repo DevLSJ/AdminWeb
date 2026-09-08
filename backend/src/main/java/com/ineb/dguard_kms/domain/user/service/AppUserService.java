@@ -290,6 +290,11 @@ public class AppUserService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public long countIntegrityViolations() {
+        return repository.findAll().stream().filter(user -> !verifyIntegrity(user)).count();
+    }
+
     private boolean verifyIntegrity(AppUser user) {
         return integrityService.verify(user.getIntegrityHash(), integrityValues(user));
     }
