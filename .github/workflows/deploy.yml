@@ -6,6 +6,10 @@ on:
       - main          # main 브랜치 push 시 자동 배포
   workflow_dispatch:  # 수동 실행 허용
 
+permissions:
+  contents: read
+  actions: read
+
 env:
   BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/dguard-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/dguard-frontend
@@ -15,11 +19,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Select Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.paths.outputs.backend }}
+      frontend: ${{ steps.paths.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Compare with last successful deployment
+        id: paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend=false
+          frontend=false
+          # Compare deployed state, so a cancelled/failed release is included next time.
+          base=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty')
+          if [[ "$EVENT_NAME" == workflow_dispatch || -z "$base" ]] || ! git cat-file -e "$base^{commit}"; then
+            backend=true
+            frontend=true
+          else
+            while IFS= read -r path; do
+              case "$path" in
+                backend/*) backend=true ;;
+                frontend/*) frontend=true ;;
+                docker-compose.yml|.dockerignore) backend=true; frontend=true ;;
+              esac
+            done < <(git diff --name-only "$base" "$GITHUB_SHA")
+          fi
+          printf 'backend=%s\nfrontend=%s\n' "$backend" "$frontend" >> "$GITHUB_OUTPUT"
+
   # ─────────────────────────────────────────────
   # Job 1: 백엔드 빌드 & Docker 이미지 Push
   # ─────────────────────────────────────────────
   build-backend:
     name: Build Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,6 +96,8 @@ jobs:
   # ─────────────────────────────────────────────
   build-frontend:
     name: Build Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -89,7 +133,12 @@ jobs:
   deploy:
     name: Deploy to Server
     runs-on: self-hosted
-    needs: [build-backend, build-frontend]  # 두 빌드 완료 후 실행
+    needs: [changes, build-backend, build-frontend]
+    if: >-
+      ${{ always() && !cancelled() && needs.changes.result == 'success'
+          && (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true')
+          && (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped')
+          && (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') }}
 
     steps:
       - name: Checkout
@@ -109,10 +158,13 @@ jobs:
 
       - name: Deploy locally
         env:
-          IMAGE_TAG: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.sha }}
+          DEPLOY_BACKEND: ${{ needs.changes.outputs.backend }}
+          DEPLOY_FRONTEND: ${{ needs.changes.outputs.frontend }}
         run: |
           set -euo pipefail
 
+          command -v python3 >/dev/null
           install -m 600 "$GITHUB_WORKSPACE/_deploy/source/docker-compose.yml" /home/dguard/app/docker-compose.yml
           cd /home/dguard/app
 
@@ -121,13 +173,37 @@ jobs:
             exit 1
           fi
 
-          if grep -q '^IMAGE_TAG=' .env; then
-            sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env
-          else
-            printf 'IMAGE_TAG=%s\n' "$IMAGE_TAG" >> .env
+          # An override only changes the selected service's image. The base compose
+          # file and legacy IMAGE_TAG continue to describe the untouched service.
+          services=()
+          override=$(mktemp)
+          trap 'rm -f "$override"' EXIT
+          printf 'services:\n' > "$override"
+          if [[ "$DEPLOY_BACKEND" == true ]]; then
+            services+=(backend)
+            printf '  backend:\n    image: %s:%s\n' "$BACKEND_IMAGE" "$RELEASE_TAG" >> "$override"
+          fi
+          if [[ "$DEPLOY_FRONTEND" == true ]]; then
+            services+=(frontend)
+            printf '  frontend:\n    image: %s:%s\n' "$FRONTEND_IMAGE" "$RELEASE_TAG" >> "$override"
           fi
 
-          docker compose pull backend frontend
-          docker compose up -d --no-deps backend frontend
+          # Retain per-service versions from prior selective deployments.
+          compose=(docker compose -f docker-compose.yml)
+          if [[ -f docker-compose.override.yml ]]; then compose+=(-f docker-compose.override.yml); fi
+          if [[ -f deployed-images.yml ]]; then compose+=(-f deployed-images.yml); fi
+          compose+=(-f "$override")
+          "${compose[@]}" pull "${services[@]}"
+          "${compose[@]}" up -d --no-deps "${services[@]}"
 
-          echo "Deploy completed: $IMAGE_TAG"
+          # Persist just image names, never the resolved compose environment/secrets.
+          images=$(mktemp)
+          printf 'services:\n' > "$images"
+          for service in backend frontend; do
+            image=$("${compose[@]}" config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"][sys.argv[1]]["image"])' "$service")
+            printf '  %s:\n    image: %s\n' "$service" "$image" >> "$images"
+          done
+          install -m 600 "$images" deployed-images.next.yml
+          mv -f deployed-images.next.yml deployed-images.yml
+          rm -f "$images"
+          echo "Deploy completed: $RELEASE_TAG (${services[*]})"
