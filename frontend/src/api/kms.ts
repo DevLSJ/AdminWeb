@@ -320,3 +320,13 @@ export interface AuditViolation { logUid: string; action: AuditLog['action']; ac
 export async function fetchAuditViolations(from: string, to: string) {
   return unwrap(await apiClient.get<ApiResponse<AuditViolation[]>>('/api/audit-logs/violations', { params: { from, to } }))
 }
+
+export interface OwnProfile { name: string; phone: string | null; email: string | null }
+
+export async function fetchOwnProfile() {
+  return unwrap(await apiClient.get<ApiResponse<OwnProfile>>(apiEndpoints.auth.profile))
+}
+
+export async function saveOwnProfile(profile: OwnProfile) {
+  return unwrap(await apiClient.put<ApiResponse<OwnProfile>>(apiEndpoints.auth.profile, profile))
+}

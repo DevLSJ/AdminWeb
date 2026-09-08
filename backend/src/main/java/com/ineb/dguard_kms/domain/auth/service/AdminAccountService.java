@@ -17,6 +17,8 @@ import com.ineb.dguard_kms.crypto.CryptoUtil;
 import com.ineb.dguard_kms.crypto.IntegrityService;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
 import com.ineb.dguard_kms.domain.auth.dto.AdminAccountResponse;
+import com.ineb.dguard_kms.domain.auth.dto.ProfileResponse;
+import com.ineb.dguard_kms.domain.auth.dto.ProfileUpdateRequest;
 import com.ineb.dguard_kms.domain.auth.dto.AdminAccountUpdateRequest;
 import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
 import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
@@ -89,6 +91,37 @@ public class AdminAccountService {
         repository.saveAndFlush(target);
         auditLogService.append(actorLoginId, "ADMIN_ACCOUNT_UPDATE", "ADMIN_USER", userUid.toString(), "관리 계정 이름·권한·암호화 연락처 수정");
         return AdminAccountResponse.from(target, true);
+    }
+
+    @Transactional
+    public ProfileResponse getOwnProfile(UUID authenticatedUid) {
+        AdminUser target = requiredForUpdate(authenticatedUid);
+        assertIntegrity(target);
+        auditLogService.append(target.getLoginId(), "USER_VIEW_PLAIN", "ADMIN_USER", authenticatedUid.toString(), "본인 프로필 연락처 조회");
+        return ownProfile(target);
+    }
+
+    @Transactional
+    public ProfileResponse updateOwnProfile(UUID authenticatedUid, ProfileUpdateRequest request) {
+        AdminUser target = requiredForUpdate(authenticatedUid);
+        assertIntegrity(target);
+        target.updateProfile(request.name().trim(), target.getRole());
+        replaceContactIfPresent(target, request.phone(), request.email());
+        resign(target);
+        repository.saveAndFlush(target);
+        auditLogService.append(target.getLoginId(), "ADMIN_ACCOUNT_UPDATE", "ADMIN_USER", authenticatedUid.toString(), "본인 프로필 이름·암호화 연락처 수정");
+        return ownProfile(target);
+    }
+
+    private ProfileResponse ownProfile(AdminUser user) {
+        return new ProfileResponse(user.getName(), decryptContact(user.getPhoneCiphertext(), user.getPhoneIv()), decryptContact(user.getEmailCiphertext(), user.getEmailIv()));
+    }
+
+    private String decryptContact(byte[] ciphertext, byte[] iv) {
+        if (ciphertext == null || iv == null) return null;
+        byte[] plaintext = cryptoUtil.decrypt(new CryptoUtil.EncryptedPayload(iv, ciphertext));
+        try { return new String(plaintext, StandardCharsets.UTF_8); }
+        finally { Arrays.fill(plaintext, (byte) 0); }
     }
 
     @Transactional

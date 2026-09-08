@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { AccountCircleRounded, LockResetRounded, SaveRounded, ShieldRounded } from '@mui/icons-material'
 import {
   Alert,
@@ -16,6 +16,7 @@ import { alpha } from '@mui/material/styles'
 import { PageHeader } from '../../components/admin/AdminPage'
 import { StatusBadge } from '../../components/common/StatusBadge'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchOwnProfile, saveOwnProfile, getApiErrorMessage, type OwnProfile } from '../../api/kms'
 import type { UserRole } from '../../types/auth'
 
 const rolePresentation: Record<UserRole, { label: string; color: string; accent: string; description: string }> = {
@@ -31,12 +32,39 @@ function Profile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [profileMessage, setProfileMessage] = useState('')
+  const [profileError, setProfileError] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [savedProfile, setSavedProfile] = useState<OwnProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [profileSaving, setProfileSaving] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setProfileLoading(true)
+    void fetchOwnProfile().then((profile) => {
+      if (!active) return
+      setName(profile.name); setPhone(profile.phone ?? ''); setEmail(profile.email ?? ''); setSavedProfile(profile)
+    }).catch((error) => { if (active) setProfileError(getApiErrorMessage(error, '프로필을 불러오지 못했습니다.')) })
+      .finally(() => { if (active) setProfileLoading(false) })
+    return () => { active = false }
+  }, [user?.userUid])
   const [passwordResult, setPasswordResult] = useState<{ success: boolean; message: string } | null>(null)
 
-  const saveProfile = (event: FormEvent<HTMLFormElement>) => {
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    updateProfile(name.trim())
-    setProfileMessage('프로필 이름이 변경되었습니다. 향후 /api/auth/me 응답과 동기화됩니다.')
+    setProfileError(''); setProfileMessage('')
+    if (phone.trim() && (!/^[0-9+()\-\s]{9,20}$/.test(phone.trim()) || !/^[0-9]{9,15}$/.test(phone.replace(/\D/g, '')))) {
+      setProfileError('전화번호는 숫자 9~15자리로 입력하세요.'); return
+    }
+    setProfileSaving(true)
+    try {
+      const profile = await saveOwnProfile({ name: name.trim(), phone: phone.trim() || null, email: email.trim() || null })
+      setSavedProfile(profile); setName(profile.name); setPhone(profile.phone ?? ''); setEmail(profile.email ?? '')
+      updateProfile(profile.name)
+      setProfileMessage('프로필을 저장했습니다.')
+    } catch (error) { setProfileError(getApiErrorMessage(error, '프로필을 저장하지 못했습니다.')) }
+    finally { setProfileSaving(false) }
   }
 
   const savePassword = (event: FormEvent<HTMLFormElement>) => {
@@ -60,7 +88,7 @@ function Profile() {
   return (
     <Box>
       <PageHeader title="프로필 관리" />
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '340px minmax(0, 1fr)' }, gap: 2.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '280px minmax(0, 1fr)' }, alignItems: 'start', gap: 2.5 }}>
         <Card>
           <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, textAlign: 'center', background: `linear-gradient(180deg, ${alpha(roleStyle.color, 0.09)} 0%, transparent 48%)` }}>
             <Avatar sx={{ width: 82, height: 82, bgcolor: alpha(roleStyle.color, 0.14), color: roleStyle.color, border: '3px solid', borderColor: alpha(roleStyle.accent, 0.28), boxShadow: `0 10px 28px ${alpha(roleStyle.color, 0.18)}` }}><AccountCircleRounded sx={{ fontSize: 52 }} /></Avatar>
@@ -73,21 +101,26 @@ function Profile() {
           </CardContent>
         </Card>
 
-        <Stack spacing={2.5}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))' }, gap: 2.5, alignItems: 'start' }}>
           <Card>
-            <CardContent sx={{ p: 3.5 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Typography variant="h6" sx={{ mb: 2.5 }}>기본정보</Typography>
               {profileMessage && <Alert severity="success" onClose={() => setProfileMessage('')} sx={{ mb: 2 }}>{profileMessage}</Alert>}
-              <Box component="form" onSubmit={saveProfile}>
+              {profileError && <Alert severity="error" onClose={() => setProfileError('')} sx={{ mb: 2 }}>{profileError}</Alert>}
+              <Box component="form" onSubmit={(event) => void saveProfile(event)}>
+                <Box component="fieldset" disabled={profileLoading || profileSaving} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
                 <TextField fullWidth label="로그인 ID" value={user.loginId} disabled sx={{ mb: 2 }} />
                 <TextField fullWidth required label="표시 이름" value={name} onChange={(event) => setName(event.target.value)} />
-                <Button type="submit" variant="contained" startIcon={<SaveRounded />} disabled={!name.trim() || name.trim() === user.name} sx={{ mt: 2.5 }}>프로필 저장</Button>
+                <TextField fullWidth type="email" label="이메일" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} slotProps={{ htmlInput: { maxLength: 254 } }} sx={{ mt: 2 }} />
+                <TextField fullWidth type="tel" label="전화번호" autoComplete="tel" placeholder="010-1234-5678" value={phone} onChange={(event) => setPhone(event.target.value)} slotProps={{ htmlInput: { maxLength: 20 } }} helperText="연락처를 비워 두면 기존 정보가 유지됩니다." sx={{ mt: 2 }} />
+                <Button type="submit" variant="contained" startIcon={<SaveRounded />} disabled={profileLoading || profileSaving || !savedProfile || !name.trim() || (name.trim() === savedProfile.name && phone === (savedProfile.phone ?? '') && email === (savedProfile.email ?? ''))} sx={{ mt: 2.5 }}>{profileLoading ? '불러오는 중…' : profileSaving ? '저장 중…' : '프로필 저장'}</Button>
+                </Box>
               </Box>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent sx={{ p: 3.5 }}>
+            <CardContent sx={{ p: 2.5 }}>
               <Typography variant="h6">비밀번호 변경</Typography>
               <Typography sx={{ mt: 0.5, mb: 2.5, color: 'text.secondary', fontSize: 14, lineHeight: 1.65 }}>비밀번호 원문 조회 기능은 제공하지 않습니다. API 연동 시 새 Salt를 생성하고 PBKDF2로 재해시합니다.</Typography>
               {passwordResult && <Alert severity={passwordResult.success ? 'success' : 'error'} onClose={() => setPasswordResult(null)} sx={{ mb: 2 }}>{passwordResult.message}</Alert>}
@@ -101,7 +134,7 @@ function Profile() {
               </Box>
             </CardContent>
           </Card>
-        </Stack>
+        </Box>
       </Box>
     </Box>
   )

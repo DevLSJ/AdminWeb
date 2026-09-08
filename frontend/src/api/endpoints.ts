@@ -16,6 +16,7 @@ export const apiEndpoints = {
     login: '/api/auth/login',
     refresh: '/api/auth/refresh',
     me: '/api/auth/me',
+    profile: '/api/auth/profile',
     logout: '/api/auth/logout',
   },
   keys: {

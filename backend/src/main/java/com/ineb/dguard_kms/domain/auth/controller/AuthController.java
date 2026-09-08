@@ -3,6 +3,10 @@ package com.ineb.dguard_kms.domain.auth.controller;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import com.ineb.dguard_kms.domain.auth.dto.ProfileResponse;
+import com.ineb.dguard_kms.domain.auth.dto.ProfileUpdateRequest;
+import com.ineb.dguard_kms.domain.auth.service.AdminAccountService;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,8 +32,11 @@ public class AuthController {
 
     private final AuthService authService;
 
-    public AuthController(AuthService authService) {
+    private final AdminAccountService adminAccountService;
+
+    public AuthController(AuthService authService, AdminAccountService adminAccountService) {
         this.authService = authService;
+        this.adminAccountService = adminAccountService;
     }
 
     @PostMapping("/login")
@@ -43,6 +50,18 @@ public class AuthController {
     @Operation(summary = "내 정보 조회", description = "현재 Bearer 토큰의 사용자 정보를 반환합니다.")
     public ApiResponse<MeResponse> me(@AuthenticationPrincipal AdminUserDetails user) {
         return ApiResponse.success(MeResponse.from(user), "내 정보를 조회했습니다.");
+    }
+
+    @GetMapping("/profile")
+    @Operation(summary = "본인 프로필 조회")
+    public ApiResponse<ProfileResponse> profile(@AuthenticationPrincipal AdminUserDetails user) {
+        return ApiResponse.success(adminAccountService.getOwnProfile(user.getUserUid()), "프로필을 조회했습니다.");
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "본인 프로필 수정")
+    public ApiResponse<ProfileResponse> updateProfile(@AuthenticationPrincipal AdminUserDetails user, @Valid @RequestBody ProfileUpdateRequest request) {
+        return ApiResponse.success(adminAccountService.updateOwnProfile(user.getUserUid(), request), "프로필을 저장했습니다.");
     }
 
     @PostMapping("/refresh")

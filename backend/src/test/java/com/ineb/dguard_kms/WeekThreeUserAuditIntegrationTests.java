@@ -375,6 +375,44 @@ class WeekThreeUserAuditIntegrationTests {
         assertThat(restored.path("data").path("valid").asBoolean()).isTrue();
     }
 
+    @Test
+    void ownProfilePersistsEncryptedContactsWithoutChangingRole() throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        sendJson(client, "GET", "/api/auth/profile", null, "", 401);
+        sendJson(client, "PUT", "/api/auth/profile", null, "{}", 401);
+        for (String loginId : new String[] {"admin", "dguard", "client"}) {
+            String token = login(client, loginId, loginId);
+            var before = adminUserRepository.findByLoginId(loginId).orElseThrow();
+            String role = before.getRole();
+            String name = before.getName();
+            String email = "profile-" + loginId + "@example.com";
+            String body = objectMapper.writeValueAsString(java.util.Map.of("name", name, "phone", "010-2345-6789", "email", email));
+            JsonNode saved = sendJson(client, "PUT", "/api/auth/profile?userUid=" + UUID.randomUUID(), token, body, 200).path("data");
+            assertThat(saved.path("phone").asText()).isEqualTo("01023456789");
+            assertThat(saved.path("email").asText()).isEqualTo(email);
+            JsonNode loaded = sendJson(client, "GET", "/api/auth/profile", token, "", 200).path("data");
+            assertThat(loaded).isEqualTo(saved);
+            var stored = adminUserRepository.findByLoginId(loginId).orElseThrow();
+            assertThat(stored.getRole()).isEqualTo(role);
+            assertThat(new String(stored.getEmailCiphertext(), StandardCharsets.UTF_8)).doesNotContain(email);
+            assertThat(new String(stored.getPhoneCiphertext(), StandardCharsets.UTF_8)).doesNotContain("01023456789");
+            assertThat(stored.getPhoneMasked()).isEqualTo("010-****-6789");
+            sendJson(client, "PUT", "/api/auth/profile", token, body.replace(email, "invalid-email"), 400);
+            sendJson(client, "PUT", "/api/auth/profile", token, body.replace("010-2345-6789", "123"), 400);
+            JsonNode preserved = sendJson(client, "PUT", "/api/auth/profile", token, objectMapper.writeValueAsString(java.util.Map.of("name", name)), 200).path("data");
+            assertThat(preserved).isEqualTo(saved);
+            jdbcTemplate.update("UPDATE admin_user SET phone_masked = ? WHERE user_uid = ?", "tampered", stored.getUserUid());
+            try {
+                sendJson(client, "GET", "/api/auth/profile", token, "", 409);
+                sendJson(client, "PUT", "/api/auth/profile", token, body, 409);
+            } finally {
+                jdbcTemplate.update("UPDATE admin_user SET phone_masked = ? WHERE user_uid = ?", stored.getPhoneMasked(), stored.getUserUid());
+            }
+            assertThat(auditLogRepository.findAll()).filteredOn(log -> log.getActor().equals(loginId))
+                    .allSatisfy(log -> assertThat(log.getDetail()).doesNotContain(email, "01023456789"));
+        }
+    }
+
     private String numericSuffix(String value) {
         String digits = value.replaceAll("[^0-9]", "7");
         return digits.substring(0, 4);
