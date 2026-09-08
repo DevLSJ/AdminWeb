@@ -15,10 +15,11 @@ import { PAGE_SIZE_OPTIONS } from './pagination'
 interface PageHeaderProps {
   title: string
   description?: string
+  reserveDescription?: boolean
   action?: ReactNode
 }
 
-export function PageHeader({ title, description, action }: PageHeaderProps) {
+export function PageHeader({ title, description, reserveDescription = false, action }: PageHeaderProps) {
   return (
     <Box
       sx={{
@@ -32,7 +33,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
     >
       <Box sx={{ minWidth: 0 }}>
         <Typography variant="h5">{title}</Typography>
-        {description && <Typography sx={{ mt: .55, color: 'text.secondary', fontSize: 13 }}>{description}</Typography>}
+        {(description || reserveDescription) && <Typography aria-hidden={!description || undefined} sx={{ mt: .55, color: 'text.secondary', fontSize: 13 }}>{description || '\u00a0'}</Typography>}
       </Box>
       {action}
     </Box>

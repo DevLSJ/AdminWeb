@@ -335,6 +335,7 @@ function UserList() {
     <Box className="list-page">
       <PageHeader
         title="사용자 관리"
+        reserveDescription
         action={(sessionUser?.role === 'ADMIN' || sessionUser?.role === 'S.ADMIN') && <Button data-testid="user-create-button" variant="contained" startIcon={<AddRounded />} onClick={openCreate}>사용자 등록</Button>}
       />
       {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
