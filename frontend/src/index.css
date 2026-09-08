@@ -379,3 +379,9 @@ input {
   .list-page > .list-results { flex: none; min-height: 280px; }
   .list-results > .MuiTableContainer-root { flex: none; max-height: 45dvh; }
 }
+
+/* Statistics fill the available viewport, including the plot itself. */
+.page-viewport:has(> .analytics-page) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}

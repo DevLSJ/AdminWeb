@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AnalyticsRounded, ErrorOutlineRounded, KeyRounded, LockRounded, ShieldRounded, VpnKeyRounded } from '@mui/icons-material'
+import { AnalyticsRounded, ErrorOutlineRounded, KeyRounded, ShieldRounded, VpnKeyRounded } from '@mui/icons-material'
 import { Alert, Avatar, Box, Card, CardContent, LinearProgress, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import { useNavigate } from 'react-router-dom'
@@ -17,12 +17,31 @@ function formatDate(date: Date) { return date.toISOString().slice(0, 10) }
 function MetricCard({ label, value, note, color, icon, href }: { label: string; value: string; note: string; color: string; icon: ReactNode; href?: string }) {
   const navigate = useNavigate()
   const open = () => href && navigate(href)
-  return <Card className="analytics-metric-card" role={href ? 'link' : undefined} tabIndex={href ? 0 : undefined} onClick={open} onKeyDown={(event) => { if (href && (event.key === 'Enter' || event.key === ' ')) open() }} sx={{ height: '100%', cursor: href ? 'pointer' : 'default' }}><CardContent sx={{ p: '18px !important' }}><Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><Box><Typography sx={{ color: 'text.secondary', fontSize: 11.5, fontWeight: 800, letterSpacing: '.035em' }}>{label}</Typography><Typography sx={{ mt: .7, fontSize: 27, lineHeight: 1.1, fontWeight: 900 }}>{value}</Typography></Box><Avatar sx={{ width: 38, height: 38, color, bgcolor: alpha(color, .11) }}>{icon}</Avatar></Stack><Typography sx={{ mt: 1.25, color: 'text.secondary', fontSize: 11.5 }}>{note}</Typography></CardContent></Card>
+  return <Card className="analytics-metric-card dashboard-card" role={href ? 'link' : undefined} tabIndex={href ? 0 : undefined} onClick={open} onKeyDown={(event) => { if (href && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open() } }} sx={{ position: 'relative', height: '100%', minWidth: 0, overflow: 'hidden', cursor: href ? 'pointer' : 'default', '&::after': { position: 'absolute', right: -24, bottom: -38, width: 88, height: 88, borderRadius: '50%', bgcolor: alpha(color, .08), content: '""' } }}>
+    <CardContent sx={{ position: 'relative', zIndex: 1, p: '10px 14px !important' }}>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ minWidth: 0 }}><Typography noWrap sx={{ color: 'text.secondary', fontSize: 11.5, fontWeight: 800 }}>{label}</Typography><Typography sx={{ mt: .3, fontSize: 25, lineHeight: 1.1, fontWeight: 900 }}>{value}</Typography></Box>
+        <Avatar className="dashboard-card-icon" variant="rounded" sx={{ width: 32, height: 32, borderRadius: 2, color, bgcolor: alpha(color, .11) }}>{icon}</Avatar>
+      </Stack>
+      <Typography noWrap sx={{ mt: .6, color: 'text.secondary', fontSize: 11 }}>{note}</Typography>
+    </CardContent>
+  </Card>
 }
 
 function DistributionPanel({ title, items, total }: { title: string; items: Array<{ label: string; value: number; color: string; href: string }>; total: number }) {
   const navigate = useNavigate()
-  return <Card className="section-card" sx={{ height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', '& > .section-card-header': { flexShrink: 0 } }}><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">{title}</Typography><StatusBadge label={`${total.toLocaleString()}개`} tone="neutral" minWidth={0} /></Box><CardContent tabIndex={0} role="region" aria-label={`${title} 통계`} sx={{ p: '18px 20px !important', flex: 1, minHeight: 0, overflow: 'auto', overscrollBehavior: 'contain' }}><Stack spacing={1.05}>{items.map((item) => { const rate = total ? item.value / total * 100 : 0; return <Box key={item.label} role="link" tabIndex={0} onClick={() => navigate(item.href)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(item.href) }} sx={{ p: .6, mx: -.6, cursor: 'pointer', borderRadius: 1, '&:hover, &:focus-visible': { bgcolor: 'action.hover' } }}><Stack direction="row" sx={{ mb: .65, justifyContent: 'space-between' }}><Stack direction="row" spacing={.8} sx={{ alignItems: 'center' }}><Box sx={{ width: 8, height: 8, bgcolor: item.color }} /><Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>{item.label}</Typography></Stack><Typography sx={{ fontSize: 12.5, fontWeight: 850 }}>{item.value} <Typography component="span" sx={{ color: 'text.secondary', fontSize: 10.5 }}>({Math.round(rate)}%)</Typography></Typography></Stack><Box sx={{ height: 7, overflow: 'hidden', bgcolor: 'action.hover' }}><Box className="analytics-progress" sx={{ width: `${rate}%`, height: '100%', bgcolor: item.color }} /></Box></Box> })}</Stack></CardContent></Card>
+  return <Card className="section-card analytics-distribution" sx={{ minWidth: 0, overflow: 'hidden' }}>
+    <Box sx={{ px: 1.5, pt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography sx={{ fontSize: 13, fontWeight: 800 }}>{title}</Typography><StatusBadge label={`${total.toLocaleString()}개`} tone="neutral" minWidth={0} /></Box>
+    <CardContent role="region" aria-label={`${title} 통계`} sx={{ p: '6px 12px 10px !important' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`, gap: 1 }}>
+        {items.map((item) => { const rate = total ? item.value / total * 100 : 0; return <Box key={item.label} role="link" tabIndex={0} onClick={() => navigate(item.href)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(item.href) } }} sx={{ minWidth: 0, p: .5, cursor: 'pointer', borderRadius: 1, '&:hover, &:focus-visible': { bgcolor: 'action.hover' } }}>
+          <Typography noWrap sx={{ fontSize: 11, color: 'text.secondary' }}>{item.label}</Typography>
+          <Typography sx={{ my: .25, fontSize: 15, fontWeight: 850 }}>{item.value} <Typography component="span" sx={{ color: 'text.secondary', fontSize: 10 }}>({Math.round(rate)}%)</Typography></Typography>
+          <Box sx={{ height: 4, overflow: 'hidden', borderRadius: 1, bgcolor: 'action.hover' }}><Box className="analytics-progress" sx={{ width: `${rate}%`, height: '100%', bgcolor: item.color }} /></Box>
+        </Box> })}
+      </Box>
+    </CardContent>
+  </Card>
 }
 
 function Analytics() {
@@ -61,13 +80,22 @@ function Analytics() {
     { label: '무결성 위반', value: `${summary?.integrityViolations ?? 0}개`, note: summary?.integrityViolations ? '즉시 조사 필요' : '전체 키 정상', color: '#df4c64', icon: summary?.integrityViolations ? <ErrorOutlineRounded /> : <ShieldRounded />, href: '/keys?category=INTEGRITY_VIOLATION' },
   ]
 
-  return <Box sx={{ width: '100%', maxWidth: '100%', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'hidden', '& > *': { flexShrink: 0 } }}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}><Box><Typography variant="h5">키 통계</Typography><Typography sx={{ mt: .4, color: 'text.secondary', fontSize: 12.5 }}>KMS 키 상태와 암·복호화 사용량을 서버 DB 기준으로 분석합니다.</Typography></Box><ToggleButtonGroup exclusive size="small" value={period} onChange={(_event, value) => value && setPeriod(value)}><ToggleButton value="DAY">최근 30일</ToggleButton><ToggleButton value="MONTH">최근 12개월</ToggleButton></ToggleButtonGroup></Stack>
-    {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
-    {loading && <LinearProgress sx={{ mb: 2 }} />}
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,minmax(0,1fr))', md: 'repeat(4,minmax(0,1fr))' }, gap: 1.5 }}>{metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}</Box>
-    <Card className="section-card" sx={{ flex: '1.3 1 0 !important', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', '& > .section-card-header': { flexShrink: 0 } }}><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Box><Typography variant="h6">키 생성·사용 상세</Typography><Typography sx={{ mt: .15, color: 'text.secondary', fontSize: 11.5 }}>그래프 지점에 마우스를 올리거나 클릭해 기간별 수치를 확인하세요.</Typography></Box><Stack direction="row" spacing={.75} sx={{ alignItems: 'center' }}><LockRounded sx={{ color: 'primary.main', fontSize: 18 }} /><Typography sx={{ color: 'text.secondary', fontSize: 11.5 }}>실시간 API 연동</Typography></Stack></Box><CardContent tabIndex={0} role="region" aria-label="키 생성·사용 상세 차트" sx={{ p: '8px 20px 14px !important', minHeight: 0, flex: 1, overflow: 'auto', overscrollBehavior: 'contain' }}><InteractiveUsageChart trend={trend} detailed /></CardContent></Card>
-    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 1.5, flex: '1 1 0 !important', minHeight: 0 }}><DistributionPanel title="전체 키 상태" items={statusItems} total={keys.length} /><DistributionPanel title="알고리즘 분포" items={algorithmItems} total={keys.length} /></Box>
+  return <Box className="analytics-page" sx={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1.25, overflow: 'hidden' }}>
+    <Stack direction="row" sx={{ flexShrink: 0, alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+      <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 24 }, whiteSpace: 'nowrap' }}>키 통계</Typography>
+      <ToggleButtonGroup exclusive size="small" value={period} onChange={(_event, value) => value && setPeriod(value)}><ToggleButton value="DAY">최근 30일</ToggleButton><ToggleButton value="MONTH">최근 12개월</ToggleButton></ToggleButtonGroup>
+    </Stack>
+    {error && <Alert severity="error" onClose={() => setError('')} sx={{ flexShrink: 0 }}>{error}</Alert>}
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,minmax(0,1fr))', md: 'repeat(4,minmax(0,1fr))' }, gap: 1.25, flexShrink: 0 }}>{metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}</Box>
+    <Card className="section-card analytics-chart-card" sx={{ position: 'relative', flex: '1 1 0', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {loading && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}
+      <Box sx={{ px: 2, pt: 1.25, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexShrink: 0 }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 800 }}>키 생성·사용 상세</Typography>
+        <Typography sx={{ display: { xs: 'none', sm: 'block' }, color: 'text.secondary', fontSize: 11 }}>그래프에 마우스를 올려 기간별 수치를 확인하세요</Typography>
+      </Box>
+      <CardContent role="region" aria-label="키 생성·사용 상세 차트" sx={{ p: '6px 12px 8px !important', minHeight: 0, minWidth: 0, flex: 1, overflow: 'hidden' }}><InteractiveUsageChart trend={trend} detailed fillContainer /></CardContent>
+    </Card>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0,1.4fr) minmax(0,1fr)' }, gap: 1.25, flexShrink: 0 }}><DistributionPanel title="전체 키 상태" items={statusItems} total={keys.length} /><DistributionPanel title="알고리즘 분포" items={algorithmItems} total={keys.length} /></Box>
   </Box>
 }
 

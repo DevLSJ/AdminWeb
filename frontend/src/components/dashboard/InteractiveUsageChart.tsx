@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Box, Stack, Typography } from '@mui/material'
 import type { DashboardTrend, DashboardTrendPoint } from '../../types/api'
 
@@ -12,6 +12,7 @@ interface InteractiveUsageChartProps {
   trend: DashboardTrend | null
   detailed?: boolean
   compact?: boolean
+  fillContainer?: boolean
 }
 
 function formatPeriod(period: string) {
@@ -21,29 +22,40 @@ function formatPeriod(period: string) {
 
 function AccessibleSummary({ point }: { point: DashboardTrendPoint }) {
   return (
-    <Typography component="span" sx={{ position: 'absolute', width: 1, height: 1, p: 0, m: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+    <Typography component="span" sx={{ position: 'absolute', top: 0, left: 0, width: 1, height: 1, p: 0, m: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
       {point.period}, 암호화 {point.encryptions}건, 복호화 {point.decryptions}건, 키 생성 {point.keysCreated}건
     </Typography>
   )
 }
 
-export function InteractiveUsageChart({ trend, detailed = false, compact = false }: InteractiveUsageChartProps) {
+export function InteractiveUsageChart({ trend, detailed = false, compact = false, fillContainer = false }: InteractiveUsageChartProps) {
   const points = trend?.points ?? []
+  const plotRef = useRef<HTMLDivElement>(null)
+  const [plotSize, setPlotSize] = useState({ width: 1080, height: 382 })
+  useLayoutEffect(() => {
+    if (!fillContainer || !plotRef.current) return
+    const element = plotRef.current
+    const observer = new ResizeObserver(([entry]) => {
+      setPlotSize({ width: Math.max(1, entry.contentRect.width), height: Math.max(1, entry.contentRect.height) })
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [fillContainer, points.length])
   const [activeIndex, setActiveIndex] = useState(Math.max(points.length - 1, 0))
   useEffect(() => setActiveIndex(Math.max(points.length - 1, 0)), [points.length])
 
   if (!points.length) {
-    return <Box sx={{ display: 'grid', height: compact ? 240 : detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
+    return <Box sx={{ display: 'grid', height: fillContainer ? '100%' : compact ? 240 : detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
   }
 
   // Keep the plot canvas stable when switching between daily and monthly data.
   // Point count changes the spacing between samples, not the chart footprint.
-  const width = detailed ? 1080 : 900
+  const width = fillContainer ? plotSize.width : detailed ? 1080 : 900
   // Reserve enough room above the plot for the tooltip. Its Y position then
   // follows the highest series value for the selected date instead of sitting
   // at a fixed height over the chart lines.
-  const chartTop = detailed ? 138 : 118
-  const chartBottom = detailed ? 330 : 255
+  const chartTop = fillContainer ? 16 : detailed ? 138 : 118
+  const chartBottom = fillContainer ? Math.max(20, plotSize.height - 30) : detailed ? 330 : 255
   const chartHeight = chartBottom - chartTop
   const maxValue = Math.max(1, ...points.flatMap((point) => series.map(({ field }) => point[field])))
   const roundedMax = Math.max(5, Math.ceil(maxValue / 5) * 5)
@@ -51,25 +63,29 @@ export function InteractiveUsageChart({ trend, detailed = false, compact = false
   const yFor = (value: number) => chartBottom - (value / roundedMax) * chartHeight
   const pathFor = (field: typeof series[number]['field']) => points.map((point, index) => `${index ? 'L' : 'M'} ${xFor(index)} ${yFor(point[field])}`).join(' ')
   const selected = points[Math.min(activeIndex, points.length - 1)]
-  const activeX = xFor(activeIndex)
+  const activeX = xFor(Math.min(activeIndex, points.length - 1))
   const activeTop = Math.min(...series.map(({ field }) => yFor(selected[field])))
   const tooltipLeft = `${Math.min(88, Math.max(12, (activeX / width) * 100))}%`
-  const labelEvery = Math.max(1, Math.ceil(points.length / (detailed ? 12 : 8)))
+  const labelEvery = Math.max(1, Math.ceil(points.length / (fillContainer ? Math.max(2, Math.floor(width / 70)) : detailed ? 12 : 8)))
 
   return (
-    <Box sx={{ minWidth: 0 }}>
-      <Stack direction="row" spacing={{ xs: 1.5, sm: 2.5 }} useFlexGap sx={{ mt: 1.5, mb: 1.25, flexWrap: 'wrap' }}>
+    <Box sx={{ minWidth: 0, ...(fillContainer && { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }) }}>
+      {fillContainer && <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: .75, px: .5, pb: .5, flexShrink: 0 }}>
+        <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 750 }}>{selected.period}</Typography>
+        <Stack direction="row" spacing={1.5}>{series.map((item) => <Stack key={item.field} direction="row" spacing={.5} sx={{ alignItems: 'center' }}><Box sx={{ width: 12, height: 3, bgcolor: item.color }} /><Typography sx={{ fontSize: 11, color: 'text.secondary' }}>{item.label} <Typography component="span" sx={{ fontSize: 'inherit', fontWeight: 800, color: 'text.primary' }}>{selected[item.field].toLocaleString()}건</Typography></Typography></Stack>)}</Stack>
+      </Stack>}
+      {!fillContainer && <Stack direction="row" spacing={{ xs: 1.5, sm: 2.5 }} useFlexGap sx={{ mt: 1.5, mb: 1.25, flexWrap: 'wrap' }}>
         {series.map((item) => (
           <Stack key={item.field} direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
             <Box sx={{ width: 20, height: 3, bgcolor: item.color }} />
             <Typography sx={{ fontSize: 12.5, color: 'text.secondary', fontWeight: 700 }}>{item.label}</Typography>
           </Stack>
         ))}
-      </Stack>
+      </Stack>}
 
-      <Box className="usage-chart-scroll" sx={{ width: '100%', maxWidth: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
-        <Box sx={{ position: 'relative', minWidth: compact ? 0 : width, width: '100%' }}>
-          <Box
+      <Box ref={plotRef} className="usage-chart-scroll" sx={{ width: '100%', maxWidth: '100%', overflowX: fillContainer ? 'hidden' : 'auto', overflowY: 'hidden', ...(fillContainer && { flex: 1, minHeight: 0 }) }}>
+        <Box sx={{ position: 'relative', minWidth: compact || fillContainer ? 0 : width, width: '100%', ...(fillContainer && { height: '100%' }) }}>
+          {!fillContainer && <Box
             sx={{
               position: 'absolute',
               zIndex: 3,
@@ -90,9 +106,9 @@ export function InteractiveUsageChart({ trend, detailed = false, compact = false
             <Stack spacing={0.45} sx={{ mt: 0.7 }}>
               {series.map((item) => <Stack key={item.field} direction="row" sx={{ justifyContent: 'space-between', gap: 2 }}><Typography sx={{ fontSize: 11.5, color: item.color, fontWeight: 750 }}>{item.label}</Typography><Typography sx={{ fontSize: 11.5, fontWeight: 850 }}>{selected[item.field].toLocaleString()}건</Typography></Stack>)}
             </Stack>
-          </Box>
+          </Box>}
 
-          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: compact ? 240 : detailed ? 382 : 296 }}>
+          <Box component="svg" viewBox={`0 0 ${width} ${fillContainer ? plotSize.height : detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: fillContainer ? '100%' : compact ? 240 : detailed ? 382 : 296 }}>
             {[0, .25, .5, .75, 1].map((ratio) => {
               const y = chartBottom - ratio * chartHeight
               return <g key={ratio}><line x1="54" x2={width - 32} y1={y} y2={y} stroke="currentColor" opacity=".1" /><text x="45" y={y + 4} textAnchor="end" fill="currentColor" opacity=".56" fontSize="10">{Math.round(roundedMax * ratio)}</text></g>
