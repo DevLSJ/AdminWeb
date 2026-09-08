@@ -101,36 +101,38 @@ function Profile() {
           </CardContent>
         </Card>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))' }, gap: 2.5, alignItems: 'start' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))' }, gap: 2.5, alignItems: 'stretch', '& > .MuiCard-root': { display: 'flex', flexDirection: 'column' } }}>
           <Card>
-            <CardContent sx={{ p: 2.5 }}>
+            <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
               <Typography variant="h6" sx={{ mb: 2.5 }}>기본정보</Typography>
               {profileMessage && <Alert severity="success" onClose={() => setProfileMessage('')} sx={{ mb: 2 }}>{profileMessage}</Alert>}
               {profileError && <Alert severity="error" onClose={() => setProfileError('')} sx={{ mb: 2 }}>{profileError}</Alert>}
-              <Box component="form" onSubmit={(event) => void saveProfile(event)}>
-                <Box component="fieldset" disabled={profileLoading || profileSaving} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
-                <TextField fullWidth label="로그인 ID" value={user.loginId} disabled sx={{ mb: 2 }} />
-                <TextField fullWidth required label="표시 이름" value={name} onChange={(event) => setName(event.target.value)} />
-                <TextField fullWidth type="email" label="이메일" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} slotProps={{ htmlInput: { maxLength: 254 } }} sx={{ mt: 2 }} />
-                <TextField fullWidth type="tel" label="전화번호" autoComplete="tel" placeholder="010-1234-5678" value={phone} onChange={(event) => setPhone(event.target.value)} slotProps={{ htmlInput: { maxLength: 20 } }} helperText="연락처를 비워 두면 기존 정보가 유지됩니다." sx={{ mt: 2 }} />
-                <Button type="submit" variant="contained" startIcon={<SaveRounded />} disabled={profileLoading || profileSaving || !savedProfile || !name.trim() || (name.trim() === savedProfile.name && phone === (savedProfile.phone ?? '') && email === (savedProfile.email ?? ''))} sx={{ mt: 2.5 }}>{profileLoading ? '불러오는 중…' : profileSaving ? '저장 중…' : '프로필 저장'}</Button>
+              <Box component="form" onSubmit={(event) => void saveProfile(event)} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <Box component="fieldset" disabled={profileLoading || profileSaving} sx={{ border: 0, p: 0, m: 0, minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <TextField slotProps={{ inputLabel: { shrink: true } }} fullWidth label="로그인 ID" value={user.loginId} disabled sx={{ mb: 2 }} />
+                <TextField slotProps={{ inputLabel: { shrink: true } }} fullWidth required label="표시 이름" value={name} onChange={(event) => setName(event.target.value)} />
+                <TextField fullWidth type="email" label="이메일" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 254 } }} sx={{ mt: 2 }} />
+                <TextField fullWidth type="tel" label="전화번호" autoComplete="tel" placeholder="010-1234-5678" value={phone} onChange={(event) => setPhone(event.target.value)} slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 20 } }} helperText="연락처를 비워 두면 기존 정보가 유지됩니다." sx={{ mt: 2 }} />
+                <Box sx={{ flex: 1, minHeight: 20 }} />
+                <Button type="submit" variant="contained" startIcon={<SaveRounded />} disabled={profileLoading || profileSaving || !savedProfile || !name.trim() || (name.trim() === savedProfile.name && phone === (savedProfile.phone ?? '') && email === (savedProfile.email ?? ''))} sx={{ alignSelf: 'flex-start' }}>{profileLoading ? '불러오는 중…' : profileSaving ? '저장 중…' : '프로필 저장'}</Button>
                 </Box>
               </Box>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="h6">비밀번호 변경</Typography>
-              <Typography sx={{ mt: 0.5, mb: 2.5, color: 'text.secondary', fontSize: 14, lineHeight: 1.65 }}>비밀번호 원문 조회 기능은 제공하지 않습니다. API 연동 시 새 Salt를 생성하고 PBKDF2로 재해시합니다.</Typography>
+            <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" sx={{ mb: 2.5 }}>비밀번호 변경</Typography>
               {passwordResult && <Alert severity={passwordResult.success ? 'success' : 'error'} onClose={() => setPasswordResult(null)} sx={{ mb: 2 }}>{passwordResult.message}</Alert>}
-              <Box component="form" onSubmit={savePassword}>
+              <Box component="form" onSubmit={savePassword} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <Stack spacing={2}>
-                  <TextField required type="password" label="현재 비밀번호" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-                  <TextField required type="password" label="새 비밀번호" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} helperText="8자 이상 입력하세요." />
-                  <TextField required type="password" label="새 비밀번호 확인" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+                  <TextField slotProps={{ inputLabel: { shrink: true } }} required type="password" label="현재 비밀번호" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+                  <TextField slotProps={{ inputLabel: { shrink: true } }} required type="password" label="새 비밀번호" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+                  <TextField slotProps={{ inputLabel: { shrink: true } }} required type="password" label="새 비밀번호 확인" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
                 </Stack>
-                <Button type="submit" variant="contained" startIcon={<LockResetRounded />} disabled={!currentPassword || newPassword.length < 8 || !confirmPassword} sx={{ mt: 2.5 }}>비밀번호 변경</Button>
+                <Typography sx={{ mt: 2, color: 'text.secondary', fontSize: 12, lineHeight: 1.65 }}>새 비밀번호는 8자 이상 입력하세요. 비밀번호 원문은 조회할 수 없습니다.</Typography>
+                <Box sx={{ flex: 1, minHeight: 20 }} />
+                <Button type="submit" variant="contained" startIcon={<LockResetRounded />} disabled={!currentPassword || newPassword.length < 8 || !confirmPassword} sx={{ alignSelf: 'flex-start' }}>비밀번호 변경</Button>
               </Box>
             </CardContent>
           </Card>
