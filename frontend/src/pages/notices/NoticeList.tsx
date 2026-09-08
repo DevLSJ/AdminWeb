@@ -181,7 +181,7 @@ function NoticeList() {
 
   return (
     <Box className="notice-page list-page" sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-      <PageHeader title="게시판" description="관리자 공지는 상단에 고정되어 강조 표시되며, 나머지는 일반 게시글로 등록됩니다." action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/notices/new')}>글 작성</Button>} />
+      <PageHeader title="게시판" description="여러분의 목소리를 담습니다" action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/notices/new')}>글 작성</Button>} />
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
       <SearchFilterForm columns={3} onSearch={search} onReset={resetFilters}>
         <TextField size="small" label="제목 검색" value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
