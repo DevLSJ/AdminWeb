@@ -358,3 +358,41 @@ input {
   border-right-color: #1769e8;
   outline: none;
 }
+
+
+/* The application shell stays in the viewport; overflow belongs to its content. */
+.page-viewport {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.page-viewport:focus { outline: none; }
+.list-page {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.list-page > * { flex-shrink: 0; }
+.list-page > .list-results {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.list-results > * { flex-shrink: 0; }
+.list-results > .MuiTableContainer-root {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+@media (max-height: 640px), (max-width: 600px) {
+  .list-page { height: auto; min-height: 100%; }
+  .list-page > .list-results { flex: none; min-height: 280px; }
+  .list-results > .MuiTableContainer-root { flex: none; max-height: 45dvh; }
+}

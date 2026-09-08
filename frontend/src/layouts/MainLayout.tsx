@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { Suspense, useState, type ReactNode } from 'react'
 import {
   AccountCircleRounded,
   AddBoxRounded,
@@ -229,18 +229,18 @@ function MainLayout() {
         <Drawer variant="permanent" open sx={{ display: { xs: 'none', md: 'block' }, '& .MuiDrawer-paper': { width: drawerWidth, overflowX: 'hidden', transition: (theme) => theme.transitions.create('width'), border: 0, background: 'linear-gradient(160deg, #0d5fe7 0%, #1647c8 100%)', boxShadow: '10px 0 32px rgba(24,72,160,.12)' } }}>{renderDrawer()}</Drawer>
       </Box>
 
-      <Box component="main" sx={{ width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, minHeight: '100vh', pt: '72px', transition: (theme) => theme.transitions.create('width') }}>
+      <Box component="main" sx={{ width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` }, height: '100dvh', overflow: 'hidden', pt: '72px', transition: (theme) => theme.transitions.create('width') }}>
         <Box
           sx={{
             width: '100%',
             maxWidth: 'none',
-            minHeight: 'calc(100vh - 72px)',
+            height: '100%', minHeight: 0, overflow: 'hidden',
             mx: 'auto',
             p: { xs: 2, sm: 2.5 },
           }}
         >
-          <Box key={location.pathname.startsWith('/users') ? '/users' : location.pathname} className="page-route-transition">
-            <Outlet />
+          <Box key={location.pathname.startsWith('/users') ? '/users' : location.pathname} className="page-viewport" role="region" aria-label="페이지 내용" tabIndex={0}>
+            <Suspense fallback={<Box role="status" sx={{ p: 3, color: 'text.secondary' }}>화면을 불러오는 중입니다.</Box>}><Outlet /></Suspense>
           </Box>
         </Box>
       </Box>

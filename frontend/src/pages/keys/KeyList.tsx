@@ -221,7 +221,7 @@ function KeyList() {
   }
 
   return (
-    <Box>
+    <Box className="list-page">
       <PageHeader
         title="키 목록"
         description={isAdmin ? 'KMS 관리 키를 검색하고 상태·무결성·만료 정보를 관리합니다. 키 원문과 래핑 값은 화면에 노출하지 않습니다.' : '사용 가능한 KMS 관리 키의 메타정보와 상태를 조회합니다.'}
@@ -254,7 +254,7 @@ function KeyList() {
           <FormControl size="small"><InputLabel id="key-filter-sort-label">정렬</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-sort-label" label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
       </SearchFilterForm>
 
-      <Card sx={{ overflow: 'hidden' }}>
+      <Card className="list-results" sx={{ overflow: 'hidden' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack></Box>
         <TableContainer sx={managementTableContainerSx}>
           <Table stickyHeader size="small" sx={managementTableSx}>

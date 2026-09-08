@@ -33,7 +33,7 @@ export function InteractiveUsageChart({ trend, detailed = false, compact = false
   useEffect(() => setActiveIndex(Math.max(points.length - 1, 0)), [points.length])
 
   if (!points.length) {
-    return <Box sx={{ display: 'grid', height: compact ? 180 : detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
+    return <Box sx={{ display: 'grid', height: compact ? 240 : detailed ? 360 : 255, placeItems: 'center', color: 'text.secondary' }}>조회 기간의 키 사용 기록이 없습니다.</Box>
   }
 
   // Keep the plot canvas stable when switching between daily and monthly data.
@@ -92,7 +92,7 @@ export function InteractiveUsageChart({ trend, detailed = false, compact = false
             </Stack>
           </Box>
 
-          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: compact ? 180 : detailed ? 382 : 296 }}>
+          <Box component="svg" viewBox={`0 0 ${width} ${detailed ? 382 : 296}`} sx={{ display: 'block', width: '100%', height: compact ? 240 : detailed ? 382 : 296 }}>
             {[0, .25, .5, .75, 1].map((ratio) => {
               const y = chartBottom - ratio * chartHeight
               return <g key={ratio}><line x1="54" x2={width - 32} y1={y} y2={y} stroke="currentColor" opacity=".1" /><text x="45" y={y + 4} textAnchor="end" fill="currentColor" opacity=".56" fontSize="10">{Math.round(roundedMax * ratio)}</text></g>

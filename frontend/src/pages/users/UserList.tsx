@@ -26,6 +26,7 @@ import {
   InputLabel,
   IconButton,
   MenuItem,
+  LinearProgress,
   Select,
   Stack,
   TableBody,
@@ -106,7 +107,10 @@ function UserList() {
   const [managedPassword, setManagedPassword] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setParams({ ...draft, page: 0 }), 300)
+    const timer = window.setTimeout(() => setParams((current) => {
+      if (current.name === draft.name && current.phone === draft.phone && current.email === draft.email && current.status === draft.status) return current
+      return { ...current, name: draft.name, phone: draft.phone, email: draft.email, status: draft.status, page: 0 }
+    }), 300)
     return () => window.clearTimeout(timer)
   }, [draft])
 
@@ -328,7 +332,7 @@ function UserList() {
   )
 
   return (
-    <Box>
+    <Box className="list-page">
       <PageHeader
         title="사용자 관리"
         action={(sessionUser?.role === 'ADMIN' || sessionUser?.role === 'S.ADMIN') && <Button data-testid="user-create-button" variant="contained" startIcon={<AddRounded />} onClick={openCreate}>사용자 등록</Button>}
@@ -342,15 +346,16 @@ function UserList() {
           <TextField size="small" label="이메일 검색" value={draft.email ?? ''} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />
       </SearchFilterForm>
 
-      <Card>
+      <Card className="list-results" aria-busy={loading} sx={{ position: 'relative' }}>
+        {loading && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0 }} />}
         <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>사용자 {pageData.totalElements.toLocaleString()}명</Typography></Box>
         <TableContainer sx={managementTableContainerSx}>
           <Table stickyHeader size="small" sx={[managementTableSx, { '& .MuiTableCell-body': { fontSize: 14, lineHeight: 1.55 }, '& .MuiTableCell-head': { fontSize: 14, fontWeight: 750 } }]}>
             <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 150 }}>사용자</TableCell><TableCell sx={{ width: 160 }}>연락처</TableCell><TableCell sx={{ width: 195 }}>이메일</TableCell><TableCell sx={{ width: 95 }}>권한</TableCell><TableCell sx={{ width: 95 }}>상태</TableCell><TableCell sx={{ width: 95 }}>무결성</TableCell><TableCell sx={{ width: 150 }}>등록일</TableCell><TableCell align="center" sx={{ width: 160 }}>최근 접속일</TableCell></TableRow></TableHead>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={9} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
+              {loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={9} align="center" sx={{ height: 180 }}><CircularProgress size={28} /></TableCell></TableRow>}
               {!loading && pageData.content.length === 0 && <TableRow><TableCell colSpan={9} align="center" sx={{ height: 180, color: 'text.secondary' }}>조회된 사용자가 없습니다.</TableCell></TableRow>}
-              {!loading && pageData.content.map((user, index) => {
+              {pageData.content.map((user, index) => {
                 const isAdminAccount = user.accountType === 'ADMIN_ACCOUNT'
                 return (
                   <TableRow key={`${user.accountType}-${user.userUid}`} hover tabIndex={0} className="interactive-row" onClick={() => navigate(`/users/${isAdminAccount ? 'admin' : 'app'}/${user.userUid}`)} sx={{ cursor: 'pointer', ...(!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : {}) }}>

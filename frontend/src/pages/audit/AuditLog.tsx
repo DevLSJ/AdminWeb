@@ -172,7 +172,7 @@ function AuditLog() {
   const invalidLogUids = new Set(verification?.invalidLogUids ?? [])
 
   return (
-    <Box>
+    <Box className="list-page">
       <PageHeader
         title="감사 로그"
         description="서버의 append-only 감사 이벤트를 검색하고 선택 기간의 행 HMAC·prev_hash 경계 연결을 검증합니다."
@@ -190,7 +190,7 @@ function AuditLog() {
           <AuditActionFilter value={draft.action} onChange={(action) => setDraft((current) => ({ ...current, action }))} />
       </SearchFilterForm>
 
-      <Card>
+      <Card className="list-results">
         <TableContainer sx={paginatedTableContainerSx(params.size, 390)}>
           <Table stickyHeader size="small" sx={{ minWidth: 920, tableLayout: 'fixed', '& th, & td': { verticalAlign: 'middle', ...paginatedTableCellSx(params.size) }, '& th': { py: 0.9 } }}>
             <TableHead><TableRow><TableCell sx={{ width: '17%' }}>시각 (KST)</TableCell><TableCell sx={{ width: '11%' }}>행위자</TableCell><TableCell sx={{ width: '19%' }}>행위</TableCell><TableCell sx={{ width: '15%' }}>대상 유형</TableCell><TableCell sx={{ width: '28%' }}>설명</TableCell><TableCell align="center" sx={{ width: '10%' }}>행 HMAC</TableCell></TableRow></TableHead>

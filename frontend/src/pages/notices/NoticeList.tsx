@@ -180,7 +180,7 @@ function NoticeList() {
   }
 
   return (
-    <Box className="notice-page" sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
+    <Box className="notice-page list-page" sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
       <PageHeader title="게시판" description="관리자 공지는 상단에 고정되어 강조 표시되며, 나머지는 일반 게시글로 등록됩니다." action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/notices/new')}>글 작성</Button>} />
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
       <SearchFilterForm columns={3} onSearch={search} onReset={resetFilters}>
@@ -188,7 +188,7 @@ function NoticeList() {
         <FormControl size="small"><InputLabel id="notice-filter-category-label">카테고리</InputLabel><Select MenuProps={categoryMenuProps} labelId="notice-filter-category-label" label="카테고리" value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value as NoticeListParams['category'] }))}><MenuItem value="ALL">전체 카테고리</MenuItem><MenuItem value="NOTICE">공지사항</MenuItem><MenuItem value="GENERAL">글</MenuItem></Select></FormControl>
         <FormControl size="small"><InputLabel id="notice-filter-exposure-label">노출 상태</InputLabel><Select MenuProps={categoryMenuProps} labelId="notice-filter-exposure-label" label="노출 상태" value={draft.exposeYn} onChange={(event) => setDraft((current) => ({ ...current, exposeYn: event.target.value as NoticeListParams['exposeYn'] }))}><MenuItem value="ALL">전체 상태</MenuItem><MenuItem value="Y">노출</MenuItem><MenuItem value="N">숨김</MenuItem></Select></FormControl>
       </SearchFilterForm>
-      <Card className="section-card" sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden', borderRadius: '2px !important' }}>
+      <Card className="section-card list-results" sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden', borderRadius: '2px !important' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ fontSize: 14, fontWeight: 800 }}>게시글 목록</Typography><StatusBadge label={`${totalElements.toLocaleString()}건`} tone="neutral" minWidth={0} /></Box>
         <TableContainer sx={managementTableContainerSx}>
           <Table stickyHeader size="small" sx={[managementTableSx, { '& .MuiTableCell-body': { fontSize: 13.25 }, '& .MuiTableCell-head': { fontSize: 13, fontWeight: 800 } }]}>
