@@ -1,5 +1,5 @@
 import { ResizableTable as Table } from '../../components/admin/ResizableTable'
-import { useEffect, useState, type DragEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { AddRounded, ArrowBackRounded, AttachFileRounded, CloseRounded, CloudUploadRounded, DeleteOutlineRounded, DownloadRounded, EditRounded, LockRounded, PushPinRounded, SearchRounded } from '@mui/icons-material'
 import { Alert, Box, Button, Card, CardContent, FormControl, FormHelperText, IconButton, InputAdornment, InputLabel, List, ListItem, ListItemText, MenuItem, Pagination, Select, Stack, Switch, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -29,6 +29,8 @@ function NoticeList() {
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [files, setFiles] = useState<File[]>([])
+  const [draggingFiles, setDraggingFiles] = useState(false)
+  const fileDragDepth = useRef(0)
   const [editing, setEditing] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -88,9 +90,22 @@ function NoticeList() {
     }
   }
 
+  const addFiles = (incoming: File[]) => {
+    if (incoming.length) selectFiles([...files, ...incoming])
+  }
+
+  const dragFilesOver = (event: DragEvent<HTMLLabelElement>) => {
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
   const dropFiles = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault()
-    selectFiles(Array.from(event.dataTransfer.files))
+    event.stopPropagation()
+    fileDragDepth.current = 0
+    setDraggingFiles(false)
+    addFiles(Array.from(event.dataTransfer.files))
   }
 
   const saveNotice = async (event: FormEvent<HTMLFormElement>) => {
@@ -163,7 +178,7 @@ function NoticeList() {
                 </Stack>
                 <Stack spacing={1.5} sx={{ minWidth: 0, minHeight: 0, maxHeight: { xs: 150, sm: 'none' }, overflowY: 'auto', overscrollBehavior: 'contain' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'action.hover' }}><Box><Typography sx={{ fontSize: 12.5, fontWeight: 750 }}>게시글 노출</Typography><Typography sx={{ mt: .25, color: 'text.secondary', fontSize: 10.5 }}>끄면 작성자와 관리자만 조회할 수 있습니다.</Typography></Box><Stack direction="row" spacing={.75} sx={{ alignItems: 'center' }}><Typography color={form.exposeYn === 'Y' ? 'primary.main' : 'text.secondary'} sx={{ fontSize: 11.5, fontWeight: 800 }}>{form.exposeYn === 'Y' ? '노출' : '숨김'}</Typography><Switch slotProps={{ input: { 'aria-label': '게시글 노출' } }} checked={form.exposeYn === 'Y'} onChange={(event) => setForm((current) => ({ ...current, exposeYn: event.target.checked ? 'Y' : 'N' }))} /></Stack></Box>
-                  <Box><Box component="label" htmlFor="notice-files" onDragOver={(event) => event.preventDefault()} onDrop={dropFiles} sx={{ display: 'grid', minHeight: 142, placeItems: 'center', p: 2.5, border: '1.5px dashed', borderColor: 'primary.light', borderRadius: 2, bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(23,105,232,.025)' : 'rgba(23,105,232,.08)', textAlign: 'center', cursor: 'pointer', transition: 'border-color 180ms ease, background-color 180ms ease', '&:hover': { borderColor: 'primary.main', bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(23,105,232,.05)' : 'rgba(23,105,232,.12)' } }}><Box><CloudUploadRounded sx={{ mb: .6, color: 'primary.main', fontSize: 27 }} /><Typography sx={{ fontSize: 12.5, fontWeight: 750 }}>첨부파일을 선택하거나 끌어놓으세요</Typography><Typography sx={{ mt: .45, color: 'text.secondary', fontSize: 10.5 }}>개별 10MB 이하 · 최대 10개 · 서버 저장 전 AES-256-GCM 암호화</Typography></Box><input id="notice-files" hidden multiple type="file" onChange={(event) => selectFiles(Array.from(event.target.files ?? []))} /></Box>
+                  <Box><Box component="label" htmlFor="notice-files" onDragEnter={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); fileDragDepth.current += 1; setDraggingFiles(true) } }} onDragLeave={() => { fileDragDepth.current = Math.max(0, fileDragDepth.current - 1); if (!fileDragDepth.current) setDraggingFiles(false) }} onDragOver={dragFilesOver} onDrop={dropFiles} data-dragging={draggingFiles} sx={{ display: 'grid', minHeight: 142, placeItems: 'center', p: 2.5, border: '1.5px dashed', borderColor: draggingFiles ? 'primary.main' : 'primary.light', borderRadius: 2, bgcolor: (theme) => draggingFiles ? (theme.palette.mode === 'light' ? 'rgba(23,105,232,.10)' : 'rgba(23,105,232,.20)') : (theme.palette.mode === 'light' ? 'rgba(23,105,232,.025)' : 'rgba(23,105,232,.08)'), textAlign: 'center', cursor: 'pointer', transition: 'border-color 180ms ease, background-color 180ms ease', '&:hover': { borderColor: 'primary.main', bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(23,105,232,.05)' : 'rgba(23,105,232,.12)' } }}><Box><CloudUploadRounded sx={{ mb: .6, color: 'primary.main', fontSize: 27 }} /><Typography sx={{ fontSize: 12.5, fontWeight: 750 }}>첨부파일을 선택하거나 끌어놓으세요</Typography><Typography sx={{ mt: .45, color: 'text.secondary', fontSize: 10.5 }}>개별 10MB 이하 · 최대 10개 · 서버 저장 전 AES-256-GCM 암호화</Typography></Box><input id="notice-files" hidden multiple type="file" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Box>
                     {files.length === 0 ? <Typography sx={{ mt: 1, color: 'text.secondary', fontSize: 10.5 }}>선택된 첨부파일이 없습니다.</Typography> : <Stack spacing={.75} sx={{ mt: 1 }}>{files.map((file, index) => <Box key={`${file.name}-${file.lastModified}`} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: .8, borderRadius: 1.5, bgcolor: 'action.hover' }}><AttachFileRounded sx={{ color: 'primary.main', fontSize: 17 }} /><Typography noWrap sx={{ minWidth: 0, flex: 1, fontSize: 11.5 }}>{file.name}</Typography><Typography sx={{ flexShrink: 0, color: 'text.secondary', fontSize: 10.5 }}>{(file.size / 1024).toFixed(1)} KB</Typography><IconButton size="small" aria-label={`${file.name} 제거`} onClick={() => selectFiles(files.filter((_item, fileIndex) => fileIndex !== index))}><CloseRounded sx={{ fontSize: 17 }} /></IconButton></Box>)}</Stack>}
                   </Box>
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ p: 1.5, borderRadius: 2, bgcolor: (theme) => theme.palette.mode === 'light' ? '#edf4ff' : 'rgba(23,105,232,.12)', color: 'text.secondary' }}><LockRounded sx={{ flexShrink: 0, color: 'primary.main', fontSize: 18 }} /><Typography sx={{ fontSize: 11, lineHeight: 1.6 }}><Typography component="span" sx={{ mr: .8, color: 'primary.main', fontSize: 'inherit', fontWeight: 800 }}>보안 처리</Typography>파일 원문을 저장하지 않습니다.</Typography></Stack>
