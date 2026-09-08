@@ -1,6 +1,5 @@
 import { createContext } from 'react'
 import type {
-  AuditLog,
   AutoRotationDays,
   CryptoKey,
   KeyDistributionResult,
@@ -8,7 +7,6 @@ import type {
   KeyStatus,
   KeyStatusHistory,
   KeyUsageSummary,
-  KeyVersion,
 } from '../types/api'
 
 export interface CreateKeyInput {
@@ -24,18 +22,14 @@ export interface CreateKeyInput {
 
 export interface KmsContextValue {
   keys: CryptoKey[]
-  auditLogs: AuditLog[]
   keyHistories: Record<string, KeyStatusHistory[]>
-  keyVersions: Record<string, KeyVersion[]>
   keyUsage: Record<string, KeyUsageSummary>
   autoRotationByKey: Record<string, AutoRotationDays>
   loading: boolean
   error: string
   refreshKeys: () => Promise<void>
-  refreshAuditLogs: () => Promise<void>
   loadKeyDetail: (keyUid: string) => Promise<CryptoKey>
   loadKeyHistory: (keyUid: string) => Promise<KeyStatusHistory[]>
-  loadKeyVersions: (keyUid: string) => Promise<KeyVersion[]>
   loadKeyUsage: (keyUid: string) => Promise<KeyUsageSummary>
   createKey: (input: CreateKeyInput) => Promise<CryptoKey>
   deleteKey: (keyUid: string) => Promise<void>

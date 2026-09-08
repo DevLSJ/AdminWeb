@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   changeKeyStatus as changeKeyStatusRequest,
   createKey as createKeyRequest,
@@ -6,12 +7,10 @@ import {
   decryptWithKey,
   distributeKey,
   encryptWithKey,
-  fetchAuditLogs,
   fetchKey,
   fetchKeyHistory,
   fetchKeys,
   fetchKeyUsage,
-  fetchKeyVersions,
   getApiErrorMessage,
   rotateKey as rotateKeyRequest,
   updateKey,
@@ -19,7 +18,6 @@ import {
 } from '../api/kms'
 import { useAuth } from '../hooks/useAuth'
 import type { AutoRotationDays, CryptoKey, KeyStatus } from '../types/api'
-import { isAdminRole } from '../types/auth'
 import { KmsContext, type CreateKeyInput } from './KmsContext'
 
 function replaceKey(keys: CryptoKey[], updated: CryptoKey) {
@@ -29,10 +27,13 @@ function replaceKey(keys: CryptoKey[], updated: CryptoKey) {
 
 export function KmsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const { pathname } = useLocation()
+  const keyListPath = pathname.replace(/\/+$/, '').toLowerCase()
+  const needsKeyList = keyListPath === '/keys' || keyListPath === '/keys/test'
+  const userUid = user?.userUid
+  const userRole = user?.role
   const [keys, setKeys] = useState<CryptoKey[]>([])
-  const [auditLogs, setAuditLogs] = useState<import('../types/api').AuditLog[]>([])
   const [keyHistories, setKeyHistories] = useState<Record<string, import('../types/api').KeyStatusHistory[]>>({})
-  const [keyVersions, setKeyVersions] = useState<Record<string, import('../types/api').KeyVersion[]>>({})
   const [keyUsage, setKeyUsage] = useState<Record<string, import('../types/api').KeyUsageSummary>>({})
   const [autoRotationByKey, setAutoRotationByKey] = useState<Record<string, AutoRotationDays>>({})
   const [loading, setLoading] = useState(false)
@@ -60,29 +61,14 @@ export function KmsProvider({ children }: { children: ReactNode }) {
     }
   }, [run])
 
-  const refreshAuditLogs = useCallback(async () => {
-    const result = await run(fetchAuditLogs, '감사 로그를 불러오지 못했습니다.')
-    setAuditLogs(result)
-  }, [run])
-
-  const refreshAuditAfterMutation = useCallback(async () => {
-    if (!user || !isAdminRole(user.role)) return
-    try {
-      await refreshAuditLogs()
-    } catch {
-      // The mutation already succeeded; keep its result even if the follow-up refresh fails.
-    }
-  }, [refreshAuditLogs, user])
-
   useEffect(() => {
-    if (!user) {
+    if (!userUid) {
       setKeys([])
-      setAuditLogs([])
       return
     }
-    void refreshKeys().catch(() => undefined)
-    if (isAdminRole(user.role)) void refreshAuditLogs().catch(() => undefined)
-  }, [refreshAuditLogs, refreshKeys, user])
+    // Only key selection/deployment screens consume the complete key list.
+    if (needsKeyList) void refreshKeys().catch(() => undefined)
+  }, [needsKeyList, refreshKeys, userUid, userRole])
 
   const loadKeyDetail = useCallback(async (keyUid: string) => {
     const result = await run(() => fetchKey(keyUid), '키 상세를 불러오지 못했습니다.')
@@ -94,12 +80,6 @@ export function KmsProvider({ children }: { children: ReactNode }) {
   const loadKeyHistory = useCallback(async (keyUid: string) => {
     const result = await run(() => fetchKeyHistory(keyUid), '키 상태 이력을 불러오지 못했습니다.')
     setKeyHistories((current) => ({ ...current, [keyUid]: result }))
-    return result
-  }, [run])
-
-  const loadKeyVersions = useCallback(async (keyUid: string) => {
-    const result = await run(() => fetchKeyVersions(keyUid), '키 버전 이력을 불러오지 못했습니다.')
-    setKeyVersions((current) => ({ ...current, [keyUid]: result }))
     return result
   }, [run])
 
@@ -119,34 +99,27 @@ export function KmsProvider({ children }: { children: ReactNode }) {
       )
     }
     setKeys((current) => replaceKey(current, created))
-    await Promise.all([
-      loadKeyVersions(created.keyUid).catch(() => undefined),
-      loadKeyHistory(created.keyUid).catch(() => undefined),
-    ])
-    await refreshAuditAfterMutation()
+    await loadKeyHistory(created.keyUid).catch(() => undefined)
     return created
-  }, [loadKeyHistory, loadKeyVersions, refreshAuditAfterMutation, run])
+  }, [loadKeyHistory, run])
 
   const deleteKey = useCallback(async (keyUid: string) => {
     await run(() => deleteKeyRequest(keyUid), '키를 삭제하지 못했습니다.')
     await Promise.all([refreshKeys(), loadKeyHistory(keyUid).catch(() => undefined)])
-    await refreshAuditAfterMutation()
-  }, [loadKeyHistory, refreshAuditAfterMutation, refreshKeys, run])
+  }, [loadKeyHistory, refreshKeys, run])
 
   const updateKeyMetadata = useCallback(async (keyUid: string, values: Pick<CryptoKey, 'keyName' | 'purpose' | 'expireAt'>) => {
     const result = await run(() => updateKey(keyUid, values), '키 메타정보를 수정하지 못했습니다.')
     setKeys((current) => replaceKey(current, result))
-    await refreshAuditAfterMutation()
     return result
-  }, [refreshAuditAfterMutation, run])
+  }, [run])
 
   const changeKeyStatus = useCallback(async (keyUid: string, status: KeyStatus, reason: string) => {
     const result = await run(() => changeKeyStatusRequest(keyUid, status, reason), '키 상태를 변경하지 못했습니다.')
     setKeys((current) => replaceKey(current, result))
     await loadKeyHistory(keyUid)
-    await refreshAuditAfterMutation()
     return result
-  }, [loadKeyHistory, refreshAuditAfterMutation, run])
+  }, [loadKeyHistory, run])
 
   const distributeKeys = useCallback(async (keyUids: string[], target: string, reason: string) => {
     const results = await run(
@@ -155,45 +128,42 @@ export function KmsProvider({ children }: { children: ReactNode }) {
     )
     await refreshKeys()
     await Promise.all(keyUids.map((keyUid) => loadKeyHistory(keyUid)))
-    await refreshAuditAfterMutation()
     return results
-  }, [loadKeyHistory, refreshAuditAfterMutation, refreshKeys, run])
+  }, [loadKeyHistory, refreshKeys, run])
 
   const rotateKey = useCallback(async (keyUid: string) => {
     const result = await run(() => rotateKeyRequest(keyUid), '키를 갱신하지 못했습니다.')
     setKeys((current) => replaceKey(current, result.key))
-    await Promise.all([loadKeyHistory(keyUid), loadKeyVersions(keyUid)])
-    await refreshAuditAfterMutation()
+    await loadKeyHistory(keyUid)
     return result.newVersion
-  }, [loadKeyHistory, loadKeyVersions, refreshAuditAfterMutation, run])
+  }, [loadKeyHistory, run])
 
   const setAutoRotation = useCallback(async (keyUid: string, days: AutoRotationDays) => {
     const result = await run(() => updateRotationPolicy(keyUid, days), '자동 갱신 정책을 수정하지 못했습니다.')
     setKeys((current) => replaceKey(current, result))
     setAutoRotationByKey((current) => ({ ...current, [keyUid]: days }))
-    await refreshAuditAfterMutation()
-  }, [refreshAuditAfterMutation, run])
+  }, [run])
 
   const encrypt = useCallback(async (keyUid: string, plaintext: string) => {
     const result = await run(() => encryptWithKey(keyUid, plaintext), '암호화에 실패했습니다.')
-    await Promise.all([loadKeyUsage(keyUid).catch(() => undefined), refreshAuditAfterMutation()])
+    await loadKeyUsage(keyUid).catch(() => undefined)
     return result
-  }, [loadKeyUsage, refreshAuditAfterMutation, run])
+  }, [loadKeyUsage, run])
 
   const decrypt = useCallback(async (keyUid: string, ciphertext: string, iv: string | null, version?: number) => {
     const result = await run(() => decryptWithKey(keyUid, ciphertext, iv, version), '복호화에 실패했습니다.')
-    await Promise.all([loadKeyUsage(keyUid).catch(() => undefined), refreshAuditAfterMutation()])
+    await loadKeyUsage(keyUid).catch(() => undefined)
     return result.plaintext
-  }, [loadKeyUsage, refreshAuditAfterMutation, run])
+  }, [loadKeyUsage, run])
 
   const value = useMemo(() => ({
-    keys, auditLogs, keyHistories, keyVersions, keyUsage, autoRotationByKey, loading, error,
-    refreshKeys, refreshAuditLogs, loadKeyDetail, loadKeyHistory, loadKeyVersions, loadKeyUsage,
+    keys, keyHistories, keyUsage, autoRotationByKey, loading, error,
+    refreshKeys, loadKeyDetail, loadKeyHistory, loadKeyUsage,
     createKey, deleteKey, updateKeyMetadata, changeKeyStatus, distributeKeys, rotateKey, setAutoRotation,
     encrypt, decrypt,
   }), [
-    keys, auditLogs, keyHistories, keyVersions, keyUsage, autoRotationByKey, loading, error,
-    refreshKeys, refreshAuditLogs, loadKeyDetail, loadKeyHistory, loadKeyVersions, loadKeyUsage,
+    keys, keyHistories, keyUsage, autoRotationByKey, loading, error,
+    refreshKeys, loadKeyDetail, loadKeyHistory, loadKeyUsage,
     createKey, deleteKey, updateKeyMetadata, changeKeyStatus, distributeKeys, rotateKey, setAutoRotation,
     encrypt, decrypt,
   ])

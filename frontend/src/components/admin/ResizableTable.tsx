@@ -16,39 +16,60 @@ export function ResizableTable(props: TableProps) {
       handle.tabIndex = 0
       handle.setAttribute('aria-orientation', 'vertical')
       handle.setAttribute('aria-label', `${header.textContent} 열 너비 조절`)
-      const resize = (width: number) => {
+      const beginResize = () => {
+        // Read layout once per gesture, then only write the changed column each frame.
         const widths = headers.map((cell) => cell.getBoundingClientRect().width)
-        widths[index] = Math.max(72, Math.min(width, 1200))
+        const otherWidth = widths.reduce((sum, value) => sum + value, 0) - widths[index]
         headers.forEach((cell, i) => { cell.style.width = `${widths[i]}px`; cell.style.minWidth = `${widths[i]}px` })
         table.style.tableLayout = 'fixed'
-        table.style.width = `${widths.reduce((sum, value) => sum + value, 0)}px`
         table.style.minWidth = '0'
-        handle.setAttribute('aria-valuenow', String(Math.round(widths[index])))
+        return (width: number) => {
+          const nextWidth = Math.max(72, Math.min(width, 1200))
+          header.style.width = `${nextWidth}px`
+          header.style.minWidth = `${nextWidth}px`
+          table.style.width = `${otherWidth + nextWidth}px`
+          handle.setAttribute('aria-valuenow', String(Math.round(nextWidth)))
+        }
       }
+      let stopDrag: (() => void) | undefined
       const down = (event: PointerEvent) => {
         event.preventDefault()
         event.stopPropagation()
+        stopDrag?.()
         const start = event.clientX
         const width = header.getBoundingClientRect().width
+        const resize = beginResize()
+        let pendingWidth = width
+        let frame = 0
         handle.setPointerCapture(event.pointerId)
-        const move = (next: PointerEvent) => resize(width + next.clientX - start)
-        const stop = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', stop); handle.removeEventListener('pointercancel', stop) }
+        const move = (next: PointerEvent) => {
+          pendingWidth = width + next.clientX - start
+          if (!frame) frame = requestAnimationFrame(() => { frame = 0; resize(pendingWidth) })
+        }
+        const stop = () => {
+          if (frame) { cancelAnimationFrame(frame); frame = 0; resize(pendingWidth) }
+          handle.removeEventListener('pointermove', move)
+          handle.removeEventListener('pointerup', stop)
+          handle.removeEventListener('pointercancel', stop)
+          stopDrag = undefined
+        }
+        stopDrag = stop
         handle.addEventListener('pointermove', move)
         handle.addEventListener('pointerup', stop)
         handle.addEventListener('pointercancel', stop)
-        cleanups.push(stop)
       }
       handle.addEventListener('pointerdown', down)
       handle.addEventListener('click', (event) => event.stopPropagation())
       handle.addEventListener('keydown', (event) => {
         if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
           event.preventDefault(); event.stopPropagation()
-          resize(header.getBoundingClientRect().width + (event.key === 'ArrowRight' ? 16 : -16))
+          const width = header.getBoundingClientRect().width
+          beginResize()(width + (event.key === 'ArrowRight' ? 16 : -16))
         }
       })
       if (getComputedStyle(header).position === 'static') header.style.position = 'relative'
       header.appendChild(handle)
-      cleanups.push(() => handle.remove())
+      cleanups.push(() => { stopDrag?.(); handle.remove() })
     })
     return () => cleanups.forEach((cleanup) => cleanup())
   }, [])

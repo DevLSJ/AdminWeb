@@ -86,11 +86,17 @@ function Dashboard() {
     }, { CREATED: 0, ACTIVE: 0, DEACTIVATED: 0, COMPROMISED: 0, DESTROYED: 0 })
     return keyStatusOrder.map((status) => ({ status, value: counts[status] }))
   }, [keys])
-  const expiringKeys = useMemo(() => keys.map((key) => ({ ...key, days: Math.ceil((new Date(`${key.expireAt}T23:59:59`).getTime() - Date.now()) / 86_400_000) })).filter((key) => key.status !== 'DESTROYED' && key.days >= 0 && key.days <= expiryDays).sort((a, b) => a.days - b.days), [keys, expiryDays])
+  const expiringKeyCount = useMemo(() => {
+    const now = Date.now()
+    return keys.reduce((count, key) => {
+      const days = Math.ceil((new Date(`${key.expireAt}T23:59:59`).getTime() - now) / 86_400_000)
+      return count + Number(key.status !== 'DESTROYED' && days >= 0 && days <= expiryDays)
+    }, 0)
+  }, [keys, expiryDays])
   const summaryItems: SummaryCardProps[] = [
     { label: '전체 관리 키', value: String(summary?.totalKeys ?? 0), note: 'DB crypto_key 전체', color: '#d92f81', icon: <VpnKeyRounded />, href: '/keys?category=ALL' },
     { label: '암호화 가능', value: String(summary?.encryptCapableKeys ?? 0), note: '현재 정책상 암호화 허용', color: '#2e9b69', icon: <CheckCircleRounded />, href: '/keys?category=ENCRYPT_CAPABLE' },
-    { label: '만료 임박 키', value: String(expiringKeys.length), note: `${expiryDays}일 이내 확인 필요`, color: '#e99220', icon: <AccessTimeRounded />, href: `/keys?category=EXPIRING&expiringWithinDays=${expiryDays}` },
+    { label: '만료 임박 키', value: String(expiringKeyCount), note: `${expiryDays}일 이내 확인 필요`, color: '#e99220', icon: <AccessTimeRounded />, href: `/keys?category=EXPIRING&expiringWithinDays=${expiryDays}` },
     { label: '무결성 위반', value: String(summary?.integrityViolations ?? 0), note: summary?.integrityViolations ? '즉시 격리·조사 필요' : '검증 결과 정상', color: '#c93451', icon: <SecurityRounded />, href: '/keys?category=INTEGRITY_VIOLATION' },
   ]
   const dashboardPanelHeaderSx = { display: 'flex', minHeight: 48, flexShrink: 0, flexWrap: 'wrap', gap: 1, justifyContent: 'space-between', alignItems: 'center', px: 2.25, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }

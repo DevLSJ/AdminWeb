@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface JwtPayload {
   exp?: number
@@ -29,7 +29,7 @@ export function formatRemainingTime(totalSeconds: number) {
 }
 
 export function useAuthTimer(token: string | null, onExpire: () => void) {
-  const expirationMillis = getExpirationMillis(token)
+  const expirationMillis = useMemo(() => getExpirationMillis(token), [token])
   const onExpireRef = useRef(onExpire)
   const expiredTokenRef = useRef<string | null>(null)
   const [remainingSeconds, setRemainingSeconds] = useState(() => expirationMillis === null

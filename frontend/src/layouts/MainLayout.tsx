@@ -26,7 +26,6 @@ import {
   Avatar,
   Box,
   Button,
-  Chip,
   Collapse,
   Divider,
   Drawer,
@@ -46,7 +45,7 @@ import { alpha } from '@mui/material/styles'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useColorMode } from '../contexts/ColorModeContext'
 import { useAuth } from '../hooks/useAuth'
-import { useAuthTimer } from '../hooks/useAuthTimer'
+import { SessionCountdown } from '../components/auth/SessionCountdown'
 import type { UserRole } from '../types/auth'
 
 const expandedWidth = 260
@@ -93,9 +92,8 @@ function MainLayout() {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ keys: true, notices: true })
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, token, logout, refreshSession, expireSession } = useAuth()
+  const { user, logout, refreshSession } = useAuth()
   const { mode, toggleColorMode } = useColorMode()
-  const { formattedTime, remainingSeconds } = useAuthTimer(token, expireSession)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [feedback, setFeedback] = useState<{ severity: 'success' | 'error'; message: string } | null>(null)
   const drawerWidth = collapsed ? collapsedWidth : expandedWidth
@@ -206,14 +204,7 @@ function MainLayout() {
             <Tooltip title={mode === 'dark' ? '라이트 모드' : '다크 모드'}>
               <IconButton aria-label={mode === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'} color="inherit" onClick={toggleColorMode}>{mode === 'dark' ? <Brightness7Rounded /> : <Brightness4Rounded />}</IconButton>
             </Tooltip>
-            <Chip
-              aria-label={`세션 남은 시간 ${formattedTime}`}
-              label={formattedTime}
-              color={remainingSeconds <= 60 ? 'error' : remainingSeconds <= 300 ? 'warning' : 'default'}
-              size="small"
-              variant={remainingSeconds <= 300 ? 'filled' : 'outlined'}
-              sx={{ minWidth: 66, fontVariantNumeric: 'tabular-nums', '& .MuiChip-label': { px: 1 } }}
-            />
+            <SessionCountdown />
             <Tooltip title="세션 연장">
               <span><IconButton aria-label="세션 연장" color="inherit" disabled={isRefreshing} onClick={() => void handleRefreshSession()} size="small"><RefreshRounded sx={{ animation: isRefreshing ? 'session-spin 0.8s linear infinite' : 'none', '@keyframes session-spin': { to: { transform: 'rotate(360deg)' } } }} /></IconButton></span>
             </Tooltip>

@@ -17,7 +17,6 @@ import type {
   KeyStatus,
   KeyStatusHistory,
   KeyUsageSummary,
-  KeyVersion,
   KeyListParams,
   PageResponse,
   UserListParams,
@@ -117,10 +116,6 @@ export async function fetchKeyUsage(keyUid: string) {
   return unwrap(await apiClient.get<ApiResponse<KeyUsageSummary>>(apiEndpoints.keys.usage(keyUid)))
 }
 
-export async function fetchKeyVersions(keyUid: string) {
-  return unwrap(await apiClient.get<ApiResponse<KeyVersion[]>>(apiEndpoints.keys.versions(keyUid)))
-}
-
 export async function createKey(request: CreateKeyRequest) {
   return unwrap(await apiClient.post<ApiResponse<CryptoKey>>(apiEndpoints.keys.create, request))
 }
@@ -166,12 +161,6 @@ export async function fetchDashboardTrend(from: string, to: string, interval: 'D
     apiEndpoints.dashboard.usageTrend,
     { params: { from, to, interval } },
   ))
-}
-
-export async function fetchAuditLogs() {
-  return (await fetchAuditLogPage({
-    from: '', to: '', actor: '', action: 'ALL', page: 0, size: 100,
-  })).content
 }
 
 export async function verifyAuditLogs(from: string, to: string) {

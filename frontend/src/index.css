@@ -44,26 +44,9 @@ input {
   }
 }
 
-@keyframes page-route-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 8px, 0);
-    filter: blur(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-    filter: blur(0);
-  }
-}
-
 @keyframes integrity-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(228, 81, 111, 0); }
   50% { box-shadow: 0 0 0 4px rgba(228, 81, 111, 0.18); }
-}
-
-.page-route-transition {
-  animation: page-route-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .timeline-scroll {
