@@ -1,7 +1,6 @@
 # D'Guard KMS
 
 > 암호키의 생성부터 갱신·폐기까지, 사용자 정보와 감사 이력을 함께 관리하는 통합 키 관리 웹 콘솔
-3주차 보고서 : https://docs.google.com/document/d/1Y2ooml9GZ2IQ76gPbjI-k5WY58Zw3gGO/edit?usp=sharing&ouid=103810997385803790305&rtpof=true&sd=true
 <p align="center">
   <img src="https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge" alt="Java 21" />
   <img src="https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot" />
@@ -221,6 +220,9 @@ npm run build
 | Repository | [DevLSJ/AdminWeb](https://github.com/DevLSJ/AdminWeb) |
 
 
-### 구현 4주차 검증
+### 보고서
+3주차 보고서 : https://docs.google.com/document/d/1Y2ooml9GZ2IQ76gPbjI-k5WY58Zw3gGO/edit?usp=sharing&ouid=103810997385803790305&rtpof=true&sd=true
 
-게시판 첨부 보호·대시보드 API와 테이블 보완, 수용 테스트 22개 및 키 역할·HSM 비교는 [4주차 완료 보고서](docs/WEEK_04_DELIVERY.md)를 참고하세요. 로컬 H2·PostgreSQL 각각 22/22, 전체 백엔드 54/54, 실제 브라우저 8/8 시나리오를 검증했습니다. 선행 구현의 PBKDF2 반복 횟수·상태 전이와 안내서 사이 차이도 보고서에 명시했습니다.
+
+
+
