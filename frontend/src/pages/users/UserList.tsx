@@ -360,7 +360,7 @@ function UserList() {
                 const isAdminAccount = user.accountType === 'ADMIN_ACCOUNT'
                 return (
                   <TableRow key={`${user.accountType}-${user.userUid}`} hover tabIndex={0} className="interactive-row" onClick={() => navigate(`/users/${isAdminAccount ? 'admin' : 'app'}/${user.userUid}`)} sx={{ cursor: 'pointer', ...(!user.integrityValid ? { bgcolor: 'rgba(228, 81, 111, 0.09)', '&:hover': { bgcolor: 'rgba(228, 81, 111, 0.14)' } } : {}) }}>
-                    <TableCell>{params.page * params.size + index + 1}</TableCell>
+                    <TableCell>{user.displayNumber ?? pageData.totalElements - params.page * params.size - index}</TableCell>
                     <TableCell><Stack direction="row" spacing={1.2} sx={{ alignItems: 'center', minWidth: 0 }}>{!user.integrityValid && <WarningAmberRounded color="error" fontSize="small" />}<Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 800, fontSize: 16 }}>{user.nameDisplay}</Typography></Box></Stack></TableCell>
                     <TableCell sx={{ whiteSpace: 'nowrap', color: user.phoneMasked ? 'inherit' : 'text.disabled' }}>{user.phoneMasked ?? '—'}</TableCell>
                     <TableCell><Typography noWrap sx={{ color: user.emailMasked ? 'inherit' : 'text.disabled' }}>{user.emailMasked ?? '—'}</Typography></TableCell>

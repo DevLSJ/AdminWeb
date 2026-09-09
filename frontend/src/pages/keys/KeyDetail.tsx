@@ -1,9 +1,9 @@
-import { getCodeLabel, useKeySettings } from '../../stores/keySettings'
+import { getCodeLabel, isExpiringKey, useKeySettings } from '../../stores/keySettings'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowBackRounded, AutorenewRounded, EditRounded } from '@mui/icons-material'
+import { AccessTimeRounded, ArrowBackRounded, AutorenewRounded, EditRounded } from '@mui/icons-material'
 import {
   Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Select, Stack, TextField, Typography,
+  FormControl, InputLabel, MenuItem, Select, Stack, TextField, Tooltip, Typography,
 } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { InfoRow } from '../../components/admin/AdminPage'
@@ -20,7 +20,7 @@ import { getStatusLabel } from '../../utils/status'
 const usageLabels: Record<string, string> = { total: '전체 사용', success: '성공', failure: '실패', encrypt: '암호화', decrypt: '복호화' }
 
 function KeyDetail() {
-  const { codes } = useKeySettings()
+  const { codes, policy } = useKeySettings()
   const { user } = useAuth()
   const { keys, keyHistories, keyUsage, autoRotationByKey, loadKeyDetail, loadKeyHistory, loadKeyUsage, updateKeyMetadata, changeKeyStatus, rotateKey, setAutoRotation } = useKmsMock()
   const isAdmin = isAdminRole(user?.role)
@@ -120,7 +120,19 @@ function KeyDetail() {
         <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
           <Button color="inherit" startIcon={<ArrowBackRounded />} onClick={() => navigate('/keys')}>키 목록</Button>
           <Box sx={{ height: 40, borderLeft: '2px solid', borderColor: 'text.disabled' }} />
-          <Box><Typography variant="h5">{key.keyName}</Typography><Typography sx={{ mt: .25, color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{key.keyUid}</Typography></Box>
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Typography variant="h5">{key.keyName}</Typography>
+              {isExpiringKey(key, policy?.expiryWarningDays ?? 30) && (
+                <Tooltip title={`만료 임박 · ${key.expireAt} 만료`}>
+                  <Box component="span" role="img" aria-label="만료 임박 키" tabIndex={0} sx={{ display: 'inline-flex', color: 'error.main', flexShrink: 0 }}>
+                    <AccessTimeRounded sx={{ fontSize: 22 }} />
+                  </Box>
+                </Tooltip>
+              )}
+            </Stack>
+            <Typography sx={{ mt: .25, color: 'text.secondary', fontFamily: 'monospace', fontSize: 11.5 }}>{key.keyUid}</Typography>
+          </Box>
         </Stack>
         {isAdmin && <Stack direction="row" spacing={1}><Button variant="contained" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={() => { setToStatus(''); setReason(''); setStatusOpen(true) }}>상태 변경</Button><Button variant="outlined" startIcon={<AutorenewRounded />} disabled={!key.integrityValid || !canRotateWithStatus(key.status)} onClick={() => setRotateOpen(true)}>키 갱신</Button></Stack>}
       </Box>

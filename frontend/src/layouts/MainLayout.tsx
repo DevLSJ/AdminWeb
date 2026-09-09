@@ -85,7 +85,7 @@ const menuGroups: MenuGroup[] = [
       { label: '게시글 작성', path: '/notices/new', icon: <AddBoxRounded />, roles: ['S.ADMIN', 'ADMIN', 'CLIENT'] },
     ],
   },
-  { id: 'settings', label: '코드·정책 관리', path: '/settings', icon: <SettingsRounded />, roles: ['S.ADMIN', 'ADMIN'] },
+  { id: 'settings', label: '운영 정책 관리', path: '/settings', icon: <SettingsRounded />, roles: ['S.ADMIN', 'ADMIN'] },
 ]
 
 function MainLayout() {

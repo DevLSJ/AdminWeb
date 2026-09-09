@@ -11,16 +11,19 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.auth.service.AdminAccountService;
 import com.ineb.dguard_kms.domain.user.dto.ManagedUserResponse;
+import com.ineb.dguard_kms.domain.user.repository.UserDisplayNumberRepository;
 
 @Service
 public class ManagedUserService {
 
     private final AdminAccountService adminAccountService;
     private final AppUserService appUserService;
+    private final UserDisplayNumberRepository displayNumbers;
 
-    public ManagedUserService(AdminAccountService adminAccountService, AppUserService appUserService) {
+    public ManagedUserService(AdminAccountService adminAccountService, AppUserService appUserService, UserDisplayNumberRepository displayNumbers) {
         this.adminAccountService = adminAccountService;
         this.appUserService = appUserService;
+        this.displayNumbers = displayNumbers;
     }
 
     @Transactional
@@ -49,11 +52,15 @@ public class ManagedUserService {
                     .forEach(users::add);
         }
 
-        users.sort(Comparator.comparing(ManagedUserResponse::createdAt).reversed());
+        users.sort(Comparator.comparing(ManagedUserResponse::createdAt)
+                .thenComparing(ManagedUserResponse::accountType).thenComparing(user -> user.userUid().toString()).reversed());
         int fromIndex = (int) Math.min((long) page * size, users.size());
         int toIndex = Math.min(fromIndex + size, users.size());
         int totalPages = users.isEmpty() ? 0 : (users.size() + size - 1) / size;
-        return new PageResponse<>(List.copyOf(users.subList(fromIndex, toIndex)), page, size, users.size(), totalPages);
+        List<ManagedUserResponse> selected = users.subList(fromIndex, toIndex);
+        var numbers = displayNumbers.findFor(selected);
+        return new PageResponse<>(selected.stream().map(user -> user.withDisplayNumber(
+                numbers.get(user.accountType() + ":" + user.userUid()))).toList(), page, size, users.size(), totalPages);
     }
 
     private boolean isBlank(String value) {

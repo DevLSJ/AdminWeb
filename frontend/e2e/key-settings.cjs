@@ -51,6 +51,21 @@ const fs = require('node:fs/promises');
     assert.equal(await row(compromised).locator('[data-testid="DeleteForeverRoundedIcon"]').count(), 0);
     await page.screenshot({ path: output + '/keys-warning-and-destroyed.png', fullPage: true });
     pass('만료 임박 행 배경 및 폐기 전용 아이콘');
+    for (const key of [soon, twenty, far, compromised, destroyed]) {
+      assert.equal((await row(key).getByRole('cell').first().innerText()).trim(), String(key.displayNumber));
+    }
+    await page.goto(base + '/keys/' + soon.keyUid);
+    const warning = page.getByRole('img', { name: '만료 임박 키' });
+    await warning.waitFor(); await warning.hover();
+    await page.getByRole('tooltip').getByText(`만료 임박 · ${soon.expireAt} 만료`, { exact: true }).waitFor();
+    await page.screenshot({ path: output + '/key-detail-expiring.png', fullPage: true });
+    for (const key of [far, compromised, destroyed]) {
+      await page.goto(base + '/keys/' + key.keyUid);
+      await page.getByRole('heading', { name: key.keyName, exact: true }).waitFor();
+      assert.equal(await page.getByRole('img', { name: '만료 임박 키' }).count(), 0);
+    }
+    pass('키 생성 번호와 상세 만료 아이콘·툴팁·비대상 숨김');
+    await page.goto(base + '/keys?keyword=' + encodeURIComponent(prefix)); await row(soon).waitFor();
     const dialog = page.getByRole('dialog', { name: '새 암호 키 등록' });
     const openRegister = async () => { await page.getByRole('button', { name: '키 등록', exact: true }).click(); await wait(() => dialog.getByLabel('키 이름').isEnabled()); };
     const cancel = () => dialog.getByRole('button', { name: '취소', exact: true }).click();
@@ -63,11 +78,22 @@ const fs = require('node:fs/promises');
     assert(await dialog.getByText(`${system.getFullYear() + 1}년 ${system.getMonth() + 1}월`, { exact: true }).isVisible());
     await cancel(); await openRegister(); assert(await dialog.getByText(month, { exact: true }).isVisible()); await cancel();
     const next = new Date(system.getFullYear(), system.getMonth() + 1, 1, 12);
-    await page.clock.setFixedTime(next); await openRegister();
+    // Advance the calendar only; keep Date.now real so JWT expiry is not part of this test.
+    await page.evaluate(timestamp => {
+      const ActualDate = Date; window.__calendarTestDate = ActualDate;
+      window.Date = class extends ActualDate { constructor(...args) { super(...(args.length ? args : [timestamp])); } };
+    }, next.getTime());
+    await openRegister();
     assert(await dialog.getByText(`${next.getFullYear()}년 ${next.getMonth() + 1}월`, { exact: true }).isVisible());
-    await cancel(); await page.clock.setFixedTime(system);
+    await cancel(); await page.evaluate(() => { window.Date = window.__calendarTestDate; delete window.__calendarTestDate; });
     pass('현재 월·재열기·시스템 다음 달과 기존 날짜 바로가기');
     await page.goto(base + '/settings');
+    await page.getByRole('heading', { name: '운영 정책 관리', exact: true }).waitFor();
+    const alignment = await page.getByText('키 운영 정책', { exact: true }).evaluate(e => {
+      const title = e.getBoundingClientRect(), header = e.parentElement.getBoundingClientRect();
+      return Math.abs(title.y + title.height / 2 - header.y - header.height / 2);
+    });
+    assert(alignment < 2, 'Policy heading must be vertically centered');
     await page.getByLabel('기본 유효기간(일)').fill('90');
     await page.getByLabel('만료 알림일(만료 전 일수)').fill('7');
     await page.getByLabel('정책 변경 사유').fill('브라우저 정책 반영 시연');
@@ -88,8 +114,8 @@ const fs = require('node:fs/promises');
     await page.goto(base + '/settings');
     await page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'RSA', exact: true }) }).getByRole('button', { name: '수정' }).click();
     const edit = page.getByRole('dialog');
-    await edit.getByRole('switch').uncheck();
-    await edit.getByLabel('코드 변경 사유').fill('RSA 신규 생성 일시 중지');
+    await edit.getByRole('switch', { name: '신규 등록 허용' }).uncheck();
+    await edit.getByLabel('변경 사유').fill('RSA 신규 생성 일시 중지');
     await edit.getByRole('button', { name: '저장', exact: true }).click(); await edit.waitFor({ state: 'hidden' });
     await request('/api/keys', 'POST', { keyName: prefix + '-차단', algorithm: 'RSA', keySize: 2048, purpose: 'ENCRYPT' }, 400);
     await page.goto(base + '/keys'); await openRegister(); await dialog.getByRole('combobox').first().click();

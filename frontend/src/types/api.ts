@@ -47,6 +47,7 @@ export type KeyListCategory =
   | 'INTEGRITY_VIOLATION'
 
 export interface CryptoKey {
+  displayNumber?: number
   keyUid: string
   keyName: string
   algorithm: KeyAlgorithm
@@ -216,6 +217,7 @@ export interface AdminAccount {
 }
 
 export interface ManagedUser {
+  displayNumber?: number
   accountType: 'ADMIN_ACCOUNT' | 'APP_USER'
   userUid: string
   loginId: string | null
@@ -271,6 +273,7 @@ export interface AuditListParams {
 }
 
 export interface AuditLog {
+  displayNumber?: number
   logUid: string
   actor: string
   action: AuditAction
@@ -319,6 +322,7 @@ export interface NoticeFile {
 }
 
 export interface Notice {
+  displayNumber?: number
   authorRole?: UserRole
   noticeUid: string
   title: string

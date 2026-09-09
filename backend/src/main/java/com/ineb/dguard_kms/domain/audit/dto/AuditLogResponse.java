@@ -9,6 +9,8 @@ import com.ineb.dguard_kms.domain.audit.entity.AuditLog;
 
 @Schema(description = "감사 로그 한 건")
 public record AuditLogResponse(
+        @io.swagger.v3.oas.annotations.media.Schema(description = "생성 순서에 따른 목록 표시 번호. API 식별자는 UUID를 사용합니다.")
+        long displayNumber,
         @Schema(description = "감사 로그 고유 UUID")
         UUID logUid,
         @Schema(description = "작업을 수행한 로그인 ID", example = "admin")
@@ -28,6 +30,7 @@ public record AuditLogResponse(
 ) {
     public static AuditLogResponse from(AuditLog log, boolean chainValid) {
         return new AuditLogResponse(
+                log.getId(),
                 log.getLogUid(), log.getActor(), log.getAction(), log.getTargetType(),
                 log.getTargetId(), log.getDetail(), log.getCreatedAt(), chainValid
         );

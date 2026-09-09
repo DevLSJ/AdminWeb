@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.ineb.dguard_kms.domain.auth.dto.AdminAccountResponse;
 
 public record ManagedUserResponse(
+        long displayNumber,
         String accountType,
         UUID userUid,
         String loginId,
@@ -19,8 +20,14 @@ public record ManagedUserResponse(
         Instant updatedAt,
         Instant lastLoginAt
 ) {
+    public ManagedUserResponse withDisplayNumber(long number) {
+        return new ManagedUserResponse(number, accountType, userUid, loginId, nameDisplay, phoneMasked,
+                emailMasked, role, status, integrityValid, createdAt, updatedAt, lastLoginAt);
+    }
+
     public static ManagedUserResponse from(AdminAccountResponse account) {
         return new ManagedUserResponse(
+                0,
                 "ADMIN_ACCOUNT", account.userUid(), account.loginId(), account.name(),
                 account.phoneMasked(), account.emailMasked(),
                 account.role(), account.status(), account.integrityValid(), account.createdAt(),
@@ -30,6 +37,7 @@ public record ManagedUserResponse(
 
     public static ManagedUserResponse from(UserResponse user) {
         return new ManagedUserResponse(
+                0,
                 "APP_USER", user.userUid(), null, user.nameMasked(), user.phoneMasked(), user.emailMasked(),
                 user.role(), user.status(), user.integrityValid(), user.createdAt(), user.updatedAt(), null
         );

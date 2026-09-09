@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "키 메타데이터와 무결성 검증 결과")
 public record KeyResponse(
+        @io.swagger.v3.oas.annotations.media.Schema(description = "생성 순서에 따른 목록 표시 번호. API 식별자는 UUID를 사용합니다.")
+        long displayNumber,
         @Schema(description = "키 고유 UUID")
         UUID keyUid,
         @Schema(description = "키 이름", example = "payment-encryption-key")
@@ -40,6 +42,7 @@ public record KeyResponse(
 ) {
     public static KeyResponse from(CryptoKey key, boolean integrityValid) {
         return new KeyResponse(
+                key.getId(),
                 key.getKeyUid(),
                 key.getKeyName(),
                 key.getAlgorithm(),

@@ -2239,6 +2239,11 @@
       "NoticeResponse": {
         "type": "object",
         "properties": {
+          "displayNumber": {
+            "type": "integer",
+            "format": "int64",
+            "description": "생성 순서에 따른 목록 표시 번호. API 식별자는 UUID를 사용합니다."
+          },
           "noticeUid": {
             "type": "string",
             "format": "uuid"
@@ -2249,6 +2254,9 @@
           "content": {
             "type": "string"
           },
+          "category": {
+            "type": "string"
+          },
           "exposeYn": {
             "type": "string"
           },
@@ -2257,6 +2265,9 @@
             "format": "int64"
           },
           "createdBy": {
+            "type": "string"
+          },
+          "authorRole": {
             "type": "string"
           },
           "createdAt": {
@@ -2338,6 +2349,11 @@
         "type": "object",
         "description": "키 메타데이터와 무결성 검증 결과",
         "properties": {
+          "displayNumber": {
+            "type": "integer",
+            "format": "int64",
+            "description": "생성 순서에 따른 목록 표시 번호. API 식별자는 UUID를 사용합니다."
+          },
           "keyUid": {
             "type": "string",
             "format": "uuid",
@@ -3362,6 +3378,10 @@
       "ManagedUserResponse": {
         "type": "object",
         "properties": {
+          "displayNumber": {
+            "type": "integer",
+            "format": "int64"
+          },
           "accountType": {
             "type": "string"
           },
@@ -4060,6 +4080,11 @@
         "type": "object",
         "description": "감사 로그 한 건",
         "properties": {
+          "displayNumber": {
+            "type": "integer",
+            "format": "int64",
+            "description": "생성 순서에 따른 목록 표시 번호. API 식별자는 UUID를 사용합니다."
+          },
           "logUid": {
             "type": "string",
             "format": "uuid",

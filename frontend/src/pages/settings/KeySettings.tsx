@@ -30,10 +30,10 @@ export default function KeySettings() {
     finally { setBusy(false) }
   }
   return <Box sx={{ height: '100%', overflow: 'auto', pb: 2 }}>
-    <PageHeader title="코드·정책 관리" action={<Button disabled={busy} onClick={() => { setDraft(null); void refreshKeySettings().then(result => setDraft(result.policy)).catch(() => {}) }}>새로고침</Button>} />
+    <PageHeader title="운영 정책 관리" action={<Button disabled={busy} onClick={() => { setDraft(null); void refreshKeySettings().then(result => setDraft(result.policy)).catch(() => {}) }}>새로고침</Button>} />
     {(feedback || loadError) && <Alert sx={{ mb: 2 }} severity={feedback?.severity ?? 'error'}>{feedback?.text ?? loadError}</Alert>}
     <Card className="section-card" sx={{ mb: 2.5 }}>
-      <Box className="section-card-header"><Typography variant="h6">키 운영 정책</Typography></Box>
+      <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', py: 1.5 }}><Typography variant="h6">키 운영 정책</Typography></Box>
       <CardContent>
         <Stack component="form" onSubmit={event => { event.preventDefault(); void save('policy') }} spacing={2}>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -48,7 +48,7 @@ export default function KeySettings() {
     <Card className="section-card">
       <Tabs value={group} onChange={(_event, value) => setGroup(value)} aria-label="공통코드 그룹"><Tab value="ALGORITHM" label="알고리즘" /><Tab value="PURPOSE" label="용도" /><Tab value="STATUS" label="상태" /></Tabs>
       <TableContainer><Table size="small" sx={{ ...managementTableSx, minWidth: 850 }}>
-        <TableHead><TableRow><TableCell>순서</TableCell><TableCell>코드</TableCell><TableCell>표시명</TableCell><TableCell>설명</TableCell><TableCell>{group === 'STATUS' ? '허용 전이' : '신규 선택'}</TableCell><TableCell align="center">관리</TableCell></TableRow></TableHead>
+        <TableHead><TableRow><TableCell>순서</TableCell><TableCell>코드</TableCell><TableCell>표시명</TableCell><TableCell>설명</TableCell><TableCell>{group === 'STATUS' ? '허용 전이' : '신규 등록'}</TableCell><TableCell align="center">관리</TableCell></TableRow></TableHead>
         <TableBody>{codes.filter(code => code.group === group).map(code => <TableRow key={code.code} hover><TableCell>{code.sortOrder}</TableCell><TableCell>{code.code}</TableCell><TableCell>{code.label}</TableCell><TableCell>{code.description}</TableCell><TableCell>{group === 'STATUS' ? code.allowedTransitions.join(', ') || '없음' : !code.selectable ? '조회 전용' : code.enabled ? '허용' : '중지'}</TableCell><TableCell align="center"><Button size="small" disabled={!editable} onClick={() => { setEditing({ ...code }); setCodeReason(''); setFeedback(null) }}>수정</Button></TableCell></TableRow>)}</TableBody>
       </Table></TableContainer>
     </Card>
@@ -59,8 +59,8 @@ export default function KeySettings() {
         <TextField label="표시명" required size="small" disabled={busy} value={editing?.label ?? ''} onChange={event => setEditing(current => current && ({ ...current, label: event.target.value }))} slotProps={{ htmlInput: { maxLength: 80 } }} />
         <TextField label="설명" size="small" disabled={busy} value={editing?.description ?? ''} onChange={event => setEditing(current => current && ({ ...current, description: event.target.value }))} slotProps={{ htmlInput: { maxLength: 200 } }} />
         <TextField label="정렬 순서" type="number" size="small" required disabled={busy} value={editing?.sortOrder ?? 0} onChange={event => setEditing(current => current && ({ ...current, sortOrder: Number(event.target.value) }))} slotProps={{ htmlInput: { min: 0, max: 999, step: 1 } }} />
-        {editing?.group !== 'STATUS' && <FormControlLabel control={<Switch checked={editing?.enabled ?? false} disabled={busy || !editing?.selectable} onChange={(_event, enabled) => setEditing(current => current && ({ ...current, enabled }))} />} label="신규 선택 허용" />}
-        <TextField label="코드 변경 사유" required size="small" disabled={busy} value={codeReason} onChange={event => setCodeReason(event.target.value)} slotProps={{ htmlInput: { minLength: 2, maxLength: 200 } }} />
+        {editing?.group !== 'STATUS' && <FormControlLabel control={<Switch checked={editing?.enabled ?? false} disabled={busy || !editing?.selectable} onChange={(_event, enabled) => setEditing(current => current && ({ ...current, enabled }))} />} label="신규 등록 허용" />}
+        <TextField label="변경 사유" required size="small" disabled={busy} value={codeReason} onChange={event => setCodeReason(event.target.value)} slotProps={{ htmlInput: { minLength: 2, maxLength: 200 } }} />
       </Stack></DialogContent>
       <DialogActions><Button disabled={busy} onClick={() => setEditing(null)}>취소</Button><Button form="code-settings-form" type="submit" variant="contained" disabled={busy || codeReason.trim().length < 2}>저장</Button></DialogActions>
     </Dialog>
