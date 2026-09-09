@@ -7,6 +7,8 @@ interface LargeDateCalendarProps {
   value: string
   onChange: (value: string) => void
   disabled?: boolean
+  open?: boolean
+  focusDate?: string
 }
 
 const weekDays = ['일', '월', '화', '수', '목', '금', '토']
@@ -23,17 +25,17 @@ function fromIsoDate(value: string) {
   return new Date(year, month - 1, day)
 }
 
-export function LargeDateCalendar({ value, onChange, disabled = false }: LargeDateCalendarProps) {
-  const selected = value ? fromIsoDate(value) : new Date()
-  const [visibleMonth, setVisibleMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1))
-  const today = useMemo(() => {
-    const current = new Date()
-    return new Date(current.getFullYear(), current.getMonth(), current.getDate())
-  }, [])
-
+export function LargeDateCalendar({ value, onChange, disabled = false, open = true, focusDate }: LargeDateCalendarProps) {
+  // The selected expiry may be next year; opening always starts at the current system month.
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const current = new Date()
+  const today = new Date(current.getFullYear(), current.getMonth(), current.getDate())
   useEffect(() => {
-    if (value) setVisibleMonth(new Date(selected.getFullYear(), selected.getMonth(), 1))
-  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (open) { const now = new Date(); setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1)) }
+  }, [open])
+  useEffect(() => {
+    if (focusDate) { const selected = fromIsoDate(focusDate); setVisibleMonth(new Date(selected.getFullYear(), selected.getMonth(), 1)) }
+  }, [focusDate])
 
   const days = useMemo(() => {
     const first = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1)
@@ -67,7 +69,7 @@ export function LargeDateCalendar({ value, onChange, disabled = false }: LargeDa
               key={iso}
               disabled={disabled || past}
               aria-label={`${iso}${active ? ' 선택됨' : ''}`}
-              onClick={() => onChange(iso)}
+              onClick={() => { onChange(iso); if (outside) setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1)) }}
               sx={{ display: 'grid', minWidth: 0, height: 36, m: 0.3, placeItems: 'center', border: 0, borderRadius: 1.5, bgcolor: active ? 'primary.main' : 'transparent', color: active ? 'primary.contrastText' : outside || past ? 'text.disabled' : 'text.primary', cursor: disabled || past ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: active ? 800 : 600, transition: 'background-color 160ms ease, transform 160ms ease', '&:hover': disabled || past ? undefined : { bgcolor: active ? 'primary.dark' : 'action.hover', transform: 'translateY(-1px)' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'secondary.main', outlineOffset: 1 } }}
             >
               {date.getDate()}

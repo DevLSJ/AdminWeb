@@ -223,6 +223,6 @@ npm run build
 ### 보고서
 3주차 보고서 : https://docs.google.com/document/d/1Y2ooml9GZ2IQ76gPbjI-k5WY58Zw3gGO/edit?usp=sharing&ouid=103810997385803790305&rtpof=true&sd=true
 
+### 코드·정책 관리
 
-
-
+`/settings`에서 공통코드와 신규 키 기본 유효기간·만료 알림일을 관리합니다. 기존 기본값은 365일/30일이며 S.ADMIN만 변경할 수 있습니다. 키 목록의 만료 임박 행 강조·폐기 아이콘·현재 월 등록 달력과 검증/시연 절차는 [코드·정책 관리 안내](docs/KEY_SETTINGS.md)를 참고하세요.

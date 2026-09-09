@@ -35,6 +35,7 @@ public class DashboardService {
     private final CryptoKeyRepository keyRepository;
     private final KeyUsageLogRepository usageRepository;
     private final CryptoKeyService keyService;
+    private final com.ineb.dguard_kms.domain.settings.KeySettingsService keySettings;
 
     public DashboardService(
             CryptoKeyRepository keyRepository,
@@ -43,8 +44,10 @@ public class DashboardService {
             com.ineb.dguard_kms.domain.user.repository.AppUserRepository userRepository,
             com.ineb.dguard_kms.domain.notice.repository.NoticeRepository noticeRepository,
             com.ineb.dguard_kms.domain.user.service.AppUserService userService,
-            com.ineb.dguard_kms.domain.audit.service.AuditLogService auditService
+            com.ineb.dguard_kms.domain.audit.service.AuditLogService auditService,
+            com.ineb.dguard_kms.domain.settings.KeySettingsService keySettings
     ) {
+        this.keySettings = keySettings;
         this.userRepository = userRepository;
         this.noticeRepository = noticeRepository;
         this.userService = userService;
@@ -64,7 +67,7 @@ public class DashboardService {
         var audit = auditService.verifyChain();
         long auditViolations = audit.invalidLogUids().size();
         if (!audit.valid() && auditViolations == 0) auditViolations = 1;
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = keySettings.today();
         return new DashboardSummaryResponse(
                 keys.size(),
                 keys.stream().filter(key -> key.getStatus().canEncrypt()).count(),
@@ -75,7 +78,7 @@ public class DashboardService {
                 success,
                 userRepository.count(),
                 noticeRepository.count(),
-                keyRepository.countByStatusAndExpireAtBetween(KeyStatus.ACTIVE, expiryDate(today), expiryDate(today.plusDays(30))),
+                keyRepository.countByStatusAndExpireAtBetween(KeyStatus.ACTIVE, expiryDate(today), expiryDate(today.plusDays(keySettings.warningDays()))),
                 keyViolations,
                 userViolations,
                 auditViolations,
@@ -84,9 +87,9 @@ public class DashboardService {
     }
 
     @Transactional(readOnly = true)
-    public List<com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse> expiring(int days) {
-        if (days < 1 || days > 365) throw badRequest("days는 1~365여야 합니다.", "INVALID_EXPIRING_DAYS");
-        LocalDate today = LocalDate.now(KST);
+    public List<com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse> expiring(Integer requestedDays) {
+        int days = keySettings.resolveWarningDays(requestedDays);
+        LocalDate today = keySettings.today();
         return keyRepository.findAllByStatusAndExpireAtBetweenOrderByExpireAtAscKeyUidAsc(KeyStatus.ACTIVE, expiryDate(today), expiryDate(today.plusDays(days)))
                 .stream().map(key -> new com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse(
                         key.getKeyUid(), key.getKeyName(), key.getAlgorithm(), key.getExpireAt())).toList();

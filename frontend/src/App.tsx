@@ -1,11 +1,13 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Box, CircularProgress } from '@mui/material'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth, RequireRole } from './components/auth/RouteGuards'
 import { useAuth } from './hooks/useAuth'
 import MainLayout from './layouts/MainLayout'
 import Login from './pages/Login'
+import { refreshKeySettings, resetKeySettings } from './stores/keySettings'
 
+const KeySettings = lazy(() => import('./pages/settings/KeySettings'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Analytics = lazy(() => import('./pages/Analytics'))
 const AuditLog = lazy(() => import('./pages/audit/AuditLog'))
@@ -19,6 +21,14 @@ const UserList = lazy(() => import('./pages/users/UserList'))
 
 function App() {
   const { isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (!isAuthenticated) { resetKeySettings(); return }
+    const refresh = () => { void refreshKeySettings().catch(() => {}) }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => { window.removeEventListener('focus', refresh); resetKeySettings() }
+  }, [isAuthenticated])
 
   return (
     <Suspense fallback={<Box sx={{ display: 'grid', minHeight: 320, placeItems: 'center' }}><CircularProgress /></Box>}>
@@ -41,6 +51,7 @@ function App() {
               <Route path="/keys/register" element={<Navigate to="/keys" replace />} />
               <Route path="/users/*" element={<UserList />} />
               <Route path="/audit-logs" element={<AuditLog />} />
+              <Route path="/settings" element={<KeySettings />} />
             </Route>
           </Route>
         </Route>

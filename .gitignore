@@ -27,7 +27,8 @@ frontend/dist/
 # Backend
 backend/build/
 backend/.gradle/
-docs/
+docs/*
+!docs/KEY_SETTINGS.md
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 graft/

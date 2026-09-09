@@ -1,4 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
+import { DeleteForeverRounded } from '@mui/icons-material'
+import { useKeySettings } from '../../stores/keySettings'
 import { Box, Chip, Typography } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import { getStatusLabel } from '../../utils/status'
@@ -60,20 +62,22 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status = '', label, tone, icon, minWidth = 62, dot = false, sx }: StatusBadgeProps) {
+  useKeySettings()
+  const statusIcon = icon ?? (status === 'DESTROYED' ? <DeleteForeverRounded sx={{ fontSize: 16, color: 'text.secondary', flexShrink: 0 }} /> : undefined)
   const colors = semanticColors[tone ?? getSemanticTone(status)]
   if (dot) {
     return (
       <Box
         sx={[{ display: 'inline-flex', minWidth, alignItems: 'center', gap: .7, color: colors.text }, ...(Array.isArray(sx) ? sx : [sx])]}
       >
-        <Box component="span" sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: colors.text, boxShadow: `0 0 0 3px ${colors.background}` }} />
+        {statusIcon ?? <Box component="span" sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: colors.text, boxShadow: `0 0 0 3px ${colors.background}` }} />}
         <Typography component="span" sx={{ color: 'text.secondary', fontSize: 12.5, fontWeight: 650 }}>{label ?? getStatusLabel(status)}</Typography>
       </Box>
     )
   }
   return (
     <Chip
-      icon={icon}
+      icon={statusIcon}
       label={label ?? getStatusLabel(status)}
       size="small"
       sx={[

@@ -34,8 +34,8 @@ public class DashboardController {
     }
 
     @GetMapping("/expiring")
-    @Operation(summary = "만료 임박 ACTIVE 키", description = "KST 오늘부터 days일 후까지 포함, 만료일 오름차순. 기본 30일, 최대 365일.")
-    public ApiResponse<java.util.List<com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse>> expiring(@RequestParam(defaultValue = "30") int days) {
+    @Operation(summary = "만료 임박 ACTIVE 키", description = "KST 오늘부터 days일 후까지 포함, 만료일 오름차순. 생략 시 저장된 만료 알림 정책(초기 30일), 최대 365일.")
+    public ApiResponse<java.util.List<com.ineb.dguard_kms.domain.dashboard.dto.DashboardExpiringKeyResponse>> expiring(@RequestParam(required = false) Integer days) {
         return ApiResponse.success(dashboardService.expiring(days), "만료 임박 키를 조회했습니다.");
     }
 

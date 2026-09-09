@@ -1,3 +1,4 @@
+import { getCodeLabel } from '../stores/keySettings'
 import { keyStatusMetadata } from './keyLifecycle'
 
 const statusLabels: Record<string, string> = {
@@ -23,5 +24,6 @@ const statusLabels: Record<string, string> = {
 }
 
 export function getStatusLabel(status: string) {
-  return statusLabels[status] ?? status
+  const canonical = status === 'REACTIVATED' || status === 'DISTRIBUTED' ? 'ACTIVE' : status === 'EXPIRED' || status === 'INACTIVE' ? 'DEACTIVATED' : status
+  return getCodeLabel('STATUS', canonical, statusLabels[status] ?? status)
 }

@@ -2,7 +2,6 @@ package com.ineb.dguard_kms.domain.key.dto;
 
 import java.time.LocalDate;
 
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -17,10 +16,10 @@ public record KeyCreateRequest(
         String mode,
         @Schema(description = "키 길이(비트). AES는 256, RSA는 2048", example = "256")
         @Positive(message = "키 길이는 양수여야 합니다.") int keySize,
-        @Schema(description = "키 사용 목적", example = "PAYMENT_ENCRYPTION")
+        @Schema(description = "키 사용 목적", example = "ENCRYPT")
         @NotBlank(message = "키 용도는 필수입니다.") String purpose,
         @Schema(description = "키 만료일(yyyy-MM-dd)", example = "2027-12-31")
-        @Future(message = "만료일은 미래 날짜여야 합니다.") LocalDate expireAt,
+        LocalDate expireAt,
         @Schema(description = "자동 갱신 주기(일). KMIP/Naver/Kakao 호환 일 단위", example = "30")
         @Positive(message = "자동 갱신 주기는 1일 이상이어야 합니다.") Integer autoRotationDays
 ) {

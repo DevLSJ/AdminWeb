@@ -10,6 +10,7 @@ interface ActionOption {
 }
 
 function actionGroup(action: AuditAction) {
+  if (action === 'KEY_POLICY_UPDATE' || action === 'COMMON_CODE_UPDATE') return '코드 · 정책'
   if (action.startsWith('KEY_')) return '키 관리'
   if (action.startsWith('USER_')) return '사용자'
   if (action.startsWith('ADMIN_ACCOUNT_')) return '관리 계정'
@@ -18,7 +19,7 @@ function actionGroup(action: AuditAction) {
   return '로그인 · 세션'
 }
 
-const groups = ['로그인 · 세션', '키 관리', '사용자', '관리 계정', '게시판 · 첨부파일', '감사 로그']
+const groups = ['로그인 · 세션', '키 관리', '사용자', '관리 계정', '게시판 · 첨부파일', '감사 로그', '코드 · 정책']
 const actions = (Object.keys(auditActionLabels) as AuditAction[]).map((value) => ({
   value, label: auditActionLabels[value], group: actionGroup(value),
 }))

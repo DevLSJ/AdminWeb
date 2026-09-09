@@ -1917,18 +1917,17 @@
         "tags": [
           "Dashboard"
         ],
-        "summary": "만료 임박 ACTIVE 키 목록",
-        "description": "KST 오늘부터 days일 후까지 포함. expireAt 오름차순, 동일 만료일은 UUID순. 키 값 미반환.",
+        "summary": "만료 임박 ACTIVE 키",
+        "description": "KST 오늘부터 days일 후까지 포함, 만료일 오름차순. 생략 시 저장된 만료 알림 정책(초기 30일), 최대 365일.",
         "operationId": "expiring",
         "parameters": [
           {
             "name": "days",
             "in": "query",
+            "required": false,
             "schema": {
               "type": "integer",
-              "default": 30,
-              "minimum": 1,
-              "maximum": 365
+              "format": "int32"
             }
           }
         ],
@@ -1936,35 +1935,128 @@
           "200": {
             "description": "OK",
             "content": {
-              "application/json": {
+              "*/*": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/DashboardExpiringKeyResponse"
-                      }
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "errorCode": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponseListDashboardExpiringKeyResponse"
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/settings/key-policy": {
+      "get": {
+        "tags": [
+          "key-settings-controller"
+        ],
+        "operationId": "policy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "key-settings-controller"
+        ],
+        "operationId": "updatePolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyUpdate"
+              }
+            }
           },
-          "400": {
-            "description": "days 범위 오류"
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/key-codes/{group}/{code}": {
+      "patch": {
+        "tags": [
+          "key-settings-controller"
+        ],
+        "operationId": "updateCode",
+        "parameters": [
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           },
-          "401": {
-            "description": "미인증"
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCodeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/key-codes": {
+      "get": {
+        "tags": [
+          "key-settings-controller"
+        ],
+        "operationId": "codes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListCodeResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2197,7 +2289,7 @@
           "purpose": {
             "type": "string",
             "description": "수정할 키 사용 목적",
-            "example": "PAYMENT_ENCRYPTION",
+            "example": "ENCRYPT",
             "maxLength": 50,
             "minLength": 0
           },
@@ -2516,7 +2608,7 @@
           "purpose": {
             "type": "string",
             "description": "키 사용 목적",
-            "example": "PAYMENT_ENCRYPTION",
+            "example": "ENCRYPT",
             "minLength": 1
           },
           "expireAt": {
@@ -4228,6 +4320,272 @@
           "expireAt": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "CodeUpdate": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 999,
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2
+          }
+        },
+        "required": [
+          "description",
+          "enabled",
+          "label",
+          "reason",
+          "sortOrder",
+          "version"
+        ]
+      },
+      "ApiResponseListDashboardExpiringKeyResponse": {
+        "type": "object",
+        "description": "모든 API의 공통 응답 형식",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "요청 처리 성공 여부",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "description": "API별 응답 데이터. 실패 시 null",
+            "items": {
+              "$ref": "#/components/schemas/DashboardExpiringKeyResponse"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "사용자에게 표시할 처리 결과 메시지",
+            "example": "조회에 성공했습니다."
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실패한 경우의 애플리케이션 오류 코드",
+            "example": "UNAUTHORIZED"
+          }
+        }
+      },
+      "ApiResponsePolicyResponse": {
+        "type": "object",
+        "description": "모든 API의 공통 응답 형식",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "요청 처리 성공 여부",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PolicyResponse",
+            "description": "API별 응답 데이터. 실패 시 null"
+          },
+          "message": {
+            "type": "string",
+            "description": "사용자에게 표시할 처리 결과 메시지",
+            "example": "조회에 성공했습니다."
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실패한 경우의 애플리케이션 오류 코드",
+            "example": "UNAUTHORIZED"
+          }
+        }
+      },
+      "PolicyResponse": {
+        "type": "object",
+        "properties": {
+          "defaultValidityDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expiryWarningDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "defaultExpireAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListCodeResponse": {
+        "type": "object",
+        "description": "모든 API의 공통 응답 형식",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "요청 처리 성공 여부",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "description": "API별 응답 데이터. 실패 시 null",
+            "items": {
+              "$ref": "#/components/schemas/CodeResponse"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "사용자에게 표시할 처리 결과 메시지",
+            "example": "조회에 성공했습니다."
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실패한 경우의 애플리케이션 오류 코드",
+            "example": "UNAUTHORIZED"
+          }
+        }
+      },
+      "ApiResponseCodeResponse": {
+        "type": "object",
+        "description": "모든 API의 공통 응답 형식",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "요청 처리 성공 여부",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CodeResponse",
+            "description": "API별 응답 데이터. 실패 시 null"
+          },
+          "message": {
+            "type": "string",
+            "description": "사용자에게 표시할 처리 결과 메시지",
+            "example": "조회에 성공했습니다."
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "실패한 경우의 애플리케이션 오류 코드",
+            "example": "UNAUTHORIZED"
+          }
+        }
+      },
+      "PolicyUpdate": {
+        "type": "object",
+        "properties": {
+          "defaultValidityDays": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 3650,
+            "minimum": 1
+          },
+          "expiryWarningDays": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 365,
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 2
+          }
+        },
+        "required": [
+          "defaultValidityDays",
+          "expiryWarningDays",
+          "reason",
+          "version"
+        ]
+      },
+      "CodeResponse": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "selectable": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "allowedPurposes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowedTransitions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

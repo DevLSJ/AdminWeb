@@ -1,6 +1,7 @@
 import type { AuditAction } from '../types/api'
 
 export const auditActionLabels: Record<AuditAction, string> = {
+  KEY_POLICY_UPDATE: '키 정책 변경', COMMON_CODE_UPDATE: '공통코드 변경',
   LOGIN: '로그인', LOGOUT: '로그아웃', SESSION_REFRESH: '세션 연장',
   KEY_CREATE: '키 생성', KEY_UPDATE: '키 정보 수정', KEY_DELETE: '키 폐기', KEY_STATUS_CHANGE: '키 상태 변경',
   KEY_TEST: '암복호화 테스트', KEY_DEPLOY: '키 배포', KEY_DEPLOY_ROLLBACK: '키 배포 롤백', KEY_ROTATE: '키 갱신',
@@ -12,6 +13,7 @@ export const auditActionLabels: Record<AuditAction, string> = {
 }
 
 const targetTypeLabels: Record<string, string> = {
+  KEY_POLICY: '키 운영 정책', COMMON_CODE: '공통코드',
   KEY: '관리 키', CRYPTO_KEY: '관리 키', USER: '사용자', APP_USER: '서비스 사용자', ADMIN_USER: '관리 계정',
   NOTICE: '게시글', NOTICE_FILE: '첨부파일', AUTH: '인증 세션', AUDIT_LOG: '감사 로그', SYSTEM: '시스템',
 }

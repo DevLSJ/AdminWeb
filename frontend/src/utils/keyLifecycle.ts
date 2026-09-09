@@ -1,3 +1,4 @@
+import { getKeyCode } from '../stores/keySettings'
 import type { KeyStatus } from '../types/api'
 
 interface KeyStatusMetadata {
@@ -54,11 +55,13 @@ export function canRotateWithStatus(status: KeyStatus) {
 }
 
 export function getAllowedKeyStatusTransitions(status: KeyStatus) {
-  return keyStatusTransitions[status]
+  const allowed = getKeyCode(getCanonicalKeyStatus(status))?.allowedTransitions
+  return keyStatusTransitions[status].filter(target => !allowed || allowed.includes(target))
 }
 
 export function getManualKeyStatusTransitions(status: KeyStatus) {
-  return keyStatusTransitions[status]
+  const allowed = getKeyCode(getCanonicalKeyStatus(status))?.allowedTransitions
+  return keyStatusTransitions[status].filter(target => !allowed || allowed.includes(target))
 }
 
 export function getKeyStatusDescription(status: KeyStatus) {

@@ -54,6 +54,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.failure("첨부파일은 개별 10MB, 요청당 101MB 이하여야 합니다.", "UPLOAD_TOO_LARGE"));
     }
 
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConcurrentSettingsUpdate(org.springframework.dao.OptimisticLockingFailureException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.failure("다른 관리자가 변경했습니다. 새로고침 후 다시 저장하세요.", "SETTINGS_VERSION_CONFLICT"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException exception) {
         return ResponseEntity.badRequest()

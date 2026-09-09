@@ -95,7 +95,7 @@ export async function fetchKeyPage(params: KeyListParams) {
         status: params.status === 'ALL' ? undefined : params.status,
         purpose: params.purpose === 'ALL' ? undefined : params.purpose,
         category: params.category === 'ALL' ? undefined : params.category,
-        expiringWithinDays: params.category === 'EXPIRING' ? params.expiringWithinDays ?? 30 : undefined,
+        expiringWithinDays: params.category === 'EXPIRING' ? params.expiringWithinDays ?? undefined : undefined,
         page: params.page,
         size: params.size,
         sort: params.sort,
@@ -152,7 +152,7 @@ export async function decryptWithKey(keyUid: string, ciphertext: string, iv: str
   return unwrap(await apiClient.post<ApiResponse<{ plaintext: string }>>(apiEndpoints.keys.decryptTest(keyUid), { ciphertext, iv, version }))
 }
 
-export async function fetchDashboardExpiring(days = 30) {
+export async function fetchDashboardExpiring(days?: number) {
   return unwrap(await apiClient.get<ApiResponse<import('../types/api').DashboardExpiringKey[]>>(apiEndpoints.dashboard.expiring, { params: { days } }))
 }
 

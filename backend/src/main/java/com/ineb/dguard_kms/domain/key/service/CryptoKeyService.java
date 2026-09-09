@@ -66,6 +66,7 @@ public class CryptoKeyService {
     private final CryptoUtil cryptoUtil;
     private final IntegrityService integrityService;
     private final AuditLogService auditLogService;
+    private final com.ineb.dguard_kms.domain.settings.KeySettingsService keySettings;
 
     public CryptoKeyService(
             CryptoKeyRepository keyRepository,
@@ -74,7 +75,8 @@ public class CryptoKeyService {
             KeyUsageLogRepository usageLogRepository,
             CryptoUtil cryptoUtil,
             IntegrityService integrityService,
-            AuditLogService auditLogService
+            AuditLogService auditLogService,
+            com.ineb.dguard_kms.domain.settings.KeySettingsService keySettings
     ) {
         this.keyRepository = keyRepository;
         this.materialRepository = materialRepository;
@@ -83,12 +85,16 @@ public class CryptoKeyService {
         this.cryptoUtil = cryptoUtil;
         this.integrityService = integrityService;
         this.auditLogService = auditLogService;
+        this.keySettings = keySettings;
     }
 
     @Transactional
     public KeyResponse create(KeyCreateRequest request, String actor) {
         ManagedKeyPolicy policy = validateManagedKeyPolicy(request.algorithm(), request.mode(), request.keySize());
         validateRotationDays(request.autoRotationDays());
+        String purpose = keySettings.validateSelection(policy.algorithm(), request.purpose(), true);
+        LocalDate expiry = request.expireAt() == null ? keySettings.defaultExpiry() : request.expireAt();
+        if (!expiry.isAfter(keySettings.today())) throw new IllegalArgumentException("만료일은 미래 날짜여야 합니다.");
         if (keyRepository.existsByKeyName(request.keyName().trim())) {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
         }
@@ -107,7 +113,7 @@ public class CryptoKeyService {
             CryptoUtil.Base64Payload wrapped = cryptoUtil.wrapKey(rawKey);
             CryptoKey key = new CryptoKey(
                     request.keyName().trim(), policy.algorithm(), policy.mode(), policy.keySize(),
-                    request.purpose().trim(), request.expireAt(), request.autoRotationDays(), publicKey, actor
+                    purpose, expiry, request.autoRotationDays(), publicKey, actor
             );
             KeyMaterial material = new KeyMaterial(
                     key, 1, cryptoUtil.decodeBase64(wrapped.ciphertext()), cryptoUtil.decodeBase64(wrapped.iv()), actor
@@ -297,7 +303,11 @@ public class CryptoKeyService {
         if (!keyName.equals(key.getKeyName()) && keyRepository.existsByKeyName(keyName)) {
             throw conflict("이미 사용 중인 키 이름입니다.", "KEY_NAME_DUPLICATED");
         }
-        key.updateMetadata(keyName, request.purpose().trim(), request.expireAt());
+        // Preserve existing/legacy codes on metadata edits; validate a newly selected purpose.
+        String purpose = request.purpose().trim();
+        if (!purpose.equals(key.getPurpose())) purpose = keySettings.validateSelection(key.getAlgorithm(), purpose, false);
+        if (!request.expireAt().isAfter(keySettings.today())) throw new IllegalArgumentException("만료일은 미래 날짜여야 합니다.");
+        key.updateMetadata(keyName, purpose, request.expireAt());
         signIntegrity(key);
         historyRepository.save(new KeyStatusHistory(
                 key, key.getStatus(), key.getStatus(), "METADATA_UPDATE", "키 메타정보 수정", actor
@@ -759,9 +769,10 @@ public class CryptoKeyService {
             if ("ENCRYPT_CAPABLE".equals(category) || "DECRYPT_CAPABLE".equals(category)) {
                 predicates.add(root.get("status").in(KeyStatus.ACTIVE, KeyStatus.REACTIVATED, KeyStatus.DISTRIBUTED));
             } else if ("EXPIRING".equals(category)) {
-                Instant today = LocalDate.now(ZoneOffset.UTC).atStartOfDay().toInstant(ZoneOffset.UTC);
+                Instant today = keySettings.today().atStartOfDay().toInstant(ZoneOffset.UTC);
                 Instant deadline = today.plusSeconds(expiringWithinDays * 86_400L);
                 predicates.add(builder.between(root.get("expireAt"), today, deadline));
+                if (status == null) predicates.add(builder.equal(root.get("status"), KeyStatus.ACTIVE));
                 predicates.add(builder.notEqual(root.get("status"), KeyStatus.DESTROYED));
             }
             return builder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
@@ -784,7 +795,7 @@ public class CryptoKeyService {
     }
 
     private int normalizeExpiringDays(Integer requestedDays) {
-        int days = requestedDays == null ? 30 : requestedDays;
+        int days = requestedDays == null ? keySettings.warningDays() : requestedDays;
         if (days < 1 || days > 3650) {
             throw new KeyOperationException(
                     HttpStatus.BAD_REQUEST,

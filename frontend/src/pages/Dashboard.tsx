@@ -1,3 +1,4 @@
+import { useKeySettings } from '../stores/keySettings'
 import { ResizableTable as Table } from '../components/admin/ResizableTable'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AccessTimeRounded, ArrowForwardRounded, PeopleRounded, CampaignRounded, SecurityRounded, VpnKeyRounded } from '@mui/icons-material'
@@ -95,13 +96,15 @@ function KeyStatusChart({ distribution }: { distribution: Array<{ status: Canoni
 }
 
 function Dashboard() {
+  const { policy: keyPolicy } = useKeySettings()
+  const expiryDays = keyPolicy?.expiryWarningDays ?? 30
   const { user } = useAuth(); const navigate = useNavigate()
   const [summary, setSummary] = useState<DashboardSummary | null>(null); const [keys, setKeys] = useState<CryptoKey[]>([]); const [trend, setTrend] = useState<DashboardTrend | null>(null); const [activities, setActivities] = useState<AuditLog[]>([])
   const [expiringKeys, setExpiringKeys] = useState<DashboardExpiringKey[]>([])
   const [notices, setNotices] = useState<Notice[]>([])
-  const [period, setPeriod] = useState<'DAY' | 'MONTH'>('DAY'); const [expiryDays] = useState(30); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
+  const [period, setPeriod] = useState<'DAY' | 'MONTH'>('DAY'); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   useEffect(() => { const to = new Date(); const from = new Date(to); if (period === 'DAY') from.setDate(from.getDate() - 29); else from.setMonth(from.getMonth() - 11); void fetchDashboardTrend(formatDate(from), formatDate(to), period).then(setTrend).catch(() => setError('키 사용 추이를 불러오지 못했습니다.')) }, [period])
-  useEffect(() => { setLoading(true); const requests: Promise<unknown>[] = [fetchDashboardSummary().then(setSummary), fetchDashboardExpiring().then(setExpiringKeys), fetchKeys().then(setKeys), fetchNoticePage({ title: "", category: "ALL", exposeYn: "ALL", page: 0, size: 20 }).then((page) => setNotices(page.content))]; if (isAdminRole(user?.role)) requests.push(fetchAuditLogPage({ from: '', to: '', actor: '', action: 'ALL', page: 0, size: 20 }).then((page) => setActivities(page.content))); void Promise.all(requests).catch(() => setError('대시보드 실데이터를 불러오지 못했습니다.')).finally(() => setLoading(false)) }, [user?.role])
+  useEffect(() => { setLoading(true); const requests: Promise<unknown>[] = [fetchDashboardSummary().then(setSummary), fetchDashboardExpiring().then(setExpiringKeys), fetchKeys().then(setKeys), fetchNoticePage({ title: "", category: "ALL", exposeYn: "ALL", page: 0, size: 20 }).then((page) => setNotices(page.content))]; if (isAdminRole(user?.role)) requests.push(fetchAuditLogPage({ from: '', to: '', actor: '', action: 'ALL', page: 0, size: 20 }).then((page) => setActivities(page.content))); void Promise.all(requests).catch(() => setError('대시보드 실데이터를 불러오지 못했습니다.')).finally(() => setLoading(false)) }, [user?.role, expiryDays])
   const statusDistribution = useMemo(() => {
     const counts = keys.reduce<Record<CanonicalKeyStatus, number>>((result, key) => {
       const status = getCanonicalKeyStatus(key.status)

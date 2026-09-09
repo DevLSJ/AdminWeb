@@ -1,3 +1,4 @@
+import { getCodeLabel, isExpiringKey, useKeySettings } from '../../stores/keySettings'
 import { ResizableTable as Table } from '../../components/admin/ResizableTable'
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -94,6 +95,9 @@ function initialParamsFrom(searchParams: URLSearchParams): KeyListParams {
 }
 
 function KeyList() {
+  const { policy, codes } = useKeySettings()
+  const warningDays = policy?.expiryWarningDays ?? 30
+  const sortedOptions = (group: string, options: readonly string[]) => ['ALL', ...options.filter(code => code !== 'ALL').sort((a, b) => (codes.find(entry => entry.group === group && entry.code === a)?.sortOrder ?? 0) - (codes.find(entry => entry.group === group && entry.code === b)?.sortOrder ?? 0))]
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const { keys, loading, error, changeKeyStatus, deleteKey, distributeKeys } = useKmsMock()
@@ -124,7 +128,7 @@ function KeyList() {
   const loadPage = useCallback(async () => {
     setListLoading(true)
     try {
-      const result = await fetchKeyPage(params)
+      const result = await fetchKeyPage({ ...params, expiringWithinDays: params.expiringWithinDays ?? warningDays })
       setPageContent(result.content)
       setTotalElements(result.totalElements)
       setListError('')
@@ -133,7 +137,7 @@ function KeyList() {
     } finally {
       setListLoading(false)
     }
-  }, [params])
+  }, [params, warningDays])
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadPage(), 200)
@@ -144,7 +148,7 @@ function KeyList() {
     const next = new URLSearchParams()
     if (params.keyword.trim()) next.set('keyword', params.keyword.trim())
     if (params.category !== 'ALL') next.set('category', params.category)
-    if (params.category === 'EXPIRING') next.set('expiringWithinDays', String(params.expiringWithinDays ?? 30))
+    if (params.category === 'EXPIRING' && params.expiringWithinDays != null) next.set('expiringWithinDays', String(params.expiringWithinDays))
     if (params.algorithm !== 'ALL') next.set('algorithm', params.algorithm)
     if (params.status !== 'ALL') next.set('status', params.status)
     if (params.purpose !== 'ALL') next.set('purpose', params.purpose)
@@ -238,7 +242,7 @@ function KeyList() {
       {(error || listError) && <Alert severity="error" sx={{ mb: 2 }}>{listError || error}</Alert>}
       {(loading || listLoading) && <Alert severity="info" sx={{ mb: 2 }}>키 목록을 불러오는 중입니다.</Alert>}
 
-      <SearchFilterForm columns={6} onSearch={(event) => { event.preventDefault(); setParams((current) => ({ ...current, page: 0 })) }} onReset={() => setParams((current) => ({ ...defaultParams, size: current.size }))} extraFilters={params.category === 'EXPIRING' && <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>만료 기준</Typography><Select MenuProps={categoryMenuProps} inputProps={{ 'aria-label': '만료 기준' }} size="small" value={params.expiringWithinDays ?? 30} onChange={(event) => updateParam('expiringWithinDays', Number(event.target.value))}>{[7, 30, 60].map((days) => <MenuItem key={days} value={days}>{days}일 이내</MenuItem>)}</Select></Stack>}>
+      <SearchFilterForm columns={6} onSearch={(event) => { event.preventDefault(); setParams((current) => ({ ...current, page: 0 })) }} onReset={() => setParams((current) => ({ ...defaultParams, size: current.size }))} extraFilters={params.category === 'EXPIRING' && <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>만료 기준</Typography><Select MenuProps={categoryMenuProps} inputProps={{ 'aria-label': '만료 기준' }} size="small" value={params.expiringWithinDays ?? warningDays} onChange={(event) => updateParam('expiringWithinDays', Number(event.target.value))}>{Array.from(new Set([7, 30, 60, warningDays, params.expiringWithinDays ?? warningDays])).sort((a, b) => a - b).map((days) => <MenuItem key={days} value={days}>{days}일 이내</MenuItem>)}</Select></Stack>}>
           <TextField
             size="small"
             label="검색어"
@@ -247,10 +251,10 @@ function KeyList() {
             onChange={(event) => updateParam('keyword', event.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }}
           />
-          <FormControl size="small"><InputLabel id="key-filter-category-label">대시보드 분류</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-category-label" label="대시보드 분류" value={params.category} onChange={(event) => { const category = event.target.value as KeyListCategory; setParams((current) => ({ ...current, category, expiringWithinDays: category === 'EXPIRING' ? current.expiringWithinDays ?? 30 : null, page: 0 })) }}>{categoryOptions.map((option) => <MenuItem key={option} value={option}>{option === 'EXPIRING' && params.category === 'EXPIRING' ? `${categoryLabels[option]} (${params.expiringWithinDays ?? 30}일)` : categoryLabels[option]}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel id="key-filter-algorithm-label">알고리즘</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-algorithm-label" label="알고리즘" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{algorithmOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 알고리즘' : algorithmLabels[option]}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel id="key-filter-status-label">상태</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-status-label" label="상태" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{statusOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : getStatusLabel(option)}</MenuItem>)}</Select></FormControl>
-          <FormControl size="small"><InputLabel id="key-filter-purpose-label">용도</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-purpose-label" label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{purposeOptions.map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : purposeLabels[option]}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel id="key-filter-category-label">대시보드 분류</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-category-label" label="대시보드 분류" value={params.category} onChange={(event) => { const category = event.target.value as KeyListCategory; setParams((current) => ({ ...current, category, expiringWithinDays: category === 'EXPIRING' ? current.expiringWithinDays ?? warningDays : null, page: 0 })) }}>{categoryOptions.map((option) => <MenuItem key={option} value={option}>{option === 'EXPIRING' && params.category === 'EXPIRING' ? `${categoryLabels[option]} (${params.expiringWithinDays ?? warningDays}일)` : categoryLabels[option]}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel id="key-filter-algorithm-label">알고리즘</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-algorithm-label" label="알고리즘" value={params.algorithm} onChange={(event) => updateParam('algorithm', event.target.value as KeyListParams['algorithm'])}>{sortedOptions('ALGORITHM', algorithmOptions).map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 알고리즘' : getCodeLabel('ALGORITHM', option, algorithmLabels[option as keyof typeof algorithmLabels] ?? option)}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel id="key-filter-status-label">상태</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-status-label" label="상태" value={params.status} onChange={(event) => updateParam('status', event.target.value as KeyListParams['status'])}>{sortedOptions('STATUS', statusOptions).map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 상태' : getStatusLabel(option)}</MenuItem>)}</Select></FormControl>
+          <FormControl size="small"><InputLabel id="key-filter-purpose-label">용도</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-purpose-label" label="용도" value={params.purpose} onChange={(event) => updateParam('purpose', event.target.value as KeyListParams['purpose'])}>{sortedOptions('PURPOSE', purposeOptions).map((option) => <MenuItem key={option} value={option}>{option === 'ALL' ? '전체 용도' : getCodeLabel('PURPOSE', option, purposeLabels[option as keyof typeof purposeLabels] ?? option)}</MenuItem>)}</Select></FormControl>
           <FormControl size="small"><InputLabel id="key-filter-sort-label">정렬</InputLabel><Select MenuProps={categoryMenuProps} labelId="key-filter-sort-label" label="정렬" value={params.sort} onChange={(event) => updateParam('sort', event.target.value)}><MenuItem value="createdAt,desc">최신 생성순</MenuItem><MenuItem value="createdAt,asc">오래된 생성순</MenuItem><MenuItem value="expireAt,asc">만료 임박순</MenuItem><MenuItem value="keyName,asc">키 이름순</MenuItem></Select></FormControl>
       </SearchFilterForm>
 
@@ -261,11 +265,11 @@ function KeyList() {
             <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 200 }}>키 이름 / UID</TableCell><TableCell sx={{ width: 140 }}>알고리즘·모드</TableCell><TableCell sx={{ width: 95 }}>용도</TableCell><TableCell sx={{ width: 95 }}>상태</TableCell><TableCell sx={{ width: 65 }}>버전</TableCell><TableCell sx={{ width: 80 }}>자동 갱신</TableCell><TableCell sx={{ width: 100 }}>만료일</TableCell><TableCell sx={{ width: 95 }}>무결성</TableCell><TableCell align="center" sx={{ width: 120 }}>관리</TableCell></TableRow></TableHead>
             <TableBody>
               {pageContent.map((key, index) => (
-                <TableRow key={key.keyUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', bgcolor: key.integrityValid ? undefined : (theme) => alpha(theme.palette.error.main, 0.085), boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: key.integrityValid ? (theme) => alpha(theme.palette.primary.main, 0.07) : (theme) => alpha(theme.palette.error.main, 0.13) } }} onClick={() => navigate(`/keys/${key.keyUid}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(`/keys/${key.keyUid}`) }}>
+                <TableRow key={key.keyUid} data-expiring={isExpiringKey(key, warningDays) || undefined} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', bgcolor: !key.integrityValid ? (theme) => alpha(theme.palette.error.main, 0.085) : isExpiringKey(key, warningDays) ? (theme) => alpha(theme.palette.error.main, 0.055) : undefined, boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.main}`, '&:hover': { bgcolor: !key.integrityValid ? (theme) => alpha(theme.palette.error.main, 0.13) : isExpiringKey(key, warningDays) ? (theme) => alpha(theme.palette.error.main, 0.10) : (theme) => alpha(theme.palette.primary.main, 0.07) } }} onClick={() => navigate(`/keys/${key.keyUid}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(`/keys/${key.keyUid}`) }}>
                   <TableCell>{params.page * params.size + index + 1}</TableCell>
                   <TableCell><Typography noWrap sx={{ maxWidth: '100%', fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography className="table-secondary" noWrap sx={{ maxWidth: '100%', color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
                   <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography className="table-secondary" sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
-                  <TableCell sx={{ fontSize: 12 }}>{purposeLabels[key.purpose]}</TableCell>
+                  <TableCell sx={{ fontSize: 12 }}>{getCodeLabel('PURPOSE', key.purpose, purposeLabels[key.purpose] ?? key.purpose)}</TableCell>
                   <TableCell><StatusBadge dot status={key.status} /></TableCell>
                   <TableCell sx={{ fontSize: 12, fontWeight: 800 }}>v{key.version}</TableCell>
                   <TableCell sx={{ fontSize: 11.5 }}>{key.autoRotationDays ? `${key.autoRotationDays}일` : '—'}</TableCell>
