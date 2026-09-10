@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -55,10 +54,16 @@ public class NoticeService {
             if (category != null && !category.isBlank() && !"ALL".equalsIgnoreCase(category)) predicates.add(builder.equal(root.get("category"), normalizeCategory(category)));
             if (exposeYn != null && !exposeYn.isBlank() && !"ALL".equalsIgnoreCase(exposeYn)) predicates.add(builder.equal(root.get("exposeYn"), normalizeExpose(exposeYn)));
             if ("CLIENT".equals(role)) predicates.add(builder.or(builder.equal(root.get("exposeYn"), "Y"), builder.equal(root.get("createdBy"), actor)));
+            // Pin notices before pagination; within each group, follow the displayed # (id).
+            // Count queries must remain unordered.
+            if (query != null && query.getResultType() != Long.class && query.getResultType() != long.class) {
+                query.orderBy(
+                        builder.asc(builder.<Integer>selectCase().when(builder.equal(root.get("category"), "NOTICE"), 0).otherwise(1)),
+                        builder.desc(root.get("id")));
+            }
             return builder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
-        Sort pinnedFirst = Sort.by(Sort.Order.desc("category"), Sort.Order.desc("createdAt"));
-        var result = noticeRepository.findAll(spec, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), pinnedFirst))
+        var result = noticeRepository.findAll(spec, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)))
                 .map(this::response);
         return PageResponse.from(result);
     }

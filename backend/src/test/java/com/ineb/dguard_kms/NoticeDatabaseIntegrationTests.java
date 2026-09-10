@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.ineb.dguard_kms.domain.notice.entity.Notice;
 import com.ineb.dguard_kms.domain.notice.repository.NoticeFileRepository;
 import com.ineb.dguard_kms.domain.notice.repository.NoticeRepository;
 
@@ -37,6 +42,48 @@ class NoticeDatabaseIntegrationTests {
     @Autowired ObjectMapper objectMapper;
     @Autowired NoticeRepository noticeRepository;
     @Autowired NoticeFileRepository fileRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
+
+    @Test
+    @Transactional
+    void pinnedNoticesFollowDisplayNumbersAcrossPagesRegardlessOfCreationTime() throws Exception {
+        String token = login("admin", "admin");
+        String title = "pinned-order-" + UUID.randomUUID();
+        List<Notice> records = new ArrayList<>();
+        for (String category : List.of("NOTICE", "GENERAL", "NOTICE", "GENERAL", "NOTICE", "GENERAL")) {
+            Notice notice = noticeRepository.saveAndFlush(new Notice(title, "정렬 검증", category, "Y", "admin"));
+            records.add(notice);
+            // Older numbers deliberately have newer timestamps: #, not time, determines order.
+            jdbcTemplate.update("update notice set created_at = ? where id = ?",
+                    java.sql.Timestamp.from(java.time.Instant.parse("2026-09-10T00:00:00Z").minusSeconds(records.size())), notice.getId());
+        }
+        List<Long> expected = List.of(records.get(4).getId(), records.get(2).getId(), records.get(0).getId(),
+                records.get(5).getId(), records.get(3).getId(), records.get(1).getId());
+        List<Long> actual = new ArrayList<>();
+        for (int page = 0; page < 3; page++) {
+            String body = mvc.perform(get("/api/notices").param("title", title)
+                            .param("page", Integer.toString(page)).param("size", "2")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+            JsonNode data = objectMapper.readTree(body).path("data");
+            assertThat(data.path("totalElements").asLong()).isEqualTo(6);
+            assertThat(data.path("totalPages").asInt()).isEqualTo(3);
+            for (JsonNode item : data.path("content")) actual.add(item.path("displayNumber").asLong());
+        }
+        assertThat(actual).containsExactlyElementsOf(expected);
+
+        for (String category : List.of("NOTICE", "GENERAL")) {
+            String body = mvc.perform(get("/api/notices").param("title", title).param("category", category)
+                            .param("size", "100").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+            List<Long> filtered = new ArrayList<>();
+            for (JsonNode item : objectMapper.readTree(body).path("data").path("content")) {
+                assertThat(item.path("category").asText()).isEqualTo(category);
+                filtered.add(item.path("displayNumber").asLong());
+            }
+            assertThat(filtered).containsExactlyElementsOf("NOTICE".equals(category) ? expected.subList(0, 3) : expected.subList(3, 6));
+        }
+    }
 
     @Test
     void multipartNoticePersistsEncryptedFileAndEachDetailViewIncrementsCount() throws Exception {
