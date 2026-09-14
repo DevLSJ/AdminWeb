@@ -1,7 +1,7 @@
 import { ResizableTable as Table } from '../../components/admin/ResizableTable'
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { AddRounded, ArrowBackRounded, AttachFileRounded, CloseRounded, CloudUploadRounded, DeleteOutlineRounded, DownloadRounded, EditRounded, LockRounded, PushPinRounded, SearchRounded } from '@mui/icons-material'
-import { Alert, Box, Button, Card, CardContent, FormControl, FormHelperText, IconButton, InputAdornment, InputLabel, List, ListItem, ListItemText, MenuItem, Pagination, Select, Stack, Switch, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, IconButton, InputAdornment, InputLabel, List, ListItem, ListItemText, MenuItem, Pagination, Select, Stack, Switch, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { createNotice, deleteNotice as deleteNoticeApi, deleteNoticeFile, downloadNoticeFile, fetchNotice, fetchNoticePage, getApiErrorMessage, updateNotice } from '../../api/kms'
 import { PageHeader } from '../../components/admin/AdminPage'
@@ -14,6 +14,7 @@ import type { Notice, NoticeListParams } from '../../types/api'
 import { isAdminRole } from '../../types/auth'
 
 type BoardForm = Pick<Notice, 'title' | 'content' | 'category' | 'exposeYn'>
+type DeleteTarget = { kind: 'notice'; notice: Notice } | { kind: 'file'; fileUid: string; originalName: string }
 
 const defaultParams: NoticeListParams = { title: '', category: 'ALL', exposeYn: 'ALL', page: 0, size: 5 }
 const emptyForm: BoardForm = { title: '', content: '', category: 'GENERAL', exposeYn: 'Y' }
@@ -37,6 +38,8 @@ function NoticeList() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [blockedFileUids, setBlockedFileUids] = useState<Set<string>>(() => new Set())
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const pathParts = location.pathname.split('/').filter(Boolean)
   const isCreate = pathParts[1] === 'new'
@@ -142,14 +145,23 @@ function NoticeList() {
 
   const deleteNotice = async (notice: Notice) => {
     if (!canManage(notice)) return
-    try { await deleteNoticeApi(notice.noticeUid); navigate('/notices') }
-    catch (requestError) { setError(getApiErrorMessage(requestError, '게시글을 삭제하지 못했습니다.')) }
+    setDeleting(true)
+    try { await deleteNoticeApi(notice.noticeUid); setDeleteTarget(null); navigate('/notices') }
+    catch (requestError) { setDeleteTarget(null); setError(getApiErrorMessage(requestError, '게시글을 삭제하지 못했습니다.')) }
+    finally { setDeleting(false) }
   }
 
   const deleteFile = async (fileUid: string) => {
     if (!selectedNotice || !canManage(selectedNotice)) return
-    try { await deleteNoticeFile(fileUid); setSelectedNotice({ ...selectedNotice, files: selectedNotice.files.filter((file) => file.fileUid !== fileUid) }); setMessage('서버 DB의 암호화 첨부파일을 삭제했습니다.') }
-    catch (requestError) { setError(getApiErrorMessage(requestError, '첨부파일을 삭제하지 못했습니다.')) }
+    setDeleting(true)
+    try { await deleteNoticeFile(fileUid); setSelectedNotice({ ...selectedNotice, files: selectedNotice.files.filter((file) => file.fileUid !== fileUid) }); setDeleteTarget(null); setMessage('서버 DB의 암호화 첨부파일을 삭제했습니다.') }
+    catch (requestError) { setDeleteTarget(null); setError(getApiErrorMessage(requestError, '첨부파일을 삭제하지 못했습니다.')) }
+    finally { setDeleting(false) }
+  }
+
+  const confirmDelete = () => {
+    if (deleteTarget?.kind === 'notice') void deleteNotice(deleteTarget.notice)
+    if (deleteTarget?.kind === 'file') void deleteFile(deleteTarget.fileUid)
   }
 
   const downloadFile = async (fileUid: string, originalName: string) => {
@@ -172,7 +184,7 @@ function NoticeList() {
       <Box className="notice-page" sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden', ...(showEditor && { height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', '& > *': { flexShrink: 0 } }) }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2.5 }}>
           <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}><Button color="inherit" startIcon={<ArrowBackRounded />} onClick={() => navigate('/notices')}>목록</Button><Box sx={{ height: 40, borderLeft: '2px solid', borderColor: 'text.disabled' }} /><Box sx={{ minWidth: 0 }}><Typography variant="h5" noWrap>{isCreate ? '글 작성' : notice?.title}</Typography></Box></Stack>
-          {notice && canManage(notice) && !showEditor && <Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<EditRounded />} onClick={() => setEditing(true)}>수정</Button><Button color="error" startIcon={<DeleteOutlineRounded />} onClick={() => deleteNotice(notice)}>삭제</Button></Stack>}
+          {notice && canManage(notice) && !showEditor && <Stack direction="row" spacing={1}><Button variant="outlined" startIcon={<EditRounded />} onClick={() => setEditing(true)}>수정</Button><Button color="error" startIcon={<DeleteOutlineRounded />} onClick={() => setDeleteTarget({ kind: 'notice', notice })}>삭제</Button></Stack>}
         </Box>
         {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
         {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
@@ -202,9 +214,21 @@ function NoticeList() {
         ) : notice ? (
           <Stack spacing={2} sx={{ '& .section-card-header': { minHeight: 58, px: 2.25 }, '& .section-card-header h6': { fontSize: 16 }, '& .section-card': { borderRadius: 2 } }}>
             <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">게시글 상세</Typography><Stack direction="row" spacing={.75}><StatusBadge icon={notice.category === 'NOTICE' ? <PushPinRounded /> : undefined} label={notice.category === 'NOTICE' ? '공지' : '일반'} tone={notice.category === 'NOTICE' ? 'warning' : 'neutral'} minWidth={0} /><StatusBadge status={notice.exposeYn} minWidth={0} /><StatusBadge label={`조회 ${notice.viewCount.toLocaleString()}`} tone="neutral" minWidth={0} /></Stack></Box><CardContent sx={{ p: '20px !important' }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: .5, sm: 2 }} sx={{ mb: 2, color: 'text.secondary' }}><Typography sx={{ fontSize: 11 }}>작성자 <strong>{notice.createdBy}</strong></Typography><Typography sx={{ fontSize: 11 }}>등록 {notice.createdAt.slice(0, 10)}</Typography><Typography sx={{ fontSize: 11 }}>수정 {new Date(notice.updatedAt).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" })}</Typography></Stack><Typography sx={{ minHeight: 220, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 16, fontWeight: 400, lineHeight: 1.9 }}>{notice.content}</Typography></CardContent></Card>
-            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => { const blocked = blockedFileUids.has(file.fileUid); return <ListItem key={file.fileUid} divider sx={{ minHeight: 66, gap: 1.5, pl: 0 }} secondaryAction={<Stack direction="row" spacing={.5}><Button disabled={blocked} color={blocked ? 'error' : 'primary'} size="small" startIcon={<DownloadRounded />} onClick={() => void downloadFile(file.fileUid, file.originalName)}>{blocked ? '다운로드 차단' : '다운로드'}</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => void deleteFile(file.fileUid)}>삭제</Button>}</Stack>}><IconButton disabled={blocked} aria-label={`${file.originalName} ${blocked ? '다운로드 차단됨' : '다운로드'}`} onClick={() => void downloadFile(file.fileUid, file.originalName)} sx={{ bgcolor: blocked ? 'error.light' : 'primary.light', color: blocked ? 'error.main' : 'primary.main', borderRadius: 2, width: 38, height: 38 }}><DownloadRounded fontSize="small" /></IconButton><ListItemText slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700 } }, secondary: { sx: { color: blocked ? 'error.main' : 'text.secondary', fontSize: 10, mt: .3, fontWeight: blocked ? 800 : 400 } } }} primary={file.originalName} secondary={blocked ? '보안 검증 실패 · 다운로드 차단' : `${(file.size / 1024).toFixed(1)} KB · 암호화 저장`} /></ListItem> })}</List>}</CardContent></Card>
+            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => { const blocked = blockedFileUids.has(file.fileUid); return <ListItem key={file.fileUid} divider sx={{ minHeight: 66, gap: 1.5, pl: 0 }} secondaryAction={<Stack direction="row" spacing={.5}><Button disabled={blocked} color={blocked ? 'error' : 'primary'} size="small" startIcon={<DownloadRounded />} onClick={() => void downloadFile(file.fileUid, file.originalName)}>{blocked ? '다운로드 차단' : '다운로드'}</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => setDeleteTarget({ kind: 'file', fileUid: file.fileUid, originalName: file.originalName })}>삭제</Button>}</Stack>}><IconButton disabled={blocked} aria-label={`${file.originalName} ${blocked ? '다운로드 차단됨' : '다운로드'}`} onClick={() => void downloadFile(file.fileUid, file.originalName)} sx={{ bgcolor: blocked ? 'error.light' : 'primary.light', color: blocked ? 'error.main' : 'primary.main', borderRadius: 2, width: 38, height: 38 }}><DownloadRounded fontSize="small" /></IconButton><ListItemText slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700 } }, secondary: { sx: { color: blocked ? 'error.main' : 'text.secondary', fontSize: 10, mt: .3, fontWeight: blocked ? 800 : 400 } } }} primary={file.originalName} secondary={blocked ? '보안 검증 실패 · 다운로드 차단' : `${(file.size / 1024).toFixed(1)} KB · 암호화 저장`} /></ListItem> })}</List>}</CardContent></Card>
           </Stack>
         ) : null}
+        <Dialog open={Boolean(deleteTarget)} onClose={() => { if (!deleting) setDeleteTarget(null) }} fullWidth maxWidth="xs" slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } }, paper: { sx: { borderRadius: 2 } } }}>
+          <DialogTitle>{deleteTarget?.kind === 'notice' ? '게시글 삭제' : '첨부파일 삭제'}</DialogTitle>
+          <DialogContent>
+            <Alert severity="warning" sx={{ mb: 2 }}>삭제한 데이터는 복구할 수 없습니다.</Alert>
+            <Typography sx={{ lineHeight: 1.7 }}>
+              {deleteTarget?.kind === 'notice'
+                ? <>게시글 <strong>“{deleteTarget.notice.title}”</strong>과 첨부파일을 정말 삭제하시겠습니까?</>
+                : <>첨부파일 <strong>“{deleteTarget?.originalName}”</strong>을 정말 삭제하시겠습니까?</>}
+            </Typography>
+          </DialogContent>
+          <DialogActions><Button disabled={deleting} onClick={() => setDeleteTarget(null)}>취소</Button><Button color="error" variant="contained" disabled={deleting} startIcon={<DeleteOutlineRounded />} onClick={confirmDelete}>{deleting ? '삭제 중…' : '삭제'}</Button></DialogActions>
+        </Dialog>
       </Box>
     )
   }
