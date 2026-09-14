@@ -64,6 +64,7 @@ export const apiEndpoints = {
     detail: (id: string) => `/api/notices/${id}`,
     update: (id: string) => `/api/notices/${id}`,
     delete: (id: string) => `/api/notices/${id}`,
+    bulkDelete: '/api/notices',
   },
   files: {
     download: (id: string) => `/api/files/${id}/download`,

@@ -18,14 +18,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import com.ineb.dguard_kms.common.ApiResponse;
 import com.ineb.dguard_kms.common.PageResponse;
 import com.ineb.dguard_kms.domain.notice.dto.NoticeCreateRequest;
+import com.ineb.dguard_kms.domain.notice.dto.NoticeBulkDeleteRequest;
 import com.ineb.dguard_kms.domain.notice.dto.NoticeFileDownload;
 import com.ineb.dguard_kms.domain.notice.dto.NoticeResponse;
 import com.ineb.dguard_kms.domain.notice.dto.NoticeUpdateRequest;
@@ -58,6 +62,7 @@ public class NoticeController {
     }
 
     @PutMapping(value = "/notices/{noticeUid}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "게시글 수정 및 첨부파일 추가", description = "multipart/form-data 요청입니다. metadata 파트는 application/json 형식으로 필수 전송하고, files 파트에는 새로 추가할 실제 파일을 반복해서 전송합니다. 기존 첨부파일은 교체되지 않으므로 기존 파일 삭제 API를 별도로 사용합니다.")
     public ApiResponse<NoticeResponse> update(@PathVariable UUID noticeUid, @Valid @RequestPart("metadata") NoticeUpdateRequest request, @RequestPart(value = "files", required = false) List<MultipartFile> files, @AuthenticationPrincipal AdminUserDetails actor) {
         return ApiResponse.success(service.update(noticeUid, request, files, actor.getUsername(), actor.getRole()), "게시글을 수정했습니다.");
     }
@@ -66,6 +71,12 @@ public class NoticeController {
     public ApiResponse<Void> delete(@PathVariable UUID noticeUid, @AuthenticationPrincipal AdminUserDetails actor) {
         service.delete(noticeUid, actor.getUsername(), actor.getRole());
         return ApiResponse.success(null, "게시글을 삭제했습니다.");
+    }
+
+    @DeleteMapping("/notices")
+    public ApiResponse<Integer> deleteMany(@Valid @RequestBody NoticeBulkDeleteRequest request, @AuthenticationPrincipal AdminUserDetails actor) {
+        int deleted = service.deleteMany(request.noticeUids(), actor.getUsername(), actor.getRole());
+        return ApiResponse.success(deleted, deleted + "개 게시글을 삭제했습니다.");
     }
 
     @GetMapping("/files/{fileUid}/download")

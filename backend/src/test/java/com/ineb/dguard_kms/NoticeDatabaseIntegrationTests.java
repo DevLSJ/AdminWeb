@@ -2,6 +2,7 @@ package com.ineb.dguard_kms;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,6 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ineb.dguard_kms.domain.notice.entity.Notice;
+import com.ineb.dguard_kms.domain.notice.entity.NoticeFile;
 import com.ineb.dguard_kms.domain.notice.repository.NoticeFileRepository;
 import com.ineb.dguard_kms.domain.notice.repository.NoticeRepository;
 
@@ -180,6 +182,32 @@ class NoticeDatabaseIntegrationTests {
             if ("GENERAL".equals(item.path("category").asText())) reachedGeneral = true;
             if (reachedGeneral) assertThat(item.path("category").asText()).isEqualTo("GENERAL");
         }
+    }
+
+    @Test
+    void adminBulkDeleteIsAtomicAndClientIsForbidden() throws Exception {
+        String adminToken = login("admin", "admin");
+        String clientToken = login("client", "client");
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        Notice first = noticeRepository.saveAndFlush(new Notice("bulk-first-" + suffix, "본문", "GENERAL", "Y", "client"));
+        Notice second = noticeRepository.saveAndFlush(new Notice("bulk-second-" + suffix, "본문", "NOTICE", "Y", "admin"));
+        Notice protectedNotice = noticeRepository.saveAndFlush(new Notice("bulk-protected-" + suffix, "본문", "GENERAL", "Y", "admin"));
+        NoticeFile attachment = fileRepository.saveAndFlush(new NoticeFile(first.getId(), "bulk.txt", MediaType.TEXT_PLAIN_VALUE, 1, new byte[12], new byte[17]));
+
+        String request = "{\"noticeUids\":[\"" + first.getNoticeUid() + "\",\"" + second.getNoticeUid() + "\"]}";
+        String response = mvc.perform(delete("/api/notices").header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(objectMapper.readTree(response).path("data").asInt()).isEqualTo(2);
+        assertThat(noticeRepository.findByNoticeUid(first.getNoticeUid())).isEmpty();
+        assertThat(noticeRepository.findByNoticeUid(second.getNoticeUid())).isEmpty();
+        assertThat(fileRepository.findByFileUid(attachment.getFileUid())).isEmpty();
+
+        mvc.perform(delete("/api/notices").header("Authorization", "Bearer " + clientToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"noticeUids\":[\"" + protectedNotice.getNoticeUid() + "\"]}"))
+                .andExpect(status().isForbidden());
+        assertThat(noticeRepository.findByNoticeUid(protectedNotice.getNoticeUid())).isPresent();
     }
 
     @Test

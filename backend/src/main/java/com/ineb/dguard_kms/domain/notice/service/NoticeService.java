@@ -111,6 +111,18 @@ public class NoticeService {
     }
 
     @Transactional
+    public int deleteMany(List<UUID> noticeUids, String actor, String role) {
+        if (!isAdmin(role)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자만 게시글을 일괄 삭제할 수 있습니다.");
+        List<UUID> uniqueUids = noticeUids.stream().distinct().toList();
+        List<Notice> notices = noticeRepository.findAllForUpdateByNoticeUidIn(uniqueUids);
+        if (notices.size() != uniqueUids.size()) throw notFound("일부 게시글");
+        fileRepository.deleteAllByNoticeIdIn(notices.stream().map(Notice::getId).toList());
+        noticeRepository.deleteAll(notices);
+        notices.forEach(notice -> auditLogService.append(actor, "NOTICE_DELETE", "NOTICE", notice.getNoticeUid().toString(), "관리자 일괄 선택 삭제"));
+        return notices.size();
+    }
+
+    @Transactional
     public NoticeFileDownload downloadFile(UUID fileUid, String actor, String role) {
         NoticeFile file = fileRepository.findByFileUid(fileUid).orElseThrow(() -> notFound("첨부파일"));
         Notice notice = noticeRepository.findById(file.getNoticeId()).orElseThrow(() -> notFound("게시글"));

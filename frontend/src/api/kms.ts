@@ -309,6 +309,9 @@ export async function updateNotice(noticeUid: string, metadata: Pick<Notice, 'ti
 }
 
 export async function deleteNotice(noticeUid: string) { await apiClient.delete<ApiResponse<null>>(apiEndpoints.notices.delete(noticeUid)) }
+export async function deleteNotices(noticeUids: string[]) {
+  return unwrap(await apiClient.delete<ApiResponse<number>>(apiEndpoints.notices.bulkDelete, { data: { noticeUids } }))
+}
 export async function deleteNoticeFile(fileUid: string) { await apiClient.delete<ApiResponse<null>>(apiEndpoints.files.delete(fileUid)) }
 export async function downloadNoticeFile(fileUid: string, originalName: string) {
   try {

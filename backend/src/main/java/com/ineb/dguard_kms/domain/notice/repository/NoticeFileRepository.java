@@ -13,4 +13,5 @@ public interface NoticeFileRepository extends JpaRepository<NoticeFile, Long> {
     Optional<NoticeFile> findByFileUid(UUID fileUid);
     long countByNoticeId(Long noticeId);
     void deleteAllByNoticeId(Long noticeId);
+    void deleteAllByNoticeIdIn(List<Long> noticeIds);
 }

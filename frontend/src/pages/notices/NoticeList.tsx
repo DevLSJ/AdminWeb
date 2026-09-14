@@ -1,9 +1,9 @@
 import { ResizableTable as Table } from '../../components/admin/ResizableTable'
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { AddRounded, ArrowBackRounded, AttachFileRounded, CloseRounded, CloudUploadRounded, DeleteOutlineRounded, DownloadRounded, EditRounded, LockRounded, PushPinRounded, SearchRounded } from '@mui/icons-material'
-import { Alert, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, IconButton, InputAdornment, InputLabel, List, ListItem, ListItemText, MenuItem, Pagination, Select, Stack, Switch, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Checkbox, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormHelperText, IconButton, InputAdornment, InputLabel, List, ListItem, ListItemText, MenuItem, Pagination, Select, Stack, Switch, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from '@mui/material'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { createNotice, deleteNotice as deleteNoticeApi, deleteNoticeFile, downloadNoticeFile, fetchNotice, fetchNoticePage, getApiErrorMessage, updateNotice } from '../../api/kms'
+import { createNotice, deleteNotice as deleteNoticeApi, deleteNotices, deleteNoticeFile, downloadNoticeFile, fetchNotice, fetchNoticePage, getApiErrorMessage, updateNotice } from '../../api/kms'
 import { PageHeader } from '../../components/admin/AdminPage'
 import { managementTableSx, managementTableContainerSx } from '../../components/admin/managementTable'
 import { categoryMenuProps } from '../../components/admin/categoryMenu'
@@ -40,6 +40,10 @@ function NoticeList() {
   const [blockedFileUids, setBlockedFileUids] = useState<Set<string>>(() => new Set())
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedNoticeUids, setSelectedNoticeUids] = useState<Set<string>>(() => new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const pathParts = location.pathname.split('/').filter(Boolean)
   const isCreate = pathParts[1] === 'new'
@@ -82,8 +86,50 @@ function NoticeList() {
   }
   const resetFilters = () => { setDraft(defaultParams); setParams(defaultParams) }
 
+  const toggleNoticeSelection = (noticeUid: string) => {
+    setSelectedNoticeUids((current) => {
+      const next = new Set(current)
+      if (next.has(noticeUid)) next.delete(noticeUid)
+      else next.add(noticeUid)
+      return next
+    })
+  }
+
+  const cancelSelection = () => {
+    setSelectionMode(false)
+    setSelectedNoticeUids(new Set())
+  }
+
+  const toggleCurrentPage = () => {
+    const currentPageUids = notices.map((notice) => notice.noticeUid)
+    const allSelected = currentPageUids.length > 0 && currentPageUids.every((uid) => selectedNoticeUids.has(uid))
+    setSelectedNoticeUids((current) => {
+      const next = new Set(current)
+      currentPageUids.forEach((uid) => allSelected ? next.delete(uid) : next.add(uid))
+      return next
+    })
+  }
+
   const openDetail = (notice: Notice) => {
+    if (selectionMode) { toggleNoticeSelection(notice.noticeUid); return }
     navigate(`/notices/${notice.noticeUid}`)
+  }
+
+  const deleteSelectedNotices = async () => {
+    if (!isAdmin || selectedNoticeUids.size === 0) return
+    setBulkDeleting(true)
+    setError('')
+    try {
+      const deleted = await deleteNotices([...selectedNoticeUids])
+      const selectedOnPage = notices.filter((notice) => selectedNoticeUids.has(notice.noticeUid)).length
+      setBulkDeleteOpen(false)
+      cancelSelection()
+      setMessage(`${deleted}개 게시글과 첨부파일을 삭제했습니다.`)
+      setParams((current) => ({ ...current, page: selectedOnPage === notices.length && current.page > 0 ? current.page - 1 : current.page }))
+    } catch (requestError) {
+      setBulkDeleteOpen(false)
+      setError(getApiErrorMessage(requestError, '선택한 게시글을 삭제하지 못했습니다.'))
+    } finally { setBulkDeleting(false) }
   }
 
   const selectFiles = (nextFiles: File[]) => {
@@ -235,7 +281,8 @@ function NoticeList() {
 
   return (
     <Box className="notice-page list-page" sx={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-      <PageHeader title="게시판" description="여러분의 목소리를 담습니다" action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/notices/new')}>글 작성</Button>} />
+      <PageHeader title="게시판" description="여러분의 목소리를 담습니다" action={<Stack direction="row" spacing={1}>{isAdmin && (selectionMode ? <><Button onClick={cancelSelection}>취소</Button><Button color="error" variant="contained" startIcon={<DeleteOutlineRounded />} disabled={selectedNoticeUids.size === 0} onClick={() => setBulkDeleteOpen(true)}>선택 삭제 ({selectedNoticeUids.size})</Button></> : <Button color="error" variant="outlined" startIcon={<DeleteOutlineRounded />} onClick={() => setSelectionMode(true)}>글 삭제</Button>)}{!selectionMode && <Button variant="contained" startIcon={<AddRounded />} onClick={() => navigate('/notices/new')}>글 작성</Button>}</Stack>} />
+      {message && <Alert severity="success" onClose={() => setMessage('')} sx={{ mb: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
       <SearchFilterForm columns={3} onSearch={search} onReset={resetFilters}>
         <TextField size="small" label="제목 검색" value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded /></InputAdornment> } }} />
@@ -246,10 +293,10 @@ function NoticeList() {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}><Typography sx={{ fontSize: 14, fontWeight: 800 }}>게시글 목록</Typography><StatusBadge label={`${totalElements.toLocaleString()}건`} tone="neutral" minWidth={0} /></Box>
         <TableContainer sx={managementTableContainerSx}>
           <Table stickyHeader size="small" sx={[managementTableSx, { '& .MuiTableCell-body': { fontSize: 13.25 }, '& .MuiTableCell-head': { fontSize: 13, fontWeight: 800 } }]}>
-            <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 120 }}>구분</TableCell><TableCell sx={{ width: 380 }}>제목</TableCell><TableCell sx={{ width: 95 }}>첨부</TableCell><TableCell sx={{ width: 105 }}>노출</TableCell><TableCell sx={{ width: 150 }}>작성자</TableCell><TableCell sx={{ width: 130 }}>등록일</TableCell><TableCell sx={{ width: 95 }} align="center">조회수</TableCell></TableRow></TableHead>
+            <TableHead><TableRow><TableCell>{selectionMode ? <Checkbox size="small" aria-label="현재 페이지 전체 선택" checked={notices.length > 0 && notices.every((notice) => selectedNoticeUids.has(notice.noticeUid))} indeterminate={notices.some((notice) => selectedNoticeUids.has(notice.noticeUid)) && !notices.every((notice) => selectedNoticeUids.has(notice.noticeUid))} onChange={toggleCurrentPage} /> : '#'}</TableCell><TableCell sx={{ width: 120 }}>구분</TableCell><TableCell sx={{ width: 380 }}>제목</TableCell><TableCell sx={{ width: 95 }}>첨부</TableCell><TableCell sx={{ width: 105 }}>노출</TableCell><TableCell sx={{ width: 150 }}>작성자</TableCell><TableCell sx={{ width: 130 }}>등록일</TableCell><TableCell sx={{ width: 95 }} align="center">조회수</TableCell></TableRow></TableHead>
             <TableBody>{notices.map((notice, index) => (
               <TableRow key={notice.noticeUid} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', ...(notice.category === 'NOTICE' ? { '& .MuiTableCell-body': { bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(249, 115, 22, .07)' : 'rgba(249, 115, 22, .12)' }, '&:hover .MuiTableCell-body': { bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(249, 115, 22, .12)' : 'rgba(249, 115, 22, .18)' }, '& .MuiTableCell-body:first-of-type': { boxShadow: 'inset 4px 0 0 #f59e0b' } } : { '&:hover': { bgcolor: 'action.hover' } }) }} onClick={() => openDetail(notice)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(notice) }}>
-                <TableCell>{notice.displayNumber ?? totalElements - params.page * params.size - index}</TableCell>
+                <TableCell>{selectionMode ? <Checkbox size="small" aria-label={`${notice.title} 선택`} checked={selectedNoticeUids.has(notice.noticeUid)} onClick={(event) => event.stopPropagation()} onChange={() => toggleNoticeSelection(notice.noticeUid)} /> : notice.displayNumber ?? totalElements - params.page * params.size - index}</TableCell>
                 <TableCell><StatusBadge icon={notice.category === 'NOTICE' ? <PushPinRounded /> : undefined} label={notice.category === 'NOTICE' ? '공지' : '일반'} tone={notice.category === 'NOTICE' ? 'warning' : 'neutral'} minWidth={0} sx={notice.category === 'NOTICE' ? { color: '#c2410c', bgcolor: '#fff1e7', borderColor: '#fed7aa' } : undefined} /></TableCell>
                 <TableCell><Typography sx={{ fontWeight: isAdminRole(notice.authorRole) ? 800 : 400, fontSize: 16 }}>{notice.title}</Typography></TableCell>
                 <TableCell><Stack direction="row" spacing={.65} sx={{ alignItems: 'center', color: notice.files.length ? 'primary.main' : 'text.disabled' }}><AttachFileRounded sx={{ fontSize: 17 }} /><Typography sx={{ fontSize: 12.5, fontWeight: 750 }}>{notice.files.length}개</Typography></Stack></TableCell>
@@ -263,6 +310,11 @@ function NoticeList() {
         </TableContainer>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider' }}><Typography sx={{ color: 'text.secondary', fontSize: 12 }}>{totalElements === 0 ? '0건' : `${params.page * params.size + 1}–${Math.min((params.page + 1) * params.size, totalElements)} / ${totalElements.toLocaleString()}건`} · 공지 우선</Typography><Pagination count={Math.max(1, Math.ceil(totalElements / params.size))} page={params.page + 1} onChange={(_event, page) => setParams((current) => ({ ...current, page: page - 1 }))} color="primary" size="small" siblingCount={1} boundaryCount={1} sx={{ '& .MuiPaginationItem-root': { minWidth: 32, height: 32, border: '1px solid', borderColor: 'divider', borderRadius: 1.25, fontWeight: 700 }, '& .Mui-selected': { borderColor: 'primary.main' } }} /></Box>
       </Card>
+      <Dialog open={bulkDeleteOpen} onClose={() => { if (!bulkDeleting) setBulkDeleteOpen(false) }} fullWidth maxWidth="xs" slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } }, paper: { sx: { borderRadius: 2 } } }}>
+        <DialogTitle>게시글 일괄 삭제</DialogTitle>
+        <DialogContent><Alert severity="warning" sx={{ mb: 2 }}>삭제한 게시글과 첨부파일은 복구할 수 없습니다.</Alert><Typography><strong>선택한 {selectedNoticeUids.size}개 게시글</strong>을 정말 삭제하시겠습니까?</Typography></DialogContent>
+        <DialogActions><Button disabled={bulkDeleting} onClick={() => setBulkDeleteOpen(false)}>취소</Button><Button color="error" variant="contained" disabled={bulkDeleting} startIcon={<DeleteOutlineRounded />} onClick={() => void deleteSelectedNotices()}>{bulkDeleting ? '삭제 중…' : '삭제'}</Button></DialogActions>
+      </Dialog>
     </Box>
   )
 }
