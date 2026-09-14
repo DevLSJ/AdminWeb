@@ -255,7 +255,6 @@ function NoticeList() {
                             <Box key={file.fileUid} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: .8, borderRadius: 1.5, bgcolor: 'action.hover' }}>
                               <AttachFileRounded sx={{ color: 'primary.main', fontSize: 17 }} />
                               <Typography noWrap sx={{ minWidth: 0, flex: 1, fontSize: 11.5 }}>{file.originalName}</Typography>
-                              <StatusBadge label="기존" tone="neutral" minWidth={0} />
                               <Typography sx={{ flexShrink: 0, color: 'text.secondary', fontSize: 10.5 }}>{(file.size / 1024).toFixed(1)} KB</Typography>
                               <IconButton type="button" size="small" color="error" disabled={deleting} aria-label={`${file.originalName} 삭제`} onClick={() => setDeleteTarget({ kind: 'file', fileUid: file.fileUid, originalName: file.originalName })}><CloseRounded sx={{ fontSize: 17 }} /></IconButton>
                             </Box>
