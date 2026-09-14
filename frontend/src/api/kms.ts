@@ -25,7 +25,7 @@ import type {
   Notice,
   NoticeListParams,
 } from '../types/api'
-import { apiClient } from './client'
+import { apiClient, showSecurityAlert } from './client'
 import { apiEndpoints } from './endpoints'
 
 export interface CreateKeyRequest {
@@ -311,13 +311,31 @@ export async function updateNotice(noticeUid: string, metadata: Pick<Notice, 'ti
 export async function deleteNotice(noticeUid: string) { await apiClient.delete<ApiResponse<null>>(apiEndpoints.notices.delete(noticeUid)) }
 export async function deleteNoticeFile(fileUid: string) { await apiClient.delete<ApiResponse<null>>(apiEndpoints.files.delete(fileUid)) }
 export async function downloadNoticeFile(fileUid: string, originalName: string) {
-  const response = await apiClient.get<Blob>(apiEndpoints.files.download(fileUid), { responseType: 'blob' })
-  const url = URL.createObjectURL(response.data)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = originalName
-  anchor.click()
-  URL.revokeObjectURL(url)
+  try {
+    const response = await apiClient.get<Blob>(apiEndpoints.files.download(fileUid), { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = originalName
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    let message = '첨부파일의 보안 정보가 변경되었거나 손상되어 다운로드를 차단했습니다.'
+    let errorCode = ''
+    if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+      try {
+        const payload = JSON.parse(await error.response.data.text()) as ApiResponse<unknown>
+        message = payload.message || message
+        errorCode = payload.errorCode ?? ''
+      } catch {
+        // JSON 오류 본문을 읽지 못해도 안전한 기본 경고를 표시한다.
+      }
+    }
+    if (errorCode.startsWith('NOTICE_FILE_') || (axios.isAxiosError(error) && [409, 410].includes(error.response?.status ?? 0))) {
+      showSecurityAlert(`보안 경고 · ${message}`)
+    }
+    throw new Error(message)
+  }
 }
 
 export interface AuditViolation { logUid: string; action: AuditLog['action']; actor: string; recordedAt: string; detectedAt: string; violations: string[] }

@@ -2,6 +2,11 @@ import axios from 'axios'
 
 export const TOKEN_STORAGE_KEY = 'token'
 export const SESSION_STORAGE_KEY = 'auth-session'
+export const SECURITY_ALERT_EVENT = 'dguard:security-alert'
+
+export function showSecurityAlert(message: string) {
+  window.dispatchEvent(new CustomEvent<string>(SECURITY_ALERT_EVENT, { detail: message }))
+}
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '',

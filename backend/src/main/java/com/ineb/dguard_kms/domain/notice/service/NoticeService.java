@@ -116,8 +116,14 @@ public class NoticeService {
         Notice notice = noticeRepository.findById(file.getNoticeId()).orElseThrow(() -> notFound("게시글"));
         assertReadable(notice, actor, role);
         byte[] ciphertext = file.getEncryptedContent();
-        if (ciphertext == null) throw new ResponseStatusException(HttpStatus.GONE, "기존 첨부파일 본문이 없습니다.");
-        if (file.getEncryptionVersion() != 1) throw new ResponseStatusException(HttpStatus.CONFLICT, "지원하지 않는 첨부파일 암호화 세대입니다.");
+        if (ciphertext == null) {
+            throw new NoticeFileOperationException(HttpStatus.GONE, "NOTICE_FILE_CONTENT_MISSING",
+                    "첨부파일 암호문이 없거나 손상되어 다운로드를 차단했습니다.");
+        }
+        if (file.getEncryptionVersion() != 1) {
+            throw new NoticeFileOperationException(HttpStatus.CONFLICT, "NOTICE_FILE_ENCRYPTION_VERSION_MISMATCH",
+                    "첨부파일 암호화 버전이 변경되어 안전을 위해 다운로드를 차단했습니다.");
+        }
         byte[] plaintext = null;
         try {
             // Authenticate the complete GCM payload before sending any plaintext.
@@ -125,7 +131,8 @@ public class NoticeService {
             auditLogService.append(actor, "FILE_DOWNLOAD", "NOTICE_FILE", fileUid.toString(), "암호화 첨부파일 복호화 다운로드");
             return new NoticeFileDownload(file.getOriginalName(), file.getContentType(), plaintext);
         } catch (CryptoOperationException exception) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "첨부파일 무결성 검증에 실패했습니다.");
+            throw new NoticeFileOperationException(HttpStatus.CONFLICT, "NOTICE_FILE_INTEGRITY_VIOLATION",
+                    "첨부파일 암호문 또는 IV의 무결성 검증에 실패하여 다운로드를 차단했습니다.");
         } catch (RuntimeException exception) {
             if (plaintext != null) Arrays.fill(plaintext, (byte) 0);
             throw exception;

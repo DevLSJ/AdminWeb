@@ -1,4 +1,4 @@
-import { Suspense, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import {
   AccountCircleRounded,
   AddBoxRounded,
@@ -20,6 +20,7 @@ import {
   ScienceRounded,
   SecurityRounded,
   SettingsRounded,
+  WarningAmberRounded,
 } from '@mui/icons-material'
 import {
   AppBar,
@@ -48,6 +49,7 @@ import { useColorMode } from '../contexts/ColorModeContext'
 import { useAuth } from '../hooks/useAuth'
 import { SessionCountdown } from '../components/auth/SessionCountdown'
 import type { UserRole } from '../types/auth'
+import { SECURITY_ALERT_EVENT } from '../api/client'
 
 const expandedWidth = 260
 const collapsedWidth = 88
@@ -98,7 +100,14 @@ function MainLayout() {
   const { mode, toggleColorMode } = useColorMode()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [feedback, setFeedback] = useState<{ severity: 'success' | 'error'; message: string } | null>(null)
+  const [securityAlert, setSecurityAlert] = useState('')
   const drawerWidth = collapsed ? collapsedWidth : expandedWidth
+
+  useEffect(() => {
+    const handleSecurityAlert = (event: Event) => setSecurityAlert((event as CustomEvent<string>).detail)
+    window.addEventListener(SECURITY_ALERT_EVENT, handleSecurityAlert)
+    return () => window.removeEventListener(SECURITY_ALERT_EVENT, handleSecurityAlert)
+  }, [])
 
   const handleNavigate = (path: string) => {
     navigate(path)
@@ -239,6 +248,17 @@ function MainLayout() {
       </Box>
       <Snackbar open={Boolean(feedback)} autoHideDuration={3500} onClose={() => setFeedback(null)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert severity={feedback?.severity ?? 'success'} variant="filled" onClose={() => setFeedback(null)}>{feedback?.message}</Alert>
+      </Snackbar>
+      <Snackbar open={Boolean(securityAlert)} autoHideDuration={12000} onClose={() => setSecurityAlert('')} anchorOrigin={{ vertical: 'top', horizontal: 'center' }} sx={{ mt: 7 }}>
+        <Alert
+          severity="error"
+          variant="filled"
+          icon={<WarningAmberRounded fontSize="large" />}
+          onClose={() => setSecurityAlert('')}
+          sx={{ minWidth: { xs: 'calc(100vw - 32px)', sm: 520 }, maxWidth: 720, alignItems: 'center', border: '2px solid rgba(255,255,255,.72)', bgcolor: '#b42318', boxShadow: '0 14px 38px rgba(122,20,20,.42)', fontSize: 15, fontWeight: 800, '& .MuiAlert-message': { py: .6 } }}
+        >
+          {securityAlert}
+        </Alert>
       </Snackbar>
     </Box>
   )

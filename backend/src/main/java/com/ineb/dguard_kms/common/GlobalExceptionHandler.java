@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.ineb.dguard_kms.domain.key.service.KeyOperationException;
+import com.ineb.dguard_kms.domain.notice.service.NoticeFileOperationException;
 import com.ineb.dguard_kms.domain.user.service.UserOperationException;
 
 @RestControllerAdvice
@@ -33,6 +34,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(KeyOperationException.class)
     public ResponseEntity<ApiResponse<Void>> handleKeyOperation(KeyOperationException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(ApiResponse.failure(exception.getMessage(), exception.getErrorCode()));
+    }
+
+    @ExceptionHandler(NoticeFileOperationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoticeFileOperation(NoticeFileOperationException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(ApiResponse.failure(exception.getMessage(), exception.getErrorCode()));
     }

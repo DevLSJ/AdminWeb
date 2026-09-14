@@ -124,6 +124,34 @@ class NoticeDatabaseIntegrationTests {
     }
 
     @Test
+    void tamperedNoticeFileSecurityColumnsReturnSpecificDownloadBlocks() throws Exception {
+        String token = login("admin", "admin");
+        MockMultipartFile metadata = new MockMultipartFile("metadata", "metadata.json", MediaType.APPLICATION_JSON_VALUE,
+                "{\"title\":\"첨부 변조 검증\",\"content\":\"보안 경고 검증\",\"category\":\"NOTICE\",\"exposeYn\":\"Y\"}".getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile versionFile = new MockMultipartFile("files", "version.txt", MediaType.TEXT_PLAIN_VALUE, "version".getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile ivFile = new MockMultipartFile("files", "iv.txt", MediaType.TEXT_PLAIN_VALUE, "initial-vector".getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile contentFile = new MockMultipartFile("files", "content.txt", MediaType.TEXT_PLAIN_VALUE, "ciphertext".getBytes(StandardCharsets.UTF_8));
+
+        String body = mvc.perform(multipart("/api/notices").file(metadata).file(versionFile).file(ivFile).file(contentFile)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode files = objectMapper.readTree(body).path("data").path("files");
+        UUID versionUid = UUID.fromString(files.get(0).path("fileUid").asText());
+        UUID ivUid = UUID.fromString(files.get(1).path("fileUid").asText());
+        UUID contentUid = UUID.fromString(files.get(2).path("fileUid").asText());
+
+        jdbcTemplate.update("update notice_file set enc_ver = 2 where file_uid = ?", versionUid);
+        jdbcTemplate.update("update notice_file set iv = ? where file_uid = ?", new byte[12], ivUid);
+        byte[] tamperedContent = fileRepository.findByFileUid(contentUid).orElseThrow().getEncryptedContent();
+        tamperedContent[0] ^= 1;
+        jdbcTemplate.update("update notice_file set content_enc = ? where file_uid = ?", tamperedContent, contentUid);
+
+        assertDownloadBlocked(token, versionUid, "NOTICE_FILE_ENCRYPTION_VERSION_MISMATCH");
+        assertDownloadBlocked(token, ivUid, "NOTICE_FILE_INTEGRITY_VIOLATION");
+        assertDownloadBlocked(token, contentUid, "NOTICE_FILE_INTEGRITY_VIOLATION");
+    }
+
+    @Test
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
     void boardPinsAdminNoticesAndRejectsClientNoticeCreation() throws Exception {
         String adminToken = login("admin", "admin");
@@ -183,6 +211,16 @@ class NoticeDatabaseIntegrationTests {
         String body = mvc.perform(get("/api/notices/{noticeUid}", noticeUid).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readTree(body).path("data");
+    }
+
+    private void assertDownloadBlocked(String token, UUID fileUid, String errorCode) throws Exception {
+        String body = mvc.perform(get("/api/files/{fileUid}/download", fileUid)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode response = objectMapper.readTree(body);
+        assertThat(response.path("success").asBoolean()).isFalse();
+        assertThat(response.path("errorCode").asText()).isEqualTo(errorCode);
+        assertThat(response.path("message").asText()).contains("다운로드를 차단");
     }
 
     private String login(String loginId, String password) throws Exception {

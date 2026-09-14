@@ -36,6 +36,7 @@ function NoticeList() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [blockedFileUids, setBlockedFileUids] = useState<Set<string>>(() => new Set())
 
   const pathParts = location.pathname.split('/').filter(Boolean)
   const isCreate = pathParts[1] === 'new'
@@ -65,6 +66,7 @@ function NoticeList() {
     setError('')
     void fetchNotice(noticeUid).then((notice) => {
       setSelectedNotice(notice)
+      setBlockedFileUids(new Set())
       setForm({ title: notice.title, content: notice.content, category: notice.category, exposeYn: notice.exposeYn })
       setFiles([])
       setEditing(false)
@@ -150,6 +152,15 @@ function NoticeList() {
     catch (requestError) { setError(getApiErrorMessage(requestError, '첨부파일을 삭제하지 못했습니다.')) }
   }
 
+  const downloadFile = async (fileUid: string, originalName: string) => {
+    setError('')
+    try { await downloadNoticeFile(fileUid, originalName) }
+    catch (requestError) {
+      setBlockedFileUids((current) => new Set(current).add(fileUid))
+      setError(getApiErrorMessage(requestError, '첨부파일 보안 검증에 실패하여 다운로드할 수 없습니다.'))
+    }
+  }
+
   if ((isDetail || isCreate) && !selectedNotice && !isCreate && !loading) {
     return <Box><Button startIcon={<ArrowBackRounded />} onClick={() => navigate('/notices')}>게시글 목록</Button><Alert severity="error" sx={{ mt: 2 }}>요청한 게시글을 찾을 수 없습니다.</Alert></Box>
   }
@@ -191,7 +202,7 @@ function NoticeList() {
         ) : notice ? (
           <Stack spacing={2} sx={{ '& .section-card-header': { minHeight: 58, px: 2.25 }, '& .section-card-header h6': { fontSize: 16 }, '& .section-card': { borderRadius: 2 } }}>
             <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">게시글 상세</Typography><Stack direction="row" spacing={.75}><StatusBadge icon={notice.category === 'NOTICE' ? <PushPinRounded /> : undefined} label={notice.category === 'NOTICE' ? '공지' : '일반'} tone={notice.category === 'NOTICE' ? 'warning' : 'neutral'} minWidth={0} /><StatusBadge status={notice.exposeYn} minWidth={0} /><StatusBadge label={`조회 ${notice.viewCount.toLocaleString()}`} tone="neutral" minWidth={0} /></Stack></Box><CardContent sx={{ p: '20px !important' }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: .5, sm: 2 }} sx={{ mb: 2, color: 'text.secondary' }}><Typography sx={{ fontSize: 11 }}>작성자 <strong>{notice.createdBy}</strong></Typography><Typography sx={{ fontSize: 11 }}>등록 {notice.createdAt.slice(0, 10)}</Typography><Typography sx={{ fontSize: 11 }}>수정 {new Date(notice.updatedAt).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" })}</Typography></Stack><Typography sx={{ minHeight: 220, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 16, fontWeight: 400, lineHeight: 1.9 }}>{notice.content}</Typography></CardContent></Card>
-            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => <ListItem key={file.fileUid} divider sx={{ minHeight: 66, gap: 1.5, pl: 0 }} secondaryAction={<Stack direction="row" spacing={.5}><Button size="small" startIcon={<DownloadRounded />} onClick={() => void downloadNoticeFile(file.fileUid, file.originalName)}>다운로드</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => void deleteFile(file.fileUid)}>삭제</Button>}</Stack>}><IconButton aria-label={`${file.originalName} 다운로드`} onClick={() => void downloadNoticeFile(file.fileUid, file.originalName)} sx={{ bgcolor: "primary.light", color: "primary.main", borderRadius: 2, width: 38, height: 38 }}><DownloadRounded fontSize="small" /></IconButton><ListItemText slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700 } }, secondary: { sx: { fontSize: 10, mt: .3 } } }} primary={file.originalName} secondary={`${(file.size / 1024).toFixed(1)} KB · 암호화 저장`} /></ListItem>)}</List>}</CardContent></Card>
+            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => { const blocked = blockedFileUids.has(file.fileUid); return <ListItem key={file.fileUid} divider sx={{ minHeight: 66, gap: 1.5, pl: 0 }} secondaryAction={<Stack direction="row" spacing={.5}><Button disabled={blocked} color={blocked ? 'error' : 'primary'} size="small" startIcon={<DownloadRounded />} onClick={() => void downloadFile(file.fileUid, file.originalName)}>{blocked ? '다운로드 차단' : '다운로드'}</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => void deleteFile(file.fileUid)}>삭제</Button>}</Stack>}><IconButton disabled={blocked} aria-label={`${file.originalName} ${blocked ? '다운로드 차단됨' : '다운로드'}`} onClick={() => void downloadFile(file.fileUid, file.originalName)} sx={{ bgcolor: blocked ? 'error.light' : 'primary.light', color: blocked ? 'error.main' : 'primary.main', borderRadius: 2, width: 38, height: 38 }}><DownloadRounded fontSize="small" /></IconButton><ListItemText slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700 } }, secondary: { sx: { color: blocked ? 'error.main' : 'text.secondary', fontSize: 10, mt: .3, fontWeight: blocked ? 800 : 400 } } }} primary={file.originalName} secondary={blocked ? '보안 검증 실패 · 다운로드 차단' : `${(file.size / 1024).toFixed(1)} KB · 암호화 저장`} /></ListItem> })}</List>}</CardContent></Card>
           </Stack>
         ) : null}
       </Box>
