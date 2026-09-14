@@ -19,6 +19,14 @@ type DeleteTarget = { kind: 'notice'; notice: Notice } | { kind: 'file'; fileUid
 const defaultParams: NoticeListParams = { title: '', category: 'ALL', exposeYn: 'ALL', page: 0, size: 5 }
 const emptyForm: BoardForm = { title: '', content: '', category: 'GENERAL', exposeYn: 'Y' }
 
+function formatAttachmentSize(bytes: number) {
+  const kilobytes = bytes / 1024
+  if (kilobytes < 1000) return `${kilobytes.toFixed(1)} KB`
+  const megabytes = kilobytes / 1000
+  if (megabytes < 1000) return `${megabytes.toFixed(1)} MB`
+  return `${(megabytes / 1000).toFixed(1)} GB`
+}
+
 function NoticeList() {
   const { user } = useAuth()
   const location = useLocation()
@@ -255,7 +263,7 @@ function NoticeList() {
                             <Box key={file.fileUid} sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.25, py: .8, borderRadius: 1.5, bgcolor: 'action.hover' }}>
                               <AttachFileRounded sx={{ color: 'primary.main', fontSize: 17 }} />
                               <Typography noWrap sx={{ minWidth: 0, flex: 1, fontSize: 11.5 }}>{file.originalName}</Typography>
-                              <Typography sx={{ flexShrink: 0, color: 'text.secondary', fontSize: 10.5 }}>{(file.size / 1024).toFixed(1)} KB</Typography>
+                              <Typography sx={{ flexShrink: 0, color: 'text.secondary', fontSize: 10.5 }}>{formatAttachmentSize(file.size)}</Typography>
                               <IconButton type="button" size="small" color="error" disabled={deleting} aria-label={`${file.originalName} 삭제`} onClick={() => setDeleteTarget({ kind: 'file', fileUid: file.fileUid, originalName: file.originalName })}><CloseRounded sx={{ fontSize: 17 }} /></IconButton>
                             </Box>
                           ))}
@@ -264,7 +272,7 @@ function NoticeList() {
                               <AttachFileRounded sx={{ color: 'primary.main', fontSize: 17 }} />
                               <Typography noWrap sx={{ minWidth: 0, flex: 1, fontSize: 11.5 }}>{file.name}</Typography>
                               <StatusBadge label="추가" tone="info" minWidth={0} />
-                              <Typography sx={{ flexShrink: 0, color: 'text.secondary', fontSize: 10.5 }}>{(file.size / 1024).toFixed(1)} KB</Typography>
+                              <Typography sx={{ flexShrink: 0, color: 'text.secondary', fontSize: 10.5 }}>{formatAttachmentSize(file.size)}</Typography>
                               <IconButton type="button" size="small" aria-label={`${file.name} 제거`} onClick={() => selectFiles(files.filter((_item, fileIndex) => fileIndex !== index))}><CloseRounded sx={{ fontSize: 17 }} /></IconButton>
                             </Box>
                           ))}
@@ -280,7 +288,7 @@ function NoticeList() {
         ) : notice ? (
           <Stack spacing={2} sx={{ '& .section-card-header': { minHeight: 58, px: 2.25 }, '& .section-card-header h6': { fontSize: 16 }, '& .section-card': { borderRadius: 2 } }}>
             <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">게시글 상세</Typography><Stack direction="row" spacing={.75}><StatusBadge icon={notice.category === 'NOTICE' ? <PushPinRounded /> : undefined} label={notice.category === 'NOTICE' ? '공지' : '일반'} tone={notice.category === 'NOTICE' ? 'warning' : 'neutral'} minWidth={0} /><StatusBadge status={notice.exposeYn} minWidth={0} /><StatusBadge label={`조회 ${notice.viewCount.toLocaleString()}`} tone="neutral" minWidth={0} /></Stack></Box><CardContent sx={{ p: '20px !important' }}><Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: .5, sm: 2 }} sx={{ mb: 2, color: 'text.secondary' }}><Typography sx={{ fontSize: 11 }}>작성자 <strong>{notice.createdBy}</strong></Typography><Typography sx={{ fontSize: 11 }}>등록 {notice.createdAt.slice(0, 10)}</Typography><Typography sx={{ fontSize: 11 }}>수정 {new Date(notice.updatedAt).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" })}</Typography></Stack><Typography sx={{ minHeight: 220, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: 16, fontWeight: 400, lineHeight: 1.9 }}>{notice.content}</Typography></CardContent></Card>
-            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => { const blocked = blockedFileUids.has(file.fileUid); return <ListItem key={file.fileUid} divider sx={{ minHeight: 66, gap: 1.5, pl: 0 }} secondaryAction={<Stack direction="row" spacing={.5}><Button disabled={blocked} color={blocked ? 'error' : 'primary'} size="small" startIcon={<DownloadRounded />} onClick={() => void downloadFile(file.fileUid, file.originalName)}>{blocked ? '다운로드 차단' : '다운로드'}</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => setDeleteTarget({ kind: 'file', fileUid: file.fileUid, originalName: file.originalName })}>삭제</Button>}</Stack>}><IconButton disabled={blocked} aria-label={`${file.originalName} ${blocked ? '다운로드 차단됨' : '다운로드'}`} onClick={() => void downloadFile(file.fileUid, file.originalName)} sx={{ bgcolor: blocked ? 'error.light' : 'primary.light', color: blocked ? 'error.main' : 'primary.main', borderRadius: 2, width: 38, height: 38 }}><DownloadRounded fontSize="small" /></IconButton><ListItemText slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700 } }, secondary: { sx: { color: blocked ? 'error.main' : 'text.secondary', fontSize: 10, mt: .3, fontWeight: blocked ? 800 : 400 } } }} primary={file.originalName} secondary={blocked ? '보안 검증 실패 · 다운로드 차단' : `${(file.size / 1024).toFixed(1)} KB · 암호화 저장`} /></ListItem> })}</List>}</CardContent></Card>
+            <Card className="section-card"><Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}><Typography variant="h6">첨부파일</Typography><StatusBadge icon={<AttachFileRounded />} label={`${notice.files.length}개`} tone="neutral" minWidth={0} /></Box><CardContent sx={{ p: '8px 20px 16px !important' }}>{notice.files.length === 0 ? <Typography color="text.secondary" sx={{ py: 3 }}>첨부파일이 없습니다.</Typography> : <List disablePadding>{notice.files.map((file) => { const blocked = blockedFileUids.has(file.fileUid); return <ListItem key={file.fileUid} divider sx={{ minHeight: 66, gap: 1.5, pl: 0 }} secondaryAction={<Stack direction="row" spacing={.5}><Button disabled={blocked} color={blocked ? 'error' : 'primary'} size="small" startIcon={<DownloadRounded />} onClick={() => void downloadFile(file.fileUid, file.originalName)}>{blocked ? '다운로드 차단' : '다운로드'}</Button>{canManage(notice) && <Button color="error" size="small" onClick={() => setDeleteTarget({ kind: 'file', fileUid: file.fileUid, originalName: file.originalName })}>삭제</Button>}</Stack>}><IconButton disabled={blocked} aria-label={`${file.originalName} ${blocked ? '다운로드 차단됨' : '다운로드'}`} onClick={() => void downloadFile(file.fileUid, file.originalName)} sx={{ bgcolor: blocked ? 'error.light' : 'primary.light', color: blocked ? 'error.main' : 'primary.main', borderRadius: 2, width: 38, height: 38 }}><DownloadRounded fontSize="small" /></IconButton><ListItemText slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700 } }, secondary: { sx: { color: blocked ? 'error.main' : 'text.secondary', fontSize: 10, mt: .3, fontWeight: blocked ? 800 : 400 } } }} primary={file.originalName} secondary={blocked ? '보안 검증 실패 · 다운로드 차단' : `${formatAttachmentSize(file.size)} · 암호화 저장`} /></ListItem> })}</List>}</CardContent></Card>
           </Stack>
         ) : null}
         <Dialog open={Boolean(deleteTarget)} onClose={() => { if (!deleting) setDeleteTarget(null) }} fullWidth maxWidth="xs" slotProps={{ backdrop: { sx: { backdropFilter: 'blur(4px)' } }, paper: { sx: { borderRadius: 2 } } }}>
