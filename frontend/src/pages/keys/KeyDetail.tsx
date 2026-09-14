@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AccessTimeRounded, ArrowBackRounded, AutorenewRounded, EditRounded } from '@mui/icons-material'
 import {
   Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControl, InputLabel, MenuItem, Select, Stack, TextField, Tooltip, Typography,
+  FormControl, IconButton, InputLabel, MenuItem, Select, Stack, TextField, Tooltip, Typography,
 } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { InfoRow } from '../../components/admin/AdminPage'
@@ -146,7 +146,7 @@ function KeyDetail() {
           <Card className="section-card">
             <Box className="section-card-header" sx={{ display: 'flex', alignItems: 'center' }}><Typography variant="h6">기본 정보</Typography></Box>
             <CardContent sx={{ p: '16px 20px !important' }}>
-              <InfoRow label="이름" value={<Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography>{key.keyName}</Typography>{isAdmin && <Button size="small" startIcon={<EditRounded />} onClick={openEdit}>Edit</Button>}</Stack>} />
+              <InfoRow label="이름" value={<Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography>{key.keyName}</Typography>{isAdmin && <Tooltip title="키 정보 수정"><IconButton size="small" color="primary" aria-label={`${key.keyName} 정보 수정`} onClick={openEdit}><EditRounded fontSize="small" /></IconButton></Tooltip>}</Stack>} />
               <InfoRow label="상태" value={<StatusBadge dot status={key.status} minWidth={0} />} />
               <InfoRow label="키 유형" value={`${getKeyCategoryLabel(key.algorithm)} · ${getKeyAlgorithmLabel(key)}`} />
               <InfoRow label="키 용도" value={key.purpose} />

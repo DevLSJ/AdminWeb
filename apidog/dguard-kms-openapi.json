@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "D'Guard KMS API",
-    "description": "D'Guard KMS 관리자 웹을 위한 인증, 키 관리 및 감사 로그 API입니다.\n\n## 개발 스택\n\n| 영역 | 구성 |\n| --- | --- |\n| Frontend | React 19, TypeScript, MUI, Vite |\n| Backend | Java 21, Spring Boot, Spring Security, Spring Data JPA |\n| Database | PostgreSQL 17, Flyway |\n| 보안 | JWT, PBKDF2-HMAC-SHA256, AES-256-GCM, HMAC-SHA256 |\n| 배포 | Docker Compose, Nginx, GitHub Actions |\n\n## 아키텍처\n\n| 계층 | 역할 |\n| --- | --- |\n| React 관리자 웹 | JWT를 Bearer 헤더에 담아 `/api/*` 요청을 전송 |\n| Nginx | 정적 웹 제공 및 `/api/*`를 Spring Boot로 역방향 프록시 |\n| Spring Boot API | 인증·인가, 키 수명주기, 암복호화, 감사 로그 처리 |\n| PostgreSQL | 사용자 해시, 키 메타데이터·암호화된 키 재료, 감사 로그 저장 |\n\n## 키 상태\n\n| 화면 표시 | API 값 | 의미 |\n| --- | --- | --- |\n| 생성됨 | `CREATED` | 생성되어 활성화 대기 중인 키 |\n| 활성화 | `ACTIVE` | 암복호화와 배포가 가능한 키 |\n| 비활성 | `DEACTIVATED` | 암복호화는 차단하고 회전 정책은 유지하는 키 |\n| 침해 | `COMPROMISED` | 키 유출·침해가 의심되어 폐기만 가능한 키 |\n| 폐기 | `DESTROYED` | 원시 키가 제로화되어 복구할 수 없는 최종 상태 |\n\n배포는 생명주기 상태를 변경하지 않고 별도 운영·감사 이력으로 기록합니다.\n\n## 접근 제어\n\n| 대상 | 권한 |\n| --- | --- |\n| 로그인·로그아웃, Swagger 문서 | 토큰 없이 접근 가능 |\n| 내 정보·세션 연장·키 조회·암복호화 테스트 | 유효한 JWT 필요 |\n| 키 생성·수정·상태 변경·갱신·배포 | `ADMIN` 역할 필요 |\n| 감사 로그 조회·무결성 검증 | `ADMIN` 역할 필요 |\n\n우측 상단 **Authorize**에 `Bearer <JWT>` 형식으로 토큰을 입력하면\n인증이 필요한 API를 Swagger UI에서 호출할 수 있습니다.\n",
+    "description": "D'Guard KMS 관리자 웹을 위한 인증, 키 관리 및 감사 로그 API입니다.\n\n## 개발 스택\n\n| 영역 | 구성 |\n| --- | --- |\n| Frontend | React 19, TypeScript, MUI, Vite |\n| Backend | Java 21, Spring Boot, Spring Security, Spring Data JPA |\n| Database | PostgreSQL 17, Flyway |\n| 보안 | JWT, PBKDF2-HMAC-SHA256, AES-256-GCM, HMAC-SHA256 |\n| 배포 | Docker Compose, Nginx, GitHub Actions |\n\n## 아키텍처\n\n| 계층 | 역할 |\n| --- | --- |\n| React 관리자 웹 | JWT를 Bearer 헤더에 담아 `/api/*` 요청을 전송 |\n| Nginx | 정적 웹 제공 및 `/api/*`를 Spring Boot로 역방향 프록시 |\n| Spring Boot API | 인증·인가, 키 수명주기, 암복호화, 감사 로그 처리 |\n| PostgreSQL | 사용자 해시, 키 메타데이터·암호화된 키 재료, 감사 로그 저장 |\n\n## 키 상태\n\n| 화면 표시 | API 값 | 의미 |\n| --- | --- | --- |\n| 생성됨 | `CREATED` | 생성되어 활성화 대기 중인 키 |\n| 활성화 | `ACTIVE` | 암복호화와 배포가 가능한 키 |\n| 비활성 | `DEACTIVATED` | 암복호화는 차단하고 회전 정책은 유지하는 키 |\n| 폐기 | `DESTROYED` | 원시 키가 제로화되어 복구할 수 없는 최종 상태 |\n\n배포는 생명주기 상태를 변경하지 않고 별도 운영·감사 이력으로 기록합니다.\n\n## 접근 제어\n\n| 대상 | 권한 |\n| --- | --- |\n| 로그인·로그아웃, Swagger 문서 | 토큰 없이 접근 가능 |\n| 내 정보·세션 연장·키 조회·암복호화 테스트 | 유효한 JWT 필요 |\n| 키 생성·수정·상태 변경·갱신·배포 | `ADMIN` 역할 필요 |\n| 감사 로그 조회·무결성 검증 | `ADMIN` 역할 필요 |\n\n우측 상단 **Authorize**에 `Bearer <JWT>` 형식으로 토큰을 입력하면\n인증이 필요한 API를 Swagger UI에서 호출할 수 있습니다.\n",
     "version": "v1"
   },
   "servers": [
@@ -629,7 +629,6 @@
                 "EXPIRED",
                 "INACTIVE",
                 "DISTRIBUTED",
-                "COMPROMISED",
                 "DESTROYED"
               ]
             }
@@ -2395,9 +2394,8 @@
               "DEACTIVATED",
               "EXPIRED",
               "INACTIVE",
-              "DISTRIBUTED",
-              "COMPROMISED",
-              "DESTROYED"
+                "DISTRIBUTED",
+                "DESTROYED"
             ],
             "example": "ACTIVE"
           },
@@ -2917,9 +2915,8 @@
               "DEACTIVATED",
               "EXPIRED",
               "INACTIVE",
-              "DISTRIBUTED",
-              "COMPROMISED",
-              "DESTROYED"
+                "DISTRIBUTED",
+                "DESTROYED"
             ],
             "example": "ACTIVE"
           },
@@ -2978,9 +2975,8 @@
               "DEACTIVATED",
               "EXPIRED",
               "INACTIVE",
-              "DISTRIBUTED",
-              "COMPROMISED",
-              "DESTROYED"
+                "DISTRIBUTED",
+                "DESTROYED"
             ]
           },
           "valid": {
@@ -3183,9 +3179,8 @@
               "DEACTIVATED",
               "EXPIRED",
               "INACTIVE",
-              "DISTRIBUTED",
-              "COMPROMISED",
-              "DESTROYED"
+                "DISTRIBUTED",
+                "DESTROYED"
             ],
             "example": "DEACTIVATED"
           },
@@ -3770,9 +3765,8 @@
               "DEACTIVATED",
               "EXPIRED",
               "INACTIVE",
-              "DISTRIBUTED",
-              "COMPROMISED",
-              "DESTROYED"
+                "DISTRIBUTED",
+                "DESTROYED"
             ]
           },
           "toStatus": {
@@ -3785,9 +3779,8 @@
               "DEACTIVATED",
               "EXPIRED",
               "INACTIVE",
-              "DISTRIBUTED",
-              "COMPROMISED",
-              "DESTROYED"
+                "DISTRIBUTED",
+                "DESTROYED"
             ]
           },
           "operation": {

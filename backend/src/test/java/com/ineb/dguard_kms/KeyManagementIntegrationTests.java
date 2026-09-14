@@ -134,7 +134,7 @@ class KeyManagementIntegrationTests {
         assertBinaryMaterial(v1);
 
         JsonNode forbidden = sendJson(client, "PATCH", "/api/keys/" + keyUid + "/status", token, """
-                {"toStatus":"COMPROMISED","reason":"금지 전이 검증"}
+                {"toStatus":"DEACTIVATED","reason":"금지 전이 검증"}
                 """, 409);
         assertThat(forbidden.path("errorCode").asText()).isEqualTo("INVALID_KEY_STATUS_TRANSITION");
 

@@ -14,7 +14,7 @@ import { getStatusLabel } from '../utils/status'
 import { getCanonicalKeyStatus, keyStatusOrder, type CanonicalKeyStatus } from '../utils/keyLifecycle'
 import { auditActionLabels, truncateAuditDetail } from '../utils/auditPresentation'
 
-const statusColors: Record<CanonicalKeyStatus, string> = { CREATED: '#8a6cc5', ACTIVE: '#2e9b69', DEACTIVATED: '#ef8b2c', COMPROMISED: '#c93451', DESTROYED: '#4f5663' }
+const statusColors: Record<CanonicalKeyStatus, string> = { CREATED: '#8a6cc5', ACTIVE: '#2e9b69', DEACTIVATED: '#ef8b2c', DESTROYED: '#4f5663' }
 interface SummaryCardProps { label: string; value: string; note: string; color: string; icon: ReactNode; href: string }
 
 function SummaryCard({ label, value, note, color, icon, href }: SummaryCardProps) {
@@ -110,7 +110,7 @@ function Dashboard() {
       const status = getCanonicalKeyStatus(key.status)
       result[status] += 1
       return result
-    }, { CREATED: 0, ACTIVE: 0, DEACTIVATED: 0, COMPROMISED: 0, DESTROYED: 0 })
+    }, { CREATED: 0, ACTIVE: 0, DEACTIVATED: 0, DESTROYED: 0 })
     return keyStatusOrder.map((status) => ({ status, value: counts[status] }))
   }, [keys])
   const summaryItems: SummaryCardProps[] = [

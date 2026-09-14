@@ -7,9 +7,9 @@ interface KeyStatusMetadata {
   terminal?: boolean
 }
 
-export type CanonicalKeyStatus = 'CREATED' | 'ACTIVE' | 'DEACTIVATED' | 'COMPROMISED' | 'DESTROYED'
+export type CanonicalKeyStatus = 'CREATED' | 'ACTIVE' | 'DEACTIVATED' | 'DESTROYED'
 
-export const keyStatusOrder: CanonicalKeyStatus[] = ['CREATED', 'ACTIVE', 'DEACTIVATED', 'COMPROMISED', 'DESTROYED']
+export const keyStatusOrder: CanonicalKeyStatus[] = ['CREATED', 'ACTIVE', 'DEACTIVATED', 'DESTROYED']
 
 export function getCanonicalKeyStatus(status: KeyStatus): CanonicalKeyStatus {
   if (status === 'REACTIVATED' || status === 'DISTRIBUTED') return 'ACTIVE'
@@ -25,19 +25,17 @@ export const keyStatusMetadata: Record<KeyStatus, KeyStatusMetadata> = {
   EXPIRED: { label: '비활성', description: '유효기간 만료로 사용이 중지된 레거시 상태이며 비활성으로 표시합니다.' },
   INACTIVE: { label: '비활성', description: '관리자가 사용을 중지한 레거시 상태이며 비활성으로 표시합니다.' },
   DISTRIBUTED: { label: '활성화', description: '배포 이력이 있는 레거시 상태입니다. 배포는 생명주기와 분리하고 활성 상태로 표시합니다.' },
-  COMPROMISED: { label: '침해', description: '키 노출 또는 유출이 의심되어 모든 암·복호화를 차단하고 폐기만 허용하는 상태입니다.' },
   DESTROYED: { label: '폐기', description: '원시 키가 제로화되어 복구할 수 없는 최종 상태입니다. 무결성 검증용 메타데이터와 감사 이력은 보존됩니다.', terminal: true },
 }
 
 export const keyStatusTransitions: Record<KeyStatus, KeyStatus[]> = {
   CREATED: ['ACTIVE', 'DESTROYED'],
-  ACTIVE: ['DEACTIVATED', 'COMPROMISED', 'DESTROYED'],
-  REACTIVATED: ['DEACTIVATED', 'COMPROMISED', 'DESTROYED'],
-  DEACTIVATED: ['ACTIVE', 'COMPROMISED', 'DESTROYED'],
-  EXPIRED: ['ACTIVE', 'COMPROMISED', 'DESTROYED'],
-  INACTIVE: ['ACTIVE', 'COMPROMISED', 'DESTROYED'],
-  DISTRIBUTED: ['DEACTIVATED', 'COMPROMISED', 'DESTROYED'],
-  COMPROMISED: ['DESTROYED'],
+  ACTIVE: ['DEACTIVATED', 'DESTROYED'],
+  REACTIVATED: ['DEACTIVATED', 'DESTROYED'],
+  DEACTIVATED: ['ACTIVE', 'DESTROYED'],
+  EXPIRED: ['ACTIVE', 'DESTROYED'],
+  INACTIVE: ['ACTIVE', 'DESTROYED'],
+  DISTRIBUTED: ['DEACTIVATED', 'DESTROYED'],
   DESTROYED: [],
 }
 
@@ -50,6 +48,7 @@ export function canDecryptWithStatus(status: KeyStatus) {
 }
 
 export function canRotateWithStatus(status: KeyStatus) {
+  if (status === 'DESTROYED') return false
   const canonical = getCanonicalKeyStatus(status)
   return canonical === 'ACTIVE' || canonical === 'DEACTIVATED'
 }

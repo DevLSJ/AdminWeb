@@ -27,8 +27,7 @@ public class KeySettingsInitializer implements ApplicationRunner {
             new CommonCode("STATUS", "CREATED", "생성됨", "활성화 전 키", 10, true),
             new CommonCode("STATUS", "ACTIVE", "활성화", "암복호화 가능", 20, true),
             new CommonCode("STATUS", "DEACTIVATED", "비활성", "암복호화 중지", 30, true),
-            new CommonCode("STATUS", "COMPROMISED", "침해", "폐기만 가능", 40, true),
-            new CommonCode("STATUS", "DESTROYED", "폐기", "키 재료 제거 완료", 50, true)
+            new CommonCode("STATUS", "DESTROYED", "폐기", "키 재료 제거 완료", 40, true)
         );
         for (CommonCode entry : defaults) if (!codes.existsById(entry.getGroup() + ":" + entry.getCode())) codes.save(entry);
     }

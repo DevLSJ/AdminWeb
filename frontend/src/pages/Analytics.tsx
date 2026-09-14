@@ -10,7 +10,7 @@ import type { CryptoKey, DashboardSummary, DashboardTrend } from '../types/api'
 import { getCanonicalKeyStatus, keyStatusOrder, type CanonicalKeyStatus } from '../utils/keyLifecycle'
 import { getStatusLabel } from '../utils/status'
 
-const statusColors: Record<CanonicalKeyStatus, string> = { CREATED: '#7f65c4', ACTIVE: '#28ad73', DEACTIVATED: '#eea325', COMPROMISED: '#df4c64', DESTROYED: '#596273' }
+const statusColors: Record<CanonicalKeyStatus, string> = { CREATED: '#7f65c4', ACTIVE: '#28ad73', DEACTIVATED: '#eea325', DESTROYED: '#596273' }
 
 function formatDate(date: Date) { return date.toISOString().slice(0, 10) }
 
@@ -66,7 +66,7 @@ function Analytics() {
   }, [period])
 
   const statusItems = useMemo(() => {
-    const counts = keys.reduce<Record<CanonicalKeyStatus, number>>((result, key) => { result[getCanonicalKeyStatus(key.status)] += 1; return result }, { CREATED: 0, ACTIVE: 0, DEACTIVATED: 0, COMPROMISED: 0, DESTROYED: 0 })
+    const counts = keys.reduce<Record<CanonicalKeyStatus, number>>((result, key) => { result[getCanonicalKeyStatus(key.status)] += 1; return result }, { CREATED: 0, ACTIVE: 0, DEACTIVATED: 0, DESTROYED: 0 })
     return keyStatusOrder.map((status) => ({ label: getStatusLabel(status), value: counts[status], color: statusColors[status], href: `/keys?status=${status}` }))
   }, [keys])
   const algorithmItems = useMemo(() => ['AES', 'RSA', 'HMAC'].map((algorithm, index) => ({ label: algorithm, value: keys.filter((key) => key.algorithm === algorithm).length, color: ['#2478e8', '#28ad73', '#eea325'][index], href: `/keys?algorithm=${algorithm}` })), [keys])

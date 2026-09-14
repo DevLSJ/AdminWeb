@@ -5,7 +5,8 @@ import {
   AddRounded,
   AccountTreeRounded,
   CloudUploadRounded,
-  DeleteOutlineRounded,
+  DeleteRounded,
+  EditRounded,
   SearchRounded,
 } from '@mui/icons-material'
 import {
@@ -21,6 +22,7 @@ import {
   FormControl,
   InputAdornment,
   InputLabel,
+  IconButton,
   ListItemText,
   MenuItem,
   Select,
@@ -31,6 +33,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -66,7 +69,7 @@ const defaultParams: KeyListParams = {
 const categoryOptions = ['ALL', 'ENCRYPT_CAPABLE', 'EXPIRING', 'INTEGRITY_VIOLATION'] as const
 const categoryLabels: Record<KeyListCategory, string> = { ALL: '전체 관리 키', ENCRYPT_CAPABLE: '암호화 가능', EXPIRING: '만료 임박', INTEGRITY_VIOLATION: '무결성 위반' }
 const algorithmOptions = ['ALL', 'AES', 'RSA', 'HMAC'] as const
-const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'DEACTIVATED', 'COMPROMISED', 'DESTROYED'] as const
+const statusOptions = ['ALL', 'CREATED', 'ACTIVE', 'DEACTIVATED', 'DESTROYED'] as const
 const purposeOptions = ['ALL', 'ENCRYPT', 'SIGN', 'AUTH', 'WRAP'] as const
 const algorithmLabels = { AES: '대칭키 · AES-256-GCM', RSA: '공개키 · RSA-2048-SHA256', HMAC: '메시지 인증 · HMAC' } as const
 const purposeLabels = { ENCRYPT: '암복호화', SIGN: '서명', AUTH: '인증', WRAP: '키 래핑' } as const
@@ -259,13 +262,13 @@ function KeyList() {
       </SearchFilterForm>
 
       <Card className="list-results" sx={{ overflow: 'hidden' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack></Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, px: 1.75, py: 0.8, borderBottom: '1px solid', borderColor: 'divider', bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.025) }}><Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><Typography sx={{ color: 'text.secondary', fontSize: 12.5 }}>관리 키 {totalElements.toLocaleString()}개</Typography>{pageContent.some((key) => !key.integrityValid) && <StatusBadge status="INVALID" label="무결성 경고 포함" minWidth={0} />}</Stack><Typography sx={{ display: { xs: 'none', md: 'block' }, color: 'text.secondary', fontSize: 11.5 }}>열 경계를 드래그해 너비 조절</Typography></Box>
         <TableContainer sx={managementTableContainerSx}>
           <Table stickyHeader size="small" sx={managementTableSx}>
             <TableHead><TableRow><TableCell>#</TableCell><TableCell sx={{ width: 200 }}>키 이름 / UID</TableCell><TableCell sx={{ width: 140 }}>알고리즘·모드</TableCell><TableCell sx={{ width: 95 }}>용도</TableCell><TableCell sx={{ width: 95 }}>상태</TableCell><TableCell sx={{ width: 65 }}>버전</TableCell><TableCell sx={{ width: 80 }}>자동 갱신</TableCell><TableCell sx={{ width: 100 }}>만료일</TableCell><TableCell sx={{ width: 95 }}>무결성</TableCell><TableCell align="center" sx={{ width: 120 }}>관리</TableCell></TableRow></TableHead>
             <TableBody>
               {pageContent.map((key, index) => (
-                <TableRow key={key.keyUid} data-expiring={isExpiringKey(key, warningDays) || undefined} hover tabIndex={0} className="interactive-row" sx={{ cursor: 'pointer', bgcolor: !key.integrityValid ? (theme) => alpha(theme.palette.error.dark, 0.17) : isExpiringKey(key, warningDays) ? (theme) => alpha(theme.palette.error.main, 0.055) : undefined, boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.dark}`, '&:hover': { bgcolor: !key.integrityValid ? (theme) => alpha(theme.palette.error.dark, 0.24) : isExpiringKey(key, warningDays) ? (theme) => alpha(theme.palette.error.main, 0.10) : (theme) => alpha(theme.palette.primary.main, 0.07) } }} onClick={() => navigate(`/keys/${key.keyUid}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(`/keys/${key.keyUid}`) }}>
+                <TableRow key={key.keyUid} data-expiring={isExpiringKey(key, warningDays) || undefined} hover tabIndex={0} className="interactive-row key-row-enter" style={{ animationDelay: `${Math.min(index, 9) * 35}ms` }} sx={{ cursor: 'pointer', bgcolor: !key.integrityValid ? (theme) => alpha(theme.palette.error.dark, 0.17) : isExpiringKey(key, warningDays) ? (theme) => alpha(theme.palette.error.main, 0.055) : undefined, boxShadow: key.integrityValid ? undefined : (theme) => `inset 4px 0 0 ${theme.palette.error.dark}`, '&:hover': { bgcolor: !key.integrityValid ? (theme) => alpha(theme.palette.error.dark, 0.24) : isExpiringKey(key, warningDays) ? (theme) => alpha(theme.palette.error.main, 0.10) : (theme) => alpha(theme.palette.primary.main, 0.07) } }} onClick={() => navigate(`/keys/${key.keyUid}`)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate(`/keys/${key.keyUid}`) }}>
                   <TableCell>{key.displayNumber ?? totalElements - params.page * params.size - index}</TableCell>
                   <TableCell><Typography noWrap sx={{ maxWidth: '100%', fontWeight: 750, fontSize: 12.75 }}>{key.keyName}</Typography><Typography className="table-secondary" noWrap sx={{ maxWidth: '100%', color: 'text.secondary', fontFamily: 'monospace', fontSize: 10.5 }}>{key.keyUid}</Typography></TableCell>
                   <TableCell><Typography sx={{ fontSize: 12.25, fontWeight: 700 }}>{getKeyCategoryLabel(key.algorithm)}</Typography><Typography className="table-secondary" sx={{ color: 'text.secondary', fontSize: 10.75 }}>{getKeyAlgorithmLabel(key)}</Typography></TableCell>
@@ -275,7 +278,7 @@ function KeyList() {
                   <TableCell sx={{ fontSize: 11.5 }}>{key.autoRotationDays ? `${key.autoRotationDays}일` : '—'}</TableCell>
                   <TableCell sx={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>{key.expireAt || '—'}</TableCell>
                   <TableCell>{key.integrityValid ? <StatusBadge dot status="VALID" /> : <StatusBadge dot status="INVALID" sx={{ animation: 'integrity-pulse 1.8s ease-in-out infinite' }} />}</TableCell>
-                  <TableCell align="center" sx={{ width: 150 }}><Stack direction="row" spacing={0.35} sx={{ alignItems: 'center', justifyContent: 'center' }}>{isAdmin && <Button size="small" variant="outlined" disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={(event) => { event.stopPropagation(); openTransition(key) }}>상태</Button>}{isAdmin && <Button size="small" color="error" disabled={key.status === 'DESTROYED'} onClick={(event) => { event.stopPropagation(); openDelete(key) }}><DeleteOutlineRounded sx={{ fontSize: 18 }} /></Button>}</Stack></TableCell>
+                  <TableCell align="center"><Stack direction="row" spacing={0.35} sx={{ alignItems: 'center', justifyContent: 'center' }}>{isAdmin && <Tooltip title="키 상태 수정"><span><IconButton size="small" color="primary" aria-label={`${key.keyName} 상태 수정`} disabled={!key.integrityValid || getManualKeyStatusTransitions(key.status).length === 0} onClick={(event) => { event.stopPropagation(); openTransition(key) }}><EditRounded fontSize="small" /></IconButton></span></Tooltip>}{isAdmin && <Tooltip title="키 삭제"><span><IconButton size="small" color="error" aria-label={`${key.keyName} 삭제`} disabled={key.status === 'DESTROYED'} onClick={(event) => { event.stopPropagation(); openDelete(key) }}><DeleteRounded fontSize="small" /></IconButton></span></Tooltip>}</Stack></TableCell>
                 </TableRow>
               ))}
               {!listLoading && pageContent.length === 0 && <TableRow><TableCell colSpan={10} align="center" sx={{ py: 8, color: 'text.secondary' }}>조건에 맞는 키가 없습니다.</TableCell></TableRow>}

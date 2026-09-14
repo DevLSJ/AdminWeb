@@ -49,7 +49,6 @@ import io.swagger.v3.oas.models.media.Schema;
                         | 생성됨 | `CREATED` | 생성되어 활성화 대기 중인 키 |
                         | 활성화 | `ACTIVE` | 암복호화와 배포가 가능한 키 |
                         | 비활성 | `DEACTIVATED` | 암복호화는 차단하고 회전 정책은 유지하는 키 |
-                        | 침해 | `COMPROMISED` | 키 유출·침해가 의심되어 폐기만 가능한 키 |
                         | 폐기 | `DESTROYED` | 원시 키가 제로화되어 복구할 수 없는 최종 상태 |
 
                         배포는 생명주기 상태를 변경하지 않고 별도 운영·감사 이력으로 기록합니다.

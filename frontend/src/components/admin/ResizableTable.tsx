@@ -41,6 +41,8 @@ export function ResizableTable(props: TableProps) {
         const resize = beginResize()
         let pendingWidth = width
         let frame = 0
+        table.classList.add('is-column-resizing')
+        handle.classList.add('is-active')
         handle.setPointerCapture(event.pointerId)
         const move = (next: PointerEvent) => {
           pendingWidth = width + next.clientX - start
@@ -51,6 +53,8 @@ export function ResizableTable(props: TableProps) {
           handle.removeEventListener('pointermove', move)
           handle.removeEventListener('pointerup', stop)
           handle.removeEventListener('pointercancel', stop)
+          table.classList.remove('is-column-resizing')
+          handle.classList.remove('is-active')
           stopDrag = undefined
         }
         stopDrag = stop
@@ -73,5 +77,6 @@ export function ResizableTable(props: TableProps) {
     })
     return () => cleanups.forEach((cleanup) => cleanup())
   }, [])
-  return <Table {...props} ref={ref} />
+  const className = ['resizable-table', props.className].filter(Boolean).join(' ')
+  return <Table {...props} className={className} ref={ref} />
 }

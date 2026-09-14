@@ -10,15 +10,13 @@ public enum KeyStatus {
     EXPIRED,
     INACTIVE,
     DISTRIBUTED,
-    COMPROMISED,
     DESTROYED;
 
     public Set<KeyStatus> allowedTransitions() {
         return switch (this) {
             case CREATED -> Set.of(ACTIVE, DESTROYED);
-            case ACTIVE, REACTIVATED, DISTRIBUTED -> Set.of(DEACTIVATED, COMPROMISED, DESTROYED);
-            case DEACTIVATED, EXPIRED, INACTIVE -> Set.of(ACTIVE, COMPROMISED, DESTROYED);
-            case COMPROMISED -> Set.of(DESTROYED);
+            case ACTIVE, REACTIVATED, DISTRIBUTED -> Set.of(DEACTIVATED, DESTROYED);
+            case DEACTIVATED, EXPIRED, INACTIVE -> Set.of(ACTIVE, DESTROYED);
             case DESTROYED -> Set.of();
         };
     }

@@ -39,19 +39,18 @@ const fs = require('node:fs/promises');
       if (status !== 'ACTIVE') await request(`/api/keys/${k.keyUid}/status`, 'PATCH', { toStatus: status, reason: '격리 환경 상태 시연' });
       return k;
     };
-    const soon = await create('5일후', 5), twenty = await create('20일후', 20), far = await create('40일후', 40), compromised = await create('침해', 5, 'COMPROMISED'), destroyed = await create('폐기', 5, 'DESTROYED');
+    const soon = await create('5일후', 5), twenty = await create('20일후', 20), far = await create('40일후', 40), destroyed = await create('폐기', 5, 'DESTROYED');
     await page.goto(base + '/keys?keyword=' + encodeURIComponent(prefix));
     const row = key => page.getByRole('row').filter({ hasText: key.keyName });
     await row(soon).waitFor();
     assert.equal(await row(soon).getAttribute('data-expiring'), 'true');
     assert.equal(await row(twenty).getAttribute('data-expiring'), 'true');
-    for (const key of [far, compromised, destroyed]) assert.equal(await row(key).getAttribute('data-expiring'), null);
+    for (const key of [far, destroyed]) assert.equal(await row(key).getAttribute('data-expiring'), null);
     assert.notEqual(await row(soon).evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
     assert.equal(await row(destroyed).locator('[data-testid="DeleteForeverRoundedIcon"]').count(), 1);
-    assert.equal(await row(compromised).locator('[data-testid="DeleteForeverRoundedIcon"]').count(), 0);
     await page.screenshot({ path: output + '/keys-warning-and-destroyed.png', fullPage: true });
     pass('만료 임박 행 배경 및 폐기 전용 아이콘');
-    for (const key of [soon, twenty, far, compromised, destroyed]) {
+    for (const key of [soon, twenty, far, destroyed]) {
       assert.equal((await row(key).getByRole('cell').first().innerText()).trim(), String(key.displayNumber));
     }
     await page.goto(base + '/keys/' + soon.keyUid);
@@ -59,7 +58,7 @@ const fs = require('node:fs/promises');
     await warning.waitFor(); await warning.hover();
     await page.getByRole('tooltip').getByText(`만료 임박 · ${soon.expireAt} 만료`, { exact: true }).waitFor();
     await page.screenshot({ path: output + '/key-detail-expiring.png', fullPage: true });
-    for (const key of [far, compromised, destroyed]) {
+    for (const key of [far, destroyed]) {
       await page.goto(base + '/keys/' + key.keyUid);
       await page.getByRole('heading', { name: key.keyName, exact: true }).waitFor();
       assert.equal(await page.getByRole('img', { name: '만료 임박 키' }).count(), 0);

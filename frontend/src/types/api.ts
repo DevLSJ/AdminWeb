@@ -25,7 +25,6 @@ export type KeyStatus =
   | 'EXPIRED'
   | 'INACTIVE'
   | 'DISTRIBUTED'
-  | 'COMPROMISED'
   | 'DESTROYED'
 
 export interface KeyListParams {
