@@ -154,6 +154,25 @@ public class AdminAccountService {
         } finally { Arrays.fill(password, '\0'); }
     }
 
+    @Transactional
+    public void syncLinkedUser(UUID userUid, String name, String role, String status) {
+        repository.findForUpdateByUserUid(userUid).ifPresent(account -> {
+            account.updateProfile(name, role);
+            account.changeStatus(status);
+            resign(account);
+            repository.saveAndFlush(account);
+        });
+    }
+
+    @Transactional
+    public void syncLinkedPassword(UUID userUid, PasswordService.PasswordHash password) {
+        repository.findForUpdateByUserUid(userUid).ifPresent(account -> {
+            account.replacePassword(password.hash(), password.salt(), password.algorithm(), password.iterations());
+            resign(account);
+            repository.saveAndFlush(account);
+        });
+    }
+
     private AdminAccountResponse initializeAndMap(AdminUser user) {
         if (user.getIntegrityHash() == null || user.getIntegrityHash().isBlank()) {
             resign(user);

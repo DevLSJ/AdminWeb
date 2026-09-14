@@ -23,6 +23,7 @@ import com.ineb.dguard_kms.crypto.IntegrityService;
 import com.ineb.dguard_kms.domain.audit.service.AuditLogService;
 import com.ineb.dguard_kms.domain.auth.entity.AdminUser;
 import com.ineb.dguard_kms.domain.auth.repository.AdminUserRepository;
+import com.ineb.dguard_kms.domain.auth.service.AdminAccountService;
 import com.ineb.dguard_kms.domain.user.dto.UserCreateRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPasswordResetRequest;
 import com.ineb.dguard_kms.domain.user.dto.UserPlainResponse;
@@ -47,6 +48,7 @@ public class AppUserService {
     private final PasswordService passwordService;
     private final AuditLogService auditLogService;
     private final AdminUserRepository adminUserRepository;
+    private final AdminAccountService adminAccountService;
 
     public AppUserService(
             AppUserRepository repository,
@@ -54,7 +56,8 @@ public class AppUserService {
             IntegrityService integrityService,
             PasswordService passwordService,
             AuditLogService auditLogService,
-            AdminUserRepository adminUserRepository
+            AdminUserRepository adminUserRepository,
+            AdminAccountService adminAccountService
     ) {
         this.repository = repository;
         this.cryptoUtil = cryptoUtil;
@@ -62,6 +65,7 @@ public class AppUserService {
         this.passwordService = passwordService;
         this.auditLogService = auditLogService;
         this.adminUserRepository = adminUserRepository;
+        this.adminAccountService = adminAccountService;
     }
 
     @Transactional(readOnly = true)
@@ -175,6 +179,7 @@ public class AppUserService {
             user.upgradeIntegrityVersion();
             user.updateIntegrityHash(calculateIntegrity(user));
             saveWithUniqueConstraintHandling(user);
+            adminAccountService.syncLinkedUser(userUid, normalized.name(), role, user.getStatus());
             auditLogService.append(actor, "USER_UPDATE", "APP_USER", userUid.toString(),
                     "개인정보 재암호화 및 검색·무결성 HMAC 갱신");
             return UserResponse.from(user, true);
@@ -195,6 +200,7 @@ public class AppUserService {
         user.upgradeIntegrityVersion();
         user.updateIntegrityHash(calculateIntegrity(user));
         repository.saveAndFlush(user);
+        adminAccountService.syncLinkedUser(userUid, decrypt(user.getNameCiphertext(), user.getNameIv()), user.getRole(), status);
         auditLogService.append(actor, "USER_STATUS_CHANGE", "APP_USER", userUid.toString(),
                 "사용자 상태 변경: " + status);
         return response(user);
@@ -210,6 +216,7 @@ public class AppUserService {
         user.upgradeIntegrityVersion();
         user.updateIntegrityHash(calculateIntegrity(user));
         repository.saveAndFlush(user);
+        adminAccountService.syncLinkedPassword(userUid, password);
         auditLogService.append(actor, "USER_PASSWORD_RESET", "APP_USER", userUid.toString(),
                 "PBKDF2 비밀번호 재설정");
     }
@@ -232,6 +239,9 @@ public class AppUserService {
         return repository.findByUserUid(userUid)
                 .orElseThrow(() -> UserOperationException.notFound(userUid));
     }
+
+    @Transactional(readOnly = true)
+    public boolean exists(UUID userUid) { return repository.existsByUserUid(userUid); }
 
     private AppUser findForUpdate(UUID userUid) {
         return repository.findForUpdateByUserUid(userUid)

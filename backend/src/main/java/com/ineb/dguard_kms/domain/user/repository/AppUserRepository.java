@@ -17,6 +17,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
 
     Optional<AppUser> findByUserUid(UUID userUid);
 
+    boolean existsByUserUid(UUID userUid);
+
     boolean existsByPhoneSearchHash(String phoneSearchHash);
 
     boolean existsByEmailSearchHash(String emailSearchHash);

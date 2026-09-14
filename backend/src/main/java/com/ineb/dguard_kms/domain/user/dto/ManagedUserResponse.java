@@ -42,4 +42,14 @@ public record ManagedUserResponse(
                 user.role(), user.status(), user.integrityValid(), user.createdAt(), user.updatedAt(), null
         );
     }
+
+    public static ManagedUserResponse from(UserResponse user, AdminAccountResponse loginAccount) {
+        if (loginAccount == null) return from(user);
+        return new ManagedUserResponse(
+                0,
+                "APP_USER", user.userUid(), loginAccount.loginId(), user.nameMasked(), user.phoneMasked(), user.emailMasked(),
+                user.role(), user.status(), user.integrityValid() && loginAccount.integrityValid(), user.createdAt(),
+                user.updatedAt(), loginAccount.lastLoginAt()
+        );
+    }
 }
